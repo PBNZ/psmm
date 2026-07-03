@@ -90,6 +90,31 @@ at import time would tax every shell start; deferring the *dot-sourcing itself*
 keeps `Import-Module psmm` lean (startup is sacred, PRD §7). Tests can force
 UI parsing via the internal loader to reach UI functions.
 
+## D-UI-ARCH — Drive Spectre.Console LiveDisplay directly; no globals, no GetNewClosure
+
+The original profile block ran its render loops through PwshSpectreConsole's
+`Invoke-SpectreLive`, which executes the loop scriptblock in *that* module's
+context — forcing all shared UI state into `$global:PSMM_*` variables and
+`GetNewClosure()` local-capture workarounds (the code carried warning comments
+about both).
+
+**Verified empirically (2026-07-04):** a scriptblock authored inside a psmm
+module function converts cleanly to `Action[LiveDisplayContext]`, runs
+synchronously on the same thread via
+`[Spectre.Console.LiveDisplay]::new($console, $renderable).Start($delegate)`,
+and resolves **unexported module functions** and module script-scope state
+just fine. It also renders against a custom `IAnsiConsole` backed by a
+`StringWriter` (`Interactive = No`).
+
+**Decision:** psmm's UI drives Spectre.Console types directly for all live
+loops and hot render paths (the reference already did this for tables, for
+perf); UI state lives in module script scope; the render console is a module
+variable (`$script:PSMM_Console`) so tests can inject a StringWriter console
+and assert on rendered frames headlessly. PwshSpectreConsole cmdlets are still
+used where they're outside live loops and convenient (prompts, spinners,
+rules). Bonus: automated smoke tests of actual rendered UI frames, which the
+original architecture could not do.
+
 ## D-CONFIG — No schema changes in this build
 
 Existing `psmm-config.json` files work byte-for-byte unchanged. New features

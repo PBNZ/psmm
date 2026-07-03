@@ -1,0 +1,65 @@
+{
+  "Enabled": true,
+  "_legend": {
+    "About": "Microsoft 365 / Azure administrator set. Everything ships as Mode=Ignore - flip what you use to Load or InstallOnly.",
+    "Install": "CheckOnly | IfMissing (default) | Latest",
+    "Mode": "Load (default) | InstallOnly | Ignore"
+  },
+  "Modules": [
+    {
+      "Name": "Microsoft.Graph.Authentication",
+      "FriendlyName": "Microsoft Graph Authentication",
+      "Description": "Connect-MgGraph; shared by the v1.0 and beta Graph SDK",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Microsoft.Entra",
+      "FriendlyName": "Microsoft Entra PowerShell",
+      "Description": "Identity-focused, friendlier layer over the Graph SDK",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "ExchangeOnlineManagement",
+      "FriendlyName": "Exchange Online Management",
+      "Description": "Connect-ExchangeOnline; Exchange Online administration",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "MicrosoftTeams",
+      "Description": "Teams administration cmdlets",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "PnP.PowerShell",
+      "FriendlyName": "PnP PowerShell",
+      "Description": "Power tools for SharePoint Online / Microsoft 365",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Microsoft.Online.SharePoint.PowerShell",
+      "FriendlyName": "SharePoint Online",
+      "Description": "Official SPO admin shell",
+      "Install": "CheckOnly",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Az.Accounts",
+      "FriendlyName": "Azure PowerShell (accounts)",
+      "Description": "Connect-AzAccount; base for all Az.* modules - lighter than installing the full Az meta-module",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Microsoft.PowerShell.SecretManagement",
+      "FriendlyName": "Secret Management",
+      "Description": "Unified API for storing/retrieving secrets across vaults",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    }
+  ]
+}

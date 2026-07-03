@@ -1,0 +1,19 @@
+{
+  "Enabled": true,
+  "_legend": {
+    "Enabled": "true/false - false deactivates every module in this file",
+    "Includes": "main config only: absolute paths of further config files to load",
+    "Install": "CheckOnly | IfMissing (default) | Latest",
+    "Mode": "Load (default) | InstallOnly | Ignore",
+    "Version": "optional pin: exact \"1.2.3\" or NuGet range \"[1.0,2.0)\" - omit for latest"
+  },
+  "Modules": [
+    {
+      "Name": "ImportExcel",
+      "FriendlyName": "Import Excel",
+      "Description": "Read/write .xlsx without Excel installed - example entry, set Mode to Load/InstallOnly to activate",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    }
+  ]
+}

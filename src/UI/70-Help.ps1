@@ -1,0 +1,169 @@
+# 70-Help.ps1 — the real help system (#13, replaces the old placeholder):
+# per-screen topics, a full key reference, and the config guide, all in the
+# shared pager. '?' anywhere opens help for the current screen.
+
+function script:Get-PSMMHelpSection {
+    param([Parameter(Mandatory)][string]$Topic)
+    switch ($Topic) {
+        'grid' { @(
+            'MAIN SCREEN (module grid)'
+            '-------------------------'
+            'Every module your config files declare, one row each.'
+            ''
+            '  State    loaded (in this session) / installed (on disk) / missing /'
+            '           unmanaged (installed but in no config file - toggle with m)'
+            '  Scope    user (CurrentUser) / all (AllUsers) / mixed. "all ro" means'
+            '           the session is not elevated, so AllUsers copies are read-only.'
+            '  Ver      version loaded (or newest installed). ^ = update available'
+            '           (after a u check). pin = version pinned in the config.'
+            '  !        the entry has validation issues (c shows details).'
+            ''
+            '  space    select/deselect row (bulk actions target the selection,'
+            '           or just the cursor row when nothing is selected)'
+            '  enter    open the module action menu (right-arrow does the same;'
+            '           left-arrow backs out of any menu)'
+            '  Ctrl+L   load      Ctrl+U unload      Ctrl+P install/update (background)'
+            '  u        check the gallery for updates (background)'
+            '  a        add a new entry   g  search the PowerShell Gallery'
+            '  x        clean up duplicate module versions   t  background tasks'
+            '  m        show/hide unmanaged modules   f  config files   c  conflicts'
+            '  r        reload everything from disk'
+        ) }
+        'module' { @(
+            'MODULE MENU'
+            '-----------'
+            'Actions for one module. Only the actions that make sense for the row'
+            'are offered (e.g. no edit for read-only sources, no disconnect when'
+            'not signed in).'
+            ''
+            '  L/U/P    load / unload / install+update (foreground, with progress)'
+            '  B        browse the module''s commands with full help'
+            '  V        pin the entry to a version: exact "1.2.3" or a NuGet range'
+            '           like "[1.0,2.0)". Pinned modules are never nagged to update.'
+            '  K        remove all but the newest installed version'
+            '  I        check connection status (Connect-* modules: Graph, Az, EXO,'
+            '           PnP, Teams)   O  disconnect the active session'
+            '  A        (unmanaged modules) add to a config file'
+            '  E/D/M    edit fields / delete entry / move entry to another file'
+        ) }
+        'commands' { @(
+            'COMMAND BROWSER'
+            '---------------'
+            'All commands the module exports. / filters (same as everywhere);'
+            'enter opens tabbed help: Overview | Parameters | Examples,'
+            'left/right switches tab, up/down scrolls.'
+            'Tip: help is much richer once the module is imported.'
+        ) }
+        'files' { @(
+            'CONFIG FILES'
+            '------------'
+            'Every config source psmm found, in load order. space toggles a whole'
+            'file on/off (saved immediately - a applies the load/unload changes to'
+            'the running session). n creates a new config, blank or from a scenario'
+            'template. m moves a file and keeps it discoverable (Includes updated).'
+            ''
+            'A disabled file''s entries are kept in the file untouched - disabling'
+            'is how you park a whole module set ("work", "lab", ...).'
+        ) }
+        'gallery' { @(
+            'GALLERY SEARCH'
+            '--------------'
+            'Searches the PowerShell Gallery (read-only). Wildcards work: Az.*,'
+            'Microsoft.Graph*. enter adds the highlighted module to one of your'
+            'config files - pick install policy and mode, done. / starts a new'
+            'search.'
+        ) }
+        'cleanup' { @(
+            'VERSION CLEANUP'
+            '---------------'
+            'Update-Module and Update-PSResource never delete old versions - they'
+            'accumulate on disk forever. This screen lists every module with more'
+            'than one installed version; enter prunes one module to its newest'
+            'version, Shift+A prunes all. Without elevation, AllUsers copies are'
+            'skipped automatically.'
+        ) }
+        'tasks' { @(
+            'BACKGROUND TASKS'
+            '----------------'
+            'Everything psmm runs in the background lands here: install/update'
+            'batches (Ctrl+P), update checks (u), the unmanaged-module scan, and'
+            'Update-Help (start it with u on this screen). enter shows a task''s'
+            'full output. The grid keeps working while tasks run; a one-line'
+            'overlay shows progress.'
+        ) }
+        default { @() }
+    }
+}
+
+function script:Get-PSMMHelpText {
+    param([string]$Topic = 'grid')
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add('psmm - PowerShell Session Module Manager')
+    $lines.Add('========================================')
+    $lines.Add('')
+    foreach ($l in (Get-PSMMHelpSection -Topic $Topic)) { $lines.Add($l) }
+    $lines.Add('')
+    $lines.Add('KEYS THAT WORK EVERYWHERE')
+    $lines.Add('-------------------------')
+    $lines.Add('  up/down, PgUp/PgDn, Home/End   move / scroll')
+    $lines.Add('  /        search: type to filter, enter keeps it, esc clears it')
+    $lines.Add('  esc      back (clears an active filter first)')
+    $lines.Add('  ?        help for the current screen')
+    $lines.Add('  Ctrl+Q or Ctrl+X   quit psmm immediately, from anywhere')
+    $lines.Add('')
+    $lines.Add('  Every list shows "row X/n"; every action reports its progress in')
+    $lines.Add('  the status line - if nothing changed, the keypress did nothing.')
+    $lines.Add('')
+    $lines.Add('CONFIG - WHERE PSMM LOOKS (in load order)')
+    $lines.Add('-----------------------------------------')
+    $lines.Add('  1. inline JSON in $PSMM_InlineJson       (set in $PROFILE; read-only)')
+    $lines.Add("  2. MAIN config:    $(Get-PSMMMainConfigPath)")
+    $lines.Add('  3. files listed in the MAIN config''s "Includes" (one level, main only)')
+    $profileCfg = Get-PSMMProfileConfigPath
+    if ($profileCfg) { $lines.Add("  4. profile-dir:    $profileCfg") }
+    $lines.Add('  5. legacy globs in $PSMM_JsonPath (default: psmodules.d next to $PROFILE)')
+    $lines.Add('')
+    $lines.Add('CONFIG - FILE FORMAT (psmm-config.json)')
+    $lines.Add('---------------------------------------')
+    $lines.Add('  {')
+    $lines.Add('    "Enabled": true,          // false = file parsed but nothing actioned')
+    $lines.Add('    "Includes": ["C:\\path\\more.json"],   // MAIN config only')
+    $lines.Add('    "Modules": [')
+    $lines.Add('      {')
+    $lines.Add('        "Name": "ImportExcel",           // required: gallery name')
+    $lines.Add('        "FriendlyName": "Import Excel",  // optional display name')
+    $lines.Add('        "Description": "what/why",       // optional')
+    $lines.Add('        "Install": "IfMissing",          // CheckOnly | IfMissing | Latest')
+    $lines.Add('        "Mode": "Load",                  // Load | InstallOnly | Ignore')
+    $lines.Add('        "Version": "1.2.3"               // optional pin (or "[1.0,2.0)")')
+    $lines.Add('      }')
+    $lines.Add('    ]')
+    $lines.Add('  }')
+    $lines.Add('')
+    $lines.Add('  Install and Mode are independent: Mode decides load / install-only /')
+    $lines.Add('  ignore (and foreground vs background at startup); Install decides the')
+    $lines.Add('  disk/gallery policy (never install / install when missing / update).')
+    $lines.Add('')
+    $lines.Add('CONFIG - RULES')
+    $lines.Add('--------------')
+    $lines.Add('  - Only the MAIN config may include other files (one level deep, so')
+    $lines.Add('    circular references are impossible). Includes anywhere else are')
+    $lines.Add('    ignored with a warning.')
+    $lines.Add('  - Same module in several files: the MAIN config wins (warning);')
+    $lines.Add('    otherwise the first-loaded file wins (error-style warning).')
+    $lines.Add('  - "Enabled": false switches a whole file off without losing entries.')
+    $lines.Add('')
+    $lines.Add('STARTUP - $PROFILE bootstrap')
+    $lines.Add('----------------------------')
+    $lines.Add('  Import-Module psmm; Invoke-PSMMStartup')
+    $lines.Add('')
+    $lines.Add('  Knobs (set before Import-Module): $PSMM_StartupReport = $false,')
+    $lines.Add('  $PSMM_BackgroundStartup = $false, $PSMM_InlineJson, $PSMM_JsonPath.')
+    $lines
+}
+
+function script:Show-PSMMHelpScreen {
+    param([string]$Topic = 'grid')
+    $lines = Get-PSMMHelpText -Topic $Topic
+    Show-PSMMPager -Lines $lines -TitleMarkup "[$script:PSMM_ColAccent]Help[/]"
+}

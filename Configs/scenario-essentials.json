@@ -1,0 +1,37 @@
+{
+  "Enabled": true,
+  "_legend": {
+    "About": "A small quality-of-life set for any PowerShell user. Everything ships as Mode=Ignore - flip what you use to Load or InstallOnly.",
+    "Install": "CheckOnly | IfMissing (default) | Latest",
+    "Mode": "Load (default) | InstallOnly | Ignore"
+  },
+  "Modules": [
+    {
+      "Name": "Terminal-Icons",
+      "FriendlyName": "Terminal Icons",
+      "Description": "File and folder glyphs in directory listings",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "PSReadLine",
+      "Description": "Command-line editing, history search, predictions (usually pre-installed; CheckOnly keeps psmm from touching it)",
+      "Install": "CheckOnly",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Microsoft.PowerShell.ConsoleGuiTools",
+      "FriendlyName": "Out-ConsoleGridView",
+      "Description": "Interactive grid view in the terminal",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "ImportExcel",
+      "FriendlyName": "Import Excel",
+      "Description": "Read/write .xlsx without Excel installed",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    }
+  ]
+}

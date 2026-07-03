@@ -18,6 +18,9 @@ $psmmEngineFiles = @(
     'src/Engine/State.ps1'
     'src/Engine/Conflict.ps1'
     'src/Engine/Startup.ps1'
+    'src/Engine/Tasks.ps1'
+    'src/Engine/Auth.ps1'
+    'src/Engine/Gallery.ps1'
 )
 $psmmPublicFiles = @(
     'src/Public/Invoke-PSMMStartup.ps1'

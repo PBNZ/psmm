@@ -1,0 +1,48 @@
+{
+  "Enabled": true,
+  "_legend": {
+    "About": "PowerShell developer set. Everything ships as Mode=Ignore - flip what you use to Load or InstallOnly.",
+    "Install": "CheckOnly | IfMissing (default) | Latest",
+    "Mode": "Load (default) | InstallOnly | Ignore"
+  },
+  "Modules": [
+    {
+      "Name": "Pester",
+      "Description": "The PowerShell testing framework",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "PSScriptAnalyzer",
+      "Description": "Linter / static analysis for PowerShell",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "platyPS",
+      "Description": "Generate external module help from markdown",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "posh-git",
+      "Description": "Git status in your prompt + tab completion",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Terminal-Icons",
+      "FriendlyName": "Terminal Icons",
+      "Description": "File and folder glyphs in directory listings",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "ImportExcel",
+      "FriendlyName": "Import Excel",
+      "Description": "Read/write .xlsx without Excel installed",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    }
+  ]
+}
