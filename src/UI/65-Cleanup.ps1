@@ -1,4 +1,4 @@
-# 65-Cleanup.ps1 — duplicate-version cleanup across ALL installed modules:
+﻿# 65-Cleanup.ps1 — duplicate-version cleanup across ALL installed modules:
 # Update-Module/-PSResource never remove old versions, so they pile up (the
 # single most-requested module-management fix in the research for #36/#37).
 

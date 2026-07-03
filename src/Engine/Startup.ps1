@@ -1,4 +1,4 @@
-# Startup.ps1 — engine half of the startup loader: the deferred background
+﻿# Startup.ps1 — engine half of the startup loader: the deferred background
 # job and startup-job state. The exported entry point is
 # src/Public/Invoke-PSMMStartup.ps1.
 
@@ -9,6 +9,8 @@ function Get-PSMMStartupJobTotal { $script:PSMM_JobTotal }
 # The job re-implements the minimal install logic because module functions
 # are not visible inside a ThreadJob's session.
 function Start-PSMMDeferredJob {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseUsingScopeModifierInNewRunspaces', '',
+        Justification = '$mods is a scriptblock param supplied via -ArgumentList; $m is its foreach variable. The rule cannot see param bindings.')]
     [CmdletBinding()]
     param([Parameter(Mandatory)] $Entries)
     $payload = @($Entries | ForEach-Object {

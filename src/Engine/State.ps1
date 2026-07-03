@@ -1,4 +1,4 @@
-# State.ps1 — refresh entry state from the live session and the disk.
+﻿# State.ps1 — refresh entry state from the live session and the disk.
 
 # Cheap: in-session loaded modules only (no disk scan).
 function Update-PSMMLoaded {

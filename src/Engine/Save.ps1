@@ -1,4 +1,4 @@
-# Save.ps1 — write config files back to disk without losing anything.
+﻿# Save.ps1 — write config files back to disk without losing anything.
 
 # Can we write to this path (or create it in its directory)?
 function Test-PSMMWritable {

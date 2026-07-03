@@ -1,4 +1,4 @@
-# 50-Files.ps1 — config-file manager: list files, toggle Enabled, apply to
+﻿# 50-Files.ps1 — config-file manager: list files, toggle Enabled, apply to
 # session, create (from scenario templates, #29), move, Includes wiring.
 
 function script:Build-PSMMFilesView {

@@ -1,4 +1,4 @@
-# 80-Manager.ps1 — the top-level manager loop Show-PSModuleManager runs.
+﻿# 80-Manager.ps1 — the top-level manager loop Show-PSModuleManager runs.
 
 function script:Invoke-PSMMManagerLoop {
     [CmdletBinding()] param()

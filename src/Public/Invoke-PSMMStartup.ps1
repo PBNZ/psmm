@@ -1,4 +1,4 @@
-function Invoke-PSMMStartup {
+﻿function Invoke-PSMMStartup {
     <#
     .SYNOPSIS
     Runs the psmm startup loader: installs and imports the modules your

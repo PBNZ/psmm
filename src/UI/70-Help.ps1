@@ -1,4 +1,4 @@
-# 70-Help.ps1 — the real help system (#13, replaces the old placeholder):
+﻿# 70-Help.ps1 — the real help system (#13, replaces the old placeholder):
 # per-screen topics, a full key reference, and the config guide, all in the
 # shared pager. '?' anywhere opens help for the current screen.
 

@@ -1,4 +1,4 @@
-# 02-List.ps1 — the shared list/navigation/filter machinery every screen
+﻿# 02-List.ps1 — the shared list/navigation/filter machinery every screen
 # uses, so navigation feels identical everywhere (#22).
 #
 # A list state is a hashtable: @{ Cursor; Top; Filter; FilterMode }.
@@ -149,6 +149,8 @@ function script:Invoke-PSMMPagerNav {
 
 # Full-screen interactive pager over prepared lines.
 function script:Show-PSMMPager {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '',
+        Justification = 'Lines and TitleMarkup are used inside the live-loop scriptblock; the rule cannot see into it.')]
     param(
         [Parameter(Mandatory)][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup

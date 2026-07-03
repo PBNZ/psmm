@@ -1,4 +1,4 @@
-# 40-Conflicts.ps1 — validation issues, duplicate names, command shadowing.
+﻿# 40-Conflicts.ps1 — validation issues, duplicate names, command shadowing.
 # Rendered to text and paged (the alt screen has no scrollback).
 
 function script:Build-PSMMConflictLines {

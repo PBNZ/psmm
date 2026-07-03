@@ -1,4 +1,4 @@
-# Entry.ps1 — raw JSON → validated module entry, and file-level parsing.
+﻿# Entry.ps1 — raw JSON → validated module entry, and file-level parsing.
 
 # Normalise one raw module entry into the rich object the rest of psmm uses.
 # Invalid Install/Mode values degrade to the defaults with an issue recorded —

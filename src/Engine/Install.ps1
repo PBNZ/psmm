@@ -1,4 +1,4 @@
-# Install.ps1 — gallery operations: install, update, uninstall.
+﻿# Install.ps1 — gallery operations: install, update, uninstall.
 # Microsoft.PowerShell.PSResourceGet is the primary engine with a
 # PowerShellGet fallback (older machines). Read-only lookups live in State.ps1.
 

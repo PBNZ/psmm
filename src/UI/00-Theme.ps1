@@ -1,4 +1,4 @@
-# 00-Theme.ps1 — palette, markup helpers, console plumbing, alternate screen.
+﻿# 00-Theme.ps1 — palette, markup helpers, console plumbing, alternate screen.
 #
 # Palette (unchanged from the original psmm - part of the look to preserve):
 #   key    = keyboard shortcuts (purple-ish)
@@ -51,6 +51,9 @@ function script:Invoke-PSMMLive {
 # output is redirected (tests, CI).
 
 function script:Enter-PSMMAltScreen {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'Raw VT escape for the alternate screen buffer must bypass any host/stream formatting.')]
+    param()
     try {
         if (-not [Console]::IsOutputRedirected) {
             [Console]::Write("$([char]27)[?1049h$([char]27)[H")
@@ -60,6 +63,9 @@ function script:Enter-PSMMAltScreen {
 }
 
 function script:Exit-PSMMAltScreen {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'Raw VT escape for the alternate screen buffer must bypass any host/stream formatting.')]
+    param()
     try {
         if ($script:PSMM_AltScreenActive) {
             [Console]::Write("$([char]27)[?1049l")

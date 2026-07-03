@@ -1,4 +1,4 @@
-# Startup loader semantics: the orthogonal Mode x Install matrix, the
+﻿# Startup loader semantics: the orthogonal Mode x Install matrix, the
 # foreground/background split, and failure resilience. All disk/gallery
 # operations are mocked — nothing is really installed or imported.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }

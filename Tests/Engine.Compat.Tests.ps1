@@ -1,4 +1,4 @@
-# Backward compatibility: Peter's existing psmm-config.json files must keep
+﻿# Backward compatibility: Peter's existing psmm-config.json files must keep
 # working, byte-for-byte, without migration.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 

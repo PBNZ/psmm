@@ -1,4 +1,4 @@
-# 20-Submenu.ps1 — per-module actions: details, load/unload/install, version
+﻿# 20-Submenu.ps1 — per-module actions: details, load/unload/install, version
 # pinning, duplicate cleanup, auth status/disconnect (#32), add-unmanaged
 # (#27), edit/delete/move, command browsing.
 
@@ -81,7 +81,6 @@ function script:Show-PSMMModuleMenu {
 
         $k = [Console]::ReadKey($true)
         if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
-        $ctrl = ($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0
         switch ($k.Key) {
             ([ConsoleKey]::L) {
                 Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"

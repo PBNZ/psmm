@@ -1,4 +1,4 @@
-# psmm root module.
+﻿# psmm root module.
 #
 # Import stays cheap by design (fast startup is the whole point): only the
 # engine and the public entry points are parsed here. The interactive UI

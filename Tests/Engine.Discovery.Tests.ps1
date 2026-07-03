@@ -1,4 +1,4 @@
-# Multi-source discovery, precedence and conflict warnings.
+﻿# Multi-source discovery, precedence and conflict warnings.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {
@@ -39,7 +39,7 @@ Describe 'Get-PSMMEntry discovery' -Tag Engine {
     }
 
     It 'main config wins a conflict against a later file, with a warning' {
-        $root = Set-TestConfigRoot
+        $null = Set-TestConfigRoot
         Write-Cfg $global:PSMM_MainConfigPath @{ Modules = @(@{ Name = 'Dup'; Description = 'from main' }) }
         Write-Cfg $global:PSMM_ProfileConfigPath @{ Modules = @(@{ Name = 'Dup'; Description = 'from profile' }) }
 
@@ -50,7 +50,7 @@ Describe 'Get-PSMMEntry discovery' -Tag Engine {
     }
 
     It 'main config wins a conflict against an EARLIER source (inline), replacing in place' {
-        $root = Set-TestConfigRoot
+        $null = Set-TestConfigRoot
         $global:PSMM_InlineJson = '{"Modules":[{"Name":"Dup","Description":"from inline"}]}'
         Write-Cfg $global:PSMM_MainConfigPath @{ Modules = @(@{ Name = 'Dup'; Description = 'from main' }) }
 
@@ -70,7 +70,7 @@ Describe 'Get-PSMMEntry discovery' -Tag Engine {
     }
 
     It 'a disabled file is parsed but contributes no active entries' {
-        $root = Set-TestConfigRoot
+        $null = Set-TestConfigRoot
         Write-Cfg $global:PSMM_ProfileConfigPath @{ Enabled = $false; Modules = @(@{ Name = 'OffMod' }) }
 
         $active = InModuleScope psmm { Get-PSMMEntry }
@@ -122,7 +122,7 @@ Describe 'Get-PSMMEntry discovery' -Tag Engine {
     }
 
     It 'never loads the same file twice (main also listed as its own include)' {
-        $root = Set-TestConfigRoot
+        $null = Set-TestConfigRoot
         Write-Cfg $global:PSMM_MainConfigPath @{ Includes = @($global:PSMM_MainConfigPath); Modules = @(@{ Name = 'Once' }) }
 
         $active = InModuleScope psmm { Get-PSMMEntry }
@@ -130,7 +130,7 @@ Describe 'Get-PSMMEntry discovery' -Tag Engine {
     }
 
     It 'a broken JSON file produces a warning, not a crash, and other files still load' {
-        $root = Set-TestConfigRoot
+        $null = Set-TestConfigRoot
         Set-Content -LiteralPath $global:PSMM_MainConfigPath -Value '{not json' -Encoding utf8
         Write-Cfg $global:PSMM_ProfileConfigPath @{ Modules = @(@{ Name = 'Survivor' }) }
 

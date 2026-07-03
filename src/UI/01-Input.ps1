@@ -1,4 +1,4 @@
-# 01-Input.ps1 — key reading with resize + background-activity wake-ups.
+﻿# 01-Input.ps1 — key reading with resize + background-activity wake-ups.
 
 # Is this key the universal hard-quit chord (Ctrl+Q / Ctrl+X)?
 function script:Test-PSMMHardQuitKey {

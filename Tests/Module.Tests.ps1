@@ -1,4 +1,4 @@
-# Manifest, exports and import hygiene (PRD §13 "Module & manifest").
+﻿# Manifest, exports and import hygiene (PRD §13 "Module & manifest").
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {

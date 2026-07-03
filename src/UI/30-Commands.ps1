@@ -1,4 +1,4 @@
-# 30-Commands.ps1 — command browser + tabbed per-command help.
+﻿# 30-Commands.ps1 — command browser + tabbed per-command help.
 # Search here now matches every other screen: '/' enters filter mode, typing
 # outside filter mode does nothing (#19, #20, #21).
 

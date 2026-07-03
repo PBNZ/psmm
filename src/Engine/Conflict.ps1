@@ -1,4 +1,4 @@
-# Conflict.ps1 — validation issues, duplicate names, command shadowing.
+﻿# Conflict.ps1 — validation issues, duplicate names, command shadowing.
 
 function Get-PSMMConflict {
     [CmdletBinding()]

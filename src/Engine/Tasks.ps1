@@ -1,4 +1,4 @@
-# Tasks.ps1 — in-session background task registry (ThreadJob-based).
+﻿# Tasks.ps1 — in-session background task registry (ThreadJob-based).
 # Powers the UI's unobtrusive progress overlay (#25), the unmanaged-module
 # scan (#26), background Update-Help (#35) and any user-initiated long work.
 # No rendering here — the UI asks for summaries and draws them itself.

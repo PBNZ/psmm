@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-and-test-windows:
+    name: Lint + full tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tooling
+        shell: pwsh
+        run: |
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository
+          Install-PSResource -Name Pester -Scope CurrentUser -TrustRepository
+          Install-PSResource -Name PwshSpectreConsole -Scope CurrentUser -TrustRepository
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity Error, Warning
+          $results | Format-Table -AutoSize | Out-String | Write-Host
+          if (@($results).Count) { throw "PSScriptAnalyzer found $(@($results).Count) issue(s)" }
+
+      - name: Pester (full suite)
+        shell: pwsh
+        run: |
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = './Tests'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg
+
+  test-engine-linux:
+    name: Engine tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tooling
+        shell: pwsh
+        run: Install-PSResource -Name Pester -Scope CurrentUser -TrustRepository
+
+      - name: Pester (engine only - platform-neutral core)
+        shell: pwsh
+        run: |
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = './Tests'
+          $cfg.Filter.Tag = 'Engine'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg

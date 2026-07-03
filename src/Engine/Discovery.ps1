@@ -1,4 +1,4 @@
-# Discovery.ps1 — build the module-entry lists from every config source.
+﻿# Discovery.ps1 — build the module-entry lists from every config source.
 #
 # Sources, in load order (precedence rules below):
 #   1. inline JSON in $PSMM_InlineJson            (read-only)

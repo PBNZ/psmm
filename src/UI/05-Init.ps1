@@ -1,8 +1,10 @@
-# 05-Init.ps1 — lazy UI bootstrap: dependency, console, UI state.
+﻿# 05-Init.ps1 — lazy UI bootstrap: dependency, console, UI state.
 
 # Ensure PwshSpectreConsole (ships the Spectre.Console assembly) is loaded,
 # offering to install it on first use. NEVER runs at profile import.
 function script:Initialize-PSMMUI {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'First-use install prompt is interactive host output by design (mirrors the original block).')]
     [CmdletBinding()] param()
     if (-not ('Spectre.Console.AnsiConsole' -as [type])) {
         if (Get-Module -ListAvailable -Name PwshSpectreConsole) {

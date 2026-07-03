@@ -1,4 +1,4 @@
-# Gallery.ps1 — read-only PowerShell Gallery search (#38) and update checks.
+﻿# Gallery.ps1 — read-only PowerShell Gallery search (#38) and update checks.
 
 # Search the gallery by name pattern. Wildcards are added around the query
 # unless the caller already supplied any. Returns lightweight result objects.

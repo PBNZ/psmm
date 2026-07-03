@@ -1,4 +1,4 @@
-# Entry resolution + file-level JSON parsing.
+﻿# Entry resolution + file-level JSON parsing.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {

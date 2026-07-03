@@ -1,4 +1,4 @@
-# 60-Gallery.ps1 — search & browse the PowerShell Gallery from the UI (#38);
+﻿# 60-Gallery.ps1 — search & browse the PowerShell Gallery from the UI (#38);
 # Enter adds a result straight into a config file.
 
 function script:Build-PSMMGalleryView {

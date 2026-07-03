@@ -1,4 +1,4 @@
-# 10-Grid.ps1 — the main module grid: the psmm home screen.
+﻿# 10-Grid.ps1 — the main module grid: the psmm home screen.
 # Direct Spectre.Console construction in the hot path (~1-2 ms/frame; the
 # cmdlet wrappers cost ~60 ms/call - unacceptable per keypress).
 

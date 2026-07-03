@@ -1,4 +1,4 @@
-function Get-PSMMConfigPath {
+﻿function Get-PSMMConfigPath {
     <#
     .SYNOPSIS
     Shows every location psmm looks for config files, in load order, and

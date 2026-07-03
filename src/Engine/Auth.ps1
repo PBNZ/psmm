@@ -1,4 +1,4 @@
-# Auth.ps1 — connection status + disconnect for Connect-* style modules (#32).
+﻿# Auth.ps1 — connection status + disconnect for Connect-* style modules (#32).
 # Everything here is on-demand and read-only except Disconnect-PSMMModule,
 # which only ever runs on an explicit user keypress. Unknown modules and any
 # provider error degrade to "unknown" — never an exception into the UI.

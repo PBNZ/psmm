@@ -1,4 +1,4 @@
-function Show-PSModuleManager {
+﻿function Show-PSModuleManager {
     <#
     .SYNOPSIS
     Opens the interactive psmm terminal UI (alias: psmm).

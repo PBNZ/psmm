@@ -1,4 +1,4 @@
-# Save round-trip: nothing is ever silently dropped or reshaped.
+﻿# Save round-trip: nothing is ever silently dropped or reshaped.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {

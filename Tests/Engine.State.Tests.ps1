@@ -1,4 +1,4 @@
-# Session/disk state refresh, scope classification, duplicates, unmanaged.
+﻿# Session/disk state refresh, scope classification, duplicates, unmanaged.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {

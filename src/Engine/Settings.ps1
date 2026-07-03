@@ -1,4 +1,4 @@
-# Settings.ps1 — user-tunable knobs and config-file locations.
+﻿# Settings.ps1 — user-tunable knobs and config-file locations.
 #
 # All knobs are plain GLOBAL variables the user may set in $PROFILE *before*
 # Import-Module psmm — the same contract the original profile block used:
@@ -32,6 +32,8 @@ function Get-PSMMMainConfigPath {
 }
 
 function Get-PSMMProfileConfigPath {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '',
+        Justification = 'Reading $global:PROFILE is the point: config discovery is anchored to the user profile directory.')]
     [CmdletBinding()] param()
     $override = Get-PSMMSetting -Name 'PSMM_ProfileConfigPath'
     if ($override) { return [string]$override }
@@ -42,6 +44,8 @@ function Get-PSMMProfileConfigPath {
 }
 
 function Get-PSMMLegacyGlobs {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '',
+        Justification = 'Reading $global:PROFILE is the point: the legacy glob default lives next to the user profile.')]
     [CmdletBinding()] param()
     $globs = Get-PSMMSetting -Name 'PSMM_JsonPath'
     if ($null -ne $globs) { return @($globs) }

@@ -1,4 +1,4 @@
-@{
+﻿@{
     RootModule           = 'psmm.psm1'
     ModuleVersion        = '0.1.0'
     GUID                 = 'ed4c75e5-4d5b-43b1-a0ed-3c46fe4bcdee'

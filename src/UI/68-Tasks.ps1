@@ -1,4 +1,4 @@
-# 68-Tasks.ps1 — background-task screen (#25) + the completion handler the
+﻿# 68-Tasks.ps1 — background-task screen (#25) + the completion handler the
 # grid loop calls, + background Update-Help (#35).
 
 # React to freshly finished tasks: refresh state, surface a status line.
