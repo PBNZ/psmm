@@ -86,6 +86,19 @@ Describe 'Legacy config compatibility' -Tag Engine {
         }
     }
 
+    It 'the REAL pre-module 17-entry config loads unchanged with zero warnings' {
+        # Tests/fixtures/legacy-real-config.json is the verbatim example
+        # config from the original $PROFILE-block era.
+        Copy-Item (Join-Path $PSScriptRoot 'fixtures' 'legacy-real-config.json') $global:PSMM_MainConfigPath -Force
+        $active = InModuleScope psmm { Get-PSMMEntry }
+        @($active).Count | Should -Be 17
+        (InModuleScope psmm { Get-PSMMWarning }) | Should -BeNullOrEmpty
+        @($active | Where-Object { $_.Issues.Count }) | Should -BeNullOrEmpty
+        ($active | Where-Object Name -eq 'Wsl').Mode | Should -Be 'Load'
+        ($active | Where-Object Name -eq 'Microsoft.Online.SharePoint.PowerShell').Install | Should -Be 'CheckOnly'
+        ($active | Where-Object Name -eq 'Az').Mode | Should -Be 'Ignore'
+    }
+
     It 'a legacy file survives a save round-trip with its legend intact' {
         $null = InModuleScope psmm { Get-PSMMEntry }
         InModuleScope psmm { Save-PSMMFile -Path (Get-PSMMMainConfigPath) -Entries (Get-PSMMAllEntries) }
