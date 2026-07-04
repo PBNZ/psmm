@@ -190,18 +190,28 @@ function script:Set-PSMMEntryPin {
     $true
 }
 
+# Writable targets for adding an entry; when none exist, offer to create the
+# main config on the spot (2026-07-05 live-run feedback) instead of a dead
+# end. Save-PSMMFile creates the file itself - only the directory must exist.
+function script:Get-PSMMAddTargets {
+    $meta = Get-PSMMFileMeta
+    $targets = @($meta.Values | Where-Object { $_.Writable -and $_.Kind -ne 'inline' } | Select-Object -ExpandProperty Path)
+    if ($targets.Count) { return $targets }
+    $main = Get-PSMMMainConfigPath
+    Write-PSMMLine '[yellow]No writable config file yet.[/]'
+    if (-not (Read-SpectreConfirm -Message "Create $(ConvertTo-PSMMSafe $main) now?" -DefaultAnswer 'y')) { return @() }
+    $dir = Split-Path -Parent $main
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    @($main)
+}
+
 # Add an unmanaged module to a writable config file (#27).
 function script:Add-PSMMUnmanagedEntry {
     param([Parameter(Mandatory)] $Entry)
-    $meta = Get-PSMMFileMeta
-    $targets = @($meta.Values | Where-Object { $_.Writable -and $_.Kind -ne 'inline' } | Select-Object -ExpandProperty Path)
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Add $(ConvertTo-PSMMSafe $Entry.Name) to a config file[/]"
-    if (-not $targets.Count) {
-        Write-PSMMLine '[yellow]No writable config file. Create one first: f (files) -> n (new).[/]'
-        $null = Wait-PSMMKey
-        return $false
-    }
+    $targets = @(Get-PSMMAddTargets)
+    if (-not $targets.Count) { return $false }
     $target = if ($targets.Count -eq 1) { $targets[0] } else { Read-SpectreSelection -Message 'Add to which file?' -Choices $targets -Color $script:PSMM_ColAccent }
     if (-not $target) { return $false }
     $install = Read-SpectreSelection -Message 'Install policy' -Choices 'IfMissing', 'CheckOnly', 'Latest' -Color $script:PSMM_ColAccent
@@ -238,13 +248,8 @@ function script:Edit-PSMMEntry {
 function script:New-PSMMEntry {
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]New entry[/]"
-    $meta = Get-PSMMFileMeta
-    $targets = @($meta.Values | Where-Object { $_.Writable -and $_.Kind -ne 'inline' } | Select-Object -ExpandProperty Path)
-    if (-not $targets.Count) {
-        Write-PSMMLine '[yellow]No writable JSON file to add to. Create one via f (files) -> n (new).[/]'
-        $null = Wait-PSMMKey
-        return
-    }
+    $targets = @(Get-PSMMAddTargets)
+    if (-not $targets.Count) { $script:PSMM_UI.Status = '[grey]add cancelled - no config file[/]'; return }
     $target = if ($targets.Count -eq 1) { $targets[0] } else { Read-SpectreSelection -Message 'Add to which file?' -Choices $targets -Color $script:PSMM_ColAccent }
     $name = Read-SpectreText -Message 'Module name'
     if ([string]::IsNullOrWhiteSpace($name)) { return }

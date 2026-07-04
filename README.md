@@ -42,9 +42,11 @@ Import-Module psmm
 Invoke-PSMMStartup
 ```
 
-**2. Create a config.** Run `psmm`, press `f` (files), then `n` (new) — pick
-the main config location (`~/.psmm/psmm-config.json`) and start blank or from
-a scenario template. Or just write the JSON yourself:
+**2. Get a config.** The first `psmm` run creates
+`~/.psmm/psmm-config.json` for you if no config exists anywhere (seeded with
+PwshSpectreConsole, psmm's own UI engine, as a managed entry). To start from
+a scenario template instead, press `f` (files) then `n` (new). Or just write
+the JSON yourself:
 
 ```json
 {

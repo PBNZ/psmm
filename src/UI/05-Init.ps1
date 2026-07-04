@@ -25,6 +25,33 @@ function script:Initialize-PSMMUI {
     $true
 }
 
+# First manager run with no config file anywhere: create the main config,
+# seeded with psmm's own UI dependency as a managed entry (2026-07-05
+# feedback). Mode InstallOnly keeps profile startup import-free - psmm loads
+# Spectre lazily itself. Only the TUI does this, never Invoke-PSMMStartup:
+# profile import must not write files.
+function script:Initialize-PSMMMainConfig {
+    [CmdletBinding()] param()
+    $null = Get-PSMMEntry   # (re)build file metadata before inspecting it
+    if (@((Get-PSMMFileMeta).Values | Where-Object { $_.Kind -ne 'inline' }).Count) { return }
+    $main = Get-PSMMMainConfigPath
+    if (Test-Path -LiteralPath $main) { return }
+    try {
+        $dir = Split-Path -Parent $main
+        if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        ([ordered]@{
+            Includes = @()
+            Modules  = @([ordered]@{
+                Name        = 'PwshSpectreConsole'
+                Description = 'TUI engine used by psmm itself'
+                Install     = 'IfMissing'
+                Mode        = 'InstallOnly'
+            })
+        } | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $main -Encoding utf8
+        $script:PSMM_UI.Status = "[green]created $(ConvertTo-PSMMSafe $main) - psmm's UI dependency is managed there[/]"
+    } catch { }   # best-effort: the add flows still offer creation
+}
+
 # Fresh UI state for a manager session.
 function script:Initialize-PSMMUIState {
     [CmdletBinding()] param()
@@ -44,6 +71,7 @@ function script:Initialize-PSMMUIState {
         Elevated      = Test-PSMMElevated
         Engine        = Get-PSMMInstallEngine
     }
+    Initialize-PSMMMainConfig
     Sync-PSMMUIEntries -FullScan
 }
 

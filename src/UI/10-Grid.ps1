@@ -27,12 +27,12 @@ function script:Build-PSMMGrid {
     # name column width budget from window width (scope column costs ~6)
     $nameCap = [Math]::Max(14, $win.Width - 84)
 
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', 'Sel', 'Name', 'Src', 'Mode', 'Inst', 'Scope', 'State', 'Ver', '!') {
-        [void][Spectre.Console.TableExtensions]::AddColumn($T, $h)
-    }
-    for ($v = $vp.First; $v -le $vp.Last; $v++) {
+    # Build EVERY row of the filtered view (not just the viewport) so column
+    # widths come from ALL content: scrolling never resizes the table
+    # (2026-07-05 live-run feedback: width jitter). ponytail: O(rows) markup
+    # strip per frame - fine to a few hundred entries.
+    $rows = [System.Collections.Generic.List[string[]]]::new()
+    for ($v = 0; $v -lt $n; $v++) {
         $idx = $ui.View[$v]
         $e = $entries[$idx]
         $isCur = ($v -eq $ui.Cursor)
@@ -61,9 +61,33 @@ function script:Build-PSMMGrid {
         if ($e.PinnedExact) { $ver = "$ver [grey]pin[/]" }
         $cur = if ($isCur) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }
         $flag = if ($e.Issues.Count) { '[red]![/]' } else { ' ' }
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
+        $rows.Add([string[]]@(
                 $cur, $box, $name, "$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))$rw",
                 $e.Mode, $e.Install, $scope, $state, $ver, $flag))
+    }
+
+    $T = [Spectre.Console.Table]::new()
+    $T.Border = [Spectre.Console.TableBorder]::Rounded
+    $ci = 0
+    foreach ($h in ' ', 'Sel', 'Name', 'Src', 'Mode', 'Inst', 'Scope', 'State', 'Ver', '!') {
+        $w = $h.Length
+        foreach ($r in $rows) {
+            $len = [Spectre.Console.Markup]::Remove($r[$ci]).Length
+            if ($len -gt $w) { $w = $len }
+        }
+        $col = [Spectre.Console.TableColumn]::new($h)
+        $col.Width = $w
+        $col.NoWrap = $true
+        [void]$T.AddColumn($col)
+        $ci++
+    }
+    for ($v = $vp.First; $v -le $vp.Last; $v++) {
+        [void][Spectre.Console.TableExtensions]::AddRow($T, $rows[$v])
+    }
+    # pad very short lists with blank rows so a fresh one-entry grid doesn't
+    # look collapsed (2026-07-05 feedback)
+    for ($pad = $n; $pad -lt 5; $pad++) {
+        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]](@('') * 10))
     }
 
     $sel = $ui.Sel.Count

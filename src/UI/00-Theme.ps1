@@ -30,7 +30,11 @@ function script:Write-PSMMRenderable {
 }
 
 function script:Clear-PSMMScreen {
-    try { (Get-PSMMConsole).Clear() } catch { }
+    # MUST be Clear($true): IAnsiConsole's zero-arg Clear() is a C# extension
+    # method PowerShell cannot see, so .Clear() throws and the catch made every
+    # "clear" a silent no-op - sub-screens appended below the grid instead of
+    # replacing it (2026-07-05 live-run bug).
+    try { (Get-PSMMConsole).Clear($true) } catch { }
 }
 
 # Run a live display on the psmm console. $Body is param($ctx) { ... } and

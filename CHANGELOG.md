@@ -40,6 +40,11 @@ original `$PROFILE` drop-in block.
 - **Drill-in navigation**: right-arrow moves into a module / its commands;
   left-arrow backs out.
 - `Get-PSMMConfigPath` public helper listing all config locations.
+- **First-run bootstrap**: opening `psmm` with no config anywhere
+  auto-creates `~/.psmm/psmm-config.json`, seeded with PwshSpectreConsole
+  (psmm's own UI engine) as a managed InstallOnly entry. Add flows (`a`,
+  adopting an unmanaged module) offer to create the config on the spot if
+  none is writable.
 
 ### Changed
 - Packaged as the `psmm` module with an explicit public surface:
@@ -52,6 +57,9 @@ original `$PROFILE` drop-in block.
   shows a `row X/n` position indicator.
 - Update checks and bulk installs survive individual module failures and
   report a per-module summary.
+- Grid column widths come from ALL rows (not the visible window), so
+  scrolling never resizes the table; short lists are padded to five rows;
+  sub-screens repaint a clean page instead of appending below the grid.
 - The UI stack (Spectre.Console) now loads lazily on first `psmm` use only —
   profile import cost stays within a few tens of ms of the original block
   (measured; see NOTES.md).
