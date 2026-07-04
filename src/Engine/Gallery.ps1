@@ -42,7 +42,7 @@ function Get-PSMMGalleryLatest {
 # module reports pinned rather than update-available).
 function Update-PSMMLatestVersion {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $Entries)
+    param([AllowNull()][AllowEmptyCollection()] $Entries)   # empty set = normal (zero configs)
     $found = 0
     foreach ($e in @($Entries | Where-Object Installed)) {
         $latest = Get-PSMMGalleryLatest -Name $e.Name

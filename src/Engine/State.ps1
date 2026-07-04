@@ -1,9 +1,13 @@
 ﻿# State.ps1 — refresh entry state from the live session and the disk.
 
 # Cheap: in-session loaded modules only (no disk scan).
+# NB: $Entries params here allow null/empty - an empty entry set is a normal
+# state (fresh machine, zero configs), and PowerShell returns empty arrays
+# from functions as $null.
 function Update-PSMMLoaded {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $Entries)
+    param([AllowNull()][AllowEmptyCollection()] $Entries)
+    if (-not $Entries) { return }
     $loaded = @{}
     Get-Module -ErrorAction SilentlyContinue | ForEach-Object { $loaded[$_.Name] = $_.Version }
     foreach ($e in $Entries) {
@@ -18,9 +22,10 @@ function Update-PSMMLoaded {
 function Update-PSMMAvailable {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)] $Entries,
+        [AllowNull()][AllowEmptyCollection()] $Entries,
         [string[]]$Name
     )
+    if (-not $Entries) { return }
     $apply = {
         param($entry, $mods)   # $mods: Get-Module -ListAvailable results, one per version
         $sorted = @($mods | Sort-Object Version -Descending)

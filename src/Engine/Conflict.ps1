@@ -2,7 +2,8 @@
 
 function Get-PSMMConflict {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $Entries)
+    param([AllowNull()][AllowEmptyCollection()] $Entries)   # empty set = normal (zero configs)
+    $Entries = @($Entries)
 
     $validation = foreach ($e in $Entries) {
         if ($e.Issues.Count) {

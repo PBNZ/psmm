@@ -24,7 +24,7 @@ function Save-PSMMFile {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)] $Entries
+        [AllowNull()][AllowEmptyCollection()] $Entries   # empty set = normal (zero configs)
     )
     $meta    = $script:PSMM_FileMeta[$Path]
     $forFile = @($Entries | Where-Object Source -eq $Path)

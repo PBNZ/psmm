@@ -9,9 +9,10 @@ function script:Receive-PSMMUITask {
     foreach ($t in @(Get-PSMMTask | Where-Object { $_.Done -and -not $_.Seen })) {
         switch ($t.Kind) {
             'unmanagedscan' {
+                # no status line here: Build-PSMMGrid renders a standing
+                # notice for unshown unmanaged modules - a status too would
+                # print the same text twice
                 $ui.Unmanaged = @($t.Output)
-                $n = @($t.Output).Count
-                if ($n) { $ui.Status = "[$script:PSMM_ColMute]$n installed module(s) not in your config - m shows them[/]" }
             }
             'install' {
                 $names = @($t.Data)
