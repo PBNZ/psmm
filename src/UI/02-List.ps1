@@ -108,7 +108,9 @@ function script:Get-PSMMFilterMarkup {
 function script:Build-PSMMPagerView {
     param(
         [Parameter(Mandatory)] $State,
-        [Parameter(Mandatory)][string[]]$Lines,
+        # AllowEmptyString: Mandatory on [string[]] otherwise rejects the
+        # blank lines every text document contains
+        [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup,
         [string[]]$HintPairs = @('up/dn=scroll', 'esc=back', 'Ctrl+Q=quit'),
         [int]$ReservedRows = 7
@@ -152,7 +154,8 @@ function script:Show-PSMMPager {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '',
         Justification = 'Lines and TitleMarkup are used inside the live-loop scriptblock; the rule cannot see into it.')]
     param(
-        [Parameter(Mandatory)][string[]]$Lines,
+        # AllowEmptyString: see Build-PSMMPagerView
+        [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup
     )
     $st = @{ Scroll = 0 }
