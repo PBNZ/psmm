@@ -12,6 +12,14 @@ browsing with full help, connection status for `Connect-*` modules, config
 file management — all without leaving your shell, and without wiping your
 terminal scrollback.
 
+> [!IMPORTANT]
+> **Vibe-coded personal project.** psmm was designed and is reviewed by a
+> human, but largely written by an AI coding agent. Right now it exists for
+> personal use and for sharing with friends and colleagues. Anyone is
+> welcome to use it — but for the first few days and weeks, **issues and
+> feature requests are limited to contributors** while it settles. If that's
+> not you yet, feel free to fork; broader participation opens up soon.
+
 Requires **PowerShell 7.0+**. Windows-first (the engine is platform-neutral;
 non-Windows UI support is on the roadmap).
 

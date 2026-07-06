@@ -1,5 +1,5 @@
-﻿# Backward compatibility: Peter's existing psmm-config.json files must keep
-# working, byte-for-byte, without migration.
+﻿# Backward compatibility: existing psmm-config.json files from the original
+# $PROFILE-block era must keep working, byte-for-byte, without migration.
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {
@@ -86,9 +86,10 @@ Describe 'Legacy config compatibility' -Tag Engine {
         }
     }
 
-    It 'the REAL pre-module 17-entry config loads unchanged with zero warnings' {
-        # Tests/fixtures/legacy-real-config.json is the verbatim example
-        # config from the original $PROFILE-block era.
+    It 'a full-size 17-entry legacy config loads unchanged with zero warnings' {
+        # Tests/fixtures/legacy-real-config.json mirrors a real config from
+        # the original $PROFILE-block era field-for-field (module names
+        # swapped for generic ones).
         Copy-Item (Join-Path $PSScriptRoot 'fixtures' 'legacy-real-config.json') $global:PSMM_MainConfigPath -Force
         $active = InModuleScope psmm { Get-PSMMEntry }
         @($active).Count | Should -Be 17
