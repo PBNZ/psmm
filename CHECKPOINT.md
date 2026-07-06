@@ -1,6 +1,16 @@
 # CHECKPOINT — resume pointer
 
-**Last updated:** 2026-07-06 — **BUILD COMPLETE + public/prerelease-ready.**
+**Last updated:** 2026-07-06 — **PUBLIC at github.com/PBNZ/psmm, CI green.**
+
+## Published (2026-07-06)
+
+Repo created public (branch renamed master→main to match the manifest
+URIs) and pushed. Maiden CI run failed on one Windows test — root cause:
+Spectre.Console force-enables ANSI when GITHUB_ACTIONS=true, overriding
+AnsiSupport.No (verified with a local probe); fixed by stripping ANSI in
+ConvertTo-PSMMTextLines + the test helper, suite verified locally under
+GITHUB_ACTIONS=true. **CI run 2: both jobs green.** Remaining for Peter:
+PSGallery beta1 publish (checklist E) and the section-A eyeball pass.
 
 ## Public + prerelease prep (2026-07-06)
 
