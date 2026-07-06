@@ -3,7 +3,7 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [0.1.0] — Unreleased (private-testing candidate)
+## [0.1.0-beta1] — Unreleased (first public prerelease)
 
 First release as a proper module. Everything below is relative to the
 original `$PROFILE` drop-in block.

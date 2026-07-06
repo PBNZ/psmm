@@ -20,11 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            # Placeholder URIs — replace with the real repo URLs before publishing
-            # (tracked in RELEASE-CHECKLIST.md).
+            Prerelease   = 'beta1'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0 - first packaged release (private testing). See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta1 - first public prerelease. See CHANGELOG.md.'
         }
     }
 }

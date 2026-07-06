@@ -17,21 +17,23 @@ non-Windows UI support is on the roadmap).
 
 ## Install
 
-Once published to the PowerShell Gallery:
+psmm is currently in **prerelease** on the PowerShell Gallery — you have to
+ask for it explicitly:
 
 ```powershell
-Install-PSResource psmm          # or: Install-Module psmm
+Install-PSResource psmm -Prerelease            # PSResourceGet (PS 7.4+ built-in)
+# or: Install-Module psmm -AllowPrerelease     # legacy PowerShellGet
 ```
 
-Until then (private testing): get the repo or the `.nupkg` from Peter and
+Or run it straight from a clone:
 
 ```powershell
-# from a folder containing psmm.<version>.nupkg
-Register-PSResourceRepository -Name psmmLocal -Uri C:\path\to\folder -Trusted
-Install-PSResource psmm -Repository psmmLocal
-# or simply import straight from the repo checkout:
-Import-Module C:\path\to\psmm\psmm.psd1
+git clone https://github.com/PBNZ/psmm
+Import-Module .\psmm\psmm.psd1
 ```
+
+(Clone/copy the folder into `~\Documents\PowerShell\Modules\psmm` instead
+and plain `Import-Module psmm` plus autoloading work as if installed.)
 
 ## Quickstart
 
