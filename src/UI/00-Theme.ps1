@@ -95,7 +95,10 @@ function script:ConvertTo-PSMMTextLines {
     $console = [Spectre.Console.AnsiConsole]::Create($settings)
     $console.Profile.Width = (Get-PSMMWinSize).Width - 4
     $console.Write($Renderable)
-    ($sw.ToString() -split "`r?`n")
+    # Ansi=No is NOT always honoured: Spectre's environment detection (e.g.
+    # GITHUB_ACTIONS=true) force-enables ANSI over the explicit setting, and
+    # escape codes here would end up as literal garbage in the pager. Strip.
+    (($sw.ToString() -replace '\x1b\[[0-9;?]*[A-Za-z]', '') -split "`r?`n")
 }
 
 # --- small shared formatting helpers --------------------------------------

@@ -42,7 +42,10 @@ BeforeAll {
             try {
                 $r = & $build
                 $console.Write($r)
-                $sw.ToString()
+                # Spectre force-enables ANSI when it detects CI (GITHUB_ACTIONS)
+                # even though Ansi=No was requested - strip codes so the text
+                # assertions hold everywhere.
+                $sw.ToString() -replace '\x1b\[[0-9;?]*[A-Za-z]', ''
             } finally { Set-PSMMConsole -Console $null }
         }
     }
