@@ -1,0 +1,18 @@
+# local tooling (saved via Save-PSResource; not part of the module)
+.tools/
+
+# packaging output — throwaway artefacts, never committed
+*.nupkg
+out/
+publish/
+.localrepo/
+
+# test/coverage output
+testResults.xml
+coverage.xml
+__pycache__/
+*.pyc
+
+# editor noise
+.vscode/
+*.swp

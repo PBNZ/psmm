@@ -1,0 +1,125 @@
+{
+  "Enabled": true,
+  "Includes": [],
+  "_legend": {
+    "Enabled": "true/false - false deactivates every module in this file",
+    "Includes": "main config only: absolute paths of further config files to load",
+    "Install": "CheckOnly | IfMissing (default) | Latest",
+    "Mode": "Load (default) | InstallOnly | Ignore"
+  },
+  "Modules": [
+    {
+      "Name": "Wsl",
+      "FriendlyName": "WSL Management for PowerShell",
+      "Description": "Manage WSL distros from PowerShell - https://www.powershellgallery.com/packages/Wsl",
+      "Install": "IfMissing",
+      "Mode": "Load"
+    },
+    {
+      "Name": "Terminal-Icons",
+      "FriendlyName": "Terminal Icons",
+      "Description": "File and folder glyphs in the terminal - https://www.powershellgallery.com/packages/Terminal-Icons",
+      "Install": "IfMissing",
+      "Mode": "Load"
+    },
+    {
+      "Name": "PSScriptAnalyzer",
+      "Description": "Linter / static analysis for PowerShell - https://www.powershellgallery.com/packages/PSScriptAnalyzer",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Pester",
+      "Description": "Unit/integration testing framework for PowerShell - https://www.powershellgallery.com/packages/Pester",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "ImportExcel",
+      "Description": "Read/write .xlsx without Excel installed - https://www.powershellgallery.com/packages/ImportExcel",
+      "Install": "IfMissing",
+      "Mode": "InstallOnly"
+    },
+    {
+      "Name": "Microsoft.PowerShell.SecretManagement",
+      "FriendlyName": "Secret Management",
+      "Description": "Unified API for storing/retrieving secrets across vaults - https://www.powershellgallery.com/packages/Microsoft.PowerShell.SecretManagement",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Microsoft.PowerShell.SecretStore",
+      "FriendlyName": "Secret Store",
+      "Description": "Local encrypted vault backend for SecretManagement - https://www.powershellgallery.com/packages/Microsoft.PowerShell.SecretStore",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "posh-git",
+      "Description": "Git status in the prompt plus tab completion - https://www.powershellgallery.com/packages/posh-git",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "PSReadLine",
+      "FriendlyName": "PS ReadLine",
+      "Description": "Command-line editing, history and prediction - https://www.powershellgallery.com/packages/PSReadLine",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "platyPS",
+      "FriendlyName": "platyPS",
+      "Description": "Write PowerShell help in Markdown - https://www.powershellgallery.com/packages/platyPS",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Az",
+      "FriendlyName": "Azure PowerShell (Az)",
+      "Description": "Azure resource management (large; submodules auto-load) - https://www.powershellgallery.com/packages/Az",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "Microsoft.Graph.Authentication",
+      "FriendlyName": "Microsoft Graph Authentication",
+      "Description": "Graph auth (Connect-MgGraph), shared by v1.0 + beta SDK; use -AllowPrerelease for beta builds - https://www.powershellgallery.com/packages/Microsoft.Graph.Authentication",
+      "Install": "IfMissing",
+      "Mode": "InstallOnly"
+    },
+    {
+      "Name": "Plaster",
+      "FriendlyName": "Plaster",
+      "Description": "Template-based file and project scaffolding - https://www.powershellgallery.com/packages/Plaster",
+      "Install": "IfMissing",
+      "Mode": "Ignore"
+    },
+    {
+      "Name": "ExchangeOnlineManagement",
+      "FriendlyName": "Exchange Online Management",
+      "Description": "Manage Exchange Online via Connect-ExchangeOnline - https://www.powershellgallery.com/packages/ExchangeOnlineManagement",
+      "Install": "IfMissing",
+      "Mode": "InstallOnly"
+    },
+    {
+      "Name": "MicrosoftTeams",
+      "Description": "Teams administration cmdlets - https://www.powershellgallery.com/packages/MicrosoftTeams",
+      "Install": "IfMissing",
+      "Mode": "InstallOnly"
+    },
+    {
+      "Name": "PnP.PowerShell",
+      "FriendlyName": "PnP PowerShell",
+      "Description": "Power tools for SharePoint Online / M365 - https://www.powershellgallery.com/packages/PnP.PowerShell",
+      "Install": "IfMissing",
+      "Mode": "InstallOnly"
+    },
+    {
+      "Name": "Microsoft.Online.SharePoint.PowerShell",
+      "FriendlyName": "SharePoint Online",
+      "Install": "CheckOnly",
+      "Mode": "InstallOnly"
+    }
+  ]
+}
