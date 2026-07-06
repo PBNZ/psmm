@@ -117,9 +117,9 @@ matches the manifest version and the full quality gate (PSSA + the whole
 Pester suite) passes first.
 
 One-time setup:
-- [ ] Repo Settings → Secrets and variables → Actions → new repository
+- [x] Repo Settings → Secrets and variables → Actions → new repository
       secret **`PSGALLERY_API_KEY`** (the same key used for beta1, scoped
-      to `psmm`).
+      to `psmm`). *Added 2026-07-06.*
 
 Per release (beta2, beta3, ... and eventually stable):
 1. Bump `Prerelease` (and/or `ModuleVersion`) in `psmm.psd1`, update
