@@ -44,7 +44,7 @@ function script:Show-PSMMCommands {
     if (-not $cmds.Count) {
         Clear-PSMMScreen
         Write-PSMMLine "[$script:PSMM_ColAccent]Commands in $(ConvertTo-PSMMSafe $Entry.Name)[/]"
-        Write-PSMMLine '[yellow]No commands available (install/import the module first).[/]'
+        Write-PSMMLine '[orange1]No commands available (install/import the module first).[/]'
         $null = Wait-PSMMKey -Message 'back'
         return
     }

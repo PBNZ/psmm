@@ -48,7 +48,7 @@ function script:Initialize-PSMMMainConfig {
                 Mode        = 'InstallOnly'
             })
         } | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $main -Encoding utf8
-        $script:PSMM_UI.Status = "[green]created $(ConvertTo-PSMMSafe $main) - psmm's UI dependency is managed there[/]"
+        $script:PSMM_UI.Status = "[green3]created $(ConvertTo-PSMMSafe $main) - psmm's UI dependency is managed there[/]"
     } catch { }   # best-effort: the add flows still offer creation
 }
 

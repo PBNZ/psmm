@@ -60,6 +60,9 @@ original `$PROFILE` drop-in block.
 - Grid column widths come from ALL rows (not the visible window), so
   scrolling never resizes the table; short lists are padded to five rows;
   sub-screens repaint a clean page instead of appending below the grid.
+- Warmer, higher-contrast colour scheme: coral keys, brighter muted text,
+  and explicit 256-colour status colours that render the same in every
+  terminal. The blue accent is unchanged.
 - The UI stack (Spectre.Console) now loads lazily on first `psmm` use only —
   profile import cost stays within a few tens of ms of the original block
   (measured; see NOTES.md).

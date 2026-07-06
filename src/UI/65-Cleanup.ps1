@@ -22,14 +22,14 @@ function script:Build-PSMMCleanupView {
         $scopes = (@($d.Obsolete.Scope | Select-Object -Unique) -join ', ')
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
                 $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
-                $nm, "[green]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
+                $nm, "[green3]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Clean up old module versions[/] [$script:PSMM_ColMute]$n module(s) with multiple versions on disk[/]$pos"))
     $items.Add($T)
     if (-not $script:PSMM_UI.Elevated) {
-        $items.Add([Spectre.Console.Markup]::new('[grey]session is not elevated: AllUsers copies are skipped automatically[/]'))
+        $items.Add([Spectre.Console.Markup]::new('[grey66]session is not elevated: AllUsers copies are skipped automatically[/]'))
     }
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=clean this module', 'A=clean ALL', 'r=rescan', '?=help', 'esc=back', 'Ctrl+Q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
@@ -47,7 +47,7 @@ function script:Show-PSMMCleanup {
         if (-not $dupes.Count) {
             Clear-PSMMScreen
             Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old module versions[/]"
-            Write-PSMMLine '[green]No module has more than one installed version - nothing to clean.[/]'
+            Write-PSMMLine '[green3]No module has more than one installed version - nothing to clean.[/]'
             $null = Wait-PSMMKey -Message 'back'
             return
         }
@@ -83,7 +83,7 @@ function script:Show-PSMMCleanup {
                 Clear-PSMMScreen
                 Write-PSMMLine "[$script:PSMM_ColAccent]rescanning...[/]"
                 $dupes = @(Get-PSMMDuplicateVersion)
-                $status = '[green]rescanned[/]'
+                $status = '[green3]rescanned[/]'
             }
             'one' {
                 $d = $dupes[$st.Cursor]
@@ -111,15 +111,15 @@ function script:Invoke-PSMMDupeCleanup {
     $skipped = @(foreach ($d in $Dupes) { @($d.Obsolete | Where-Object { $_.Scope -eq 'AllUsers' -and -not $ui.Elevated }) }).Count
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old versions[/]"
-    if ($skipped) { Write-PSMMLine "[yellow]$skipped AllUsers version(s) skipped - session is not elevated[/]" }
-    if (-not $work.Count) { $null = Wait-PSMMKey; return '[yellow]nothing removable without elevation[/]' }
-    foreach ($w in $work) { Write-PSMMLine "  $(ConvertTo-PSMMSafe $w.Name) v$($w.Version) [grey]($($w.Scope))[/]" }
-    if (-not (Read-SpectreConfirm -Message "Remove these $($work.Count) old version(s)?" -DefaultAnswer 'n')) { return '[grey]cleanup cancelled[/]' }
+    if ($skipped) { Write-PSMMLine "[orange1]$skipped AllUsers version(s) skipped - session is not elevated[/]" }
+    if (-not $work.Count) { $null = Wait-PSMMKey; return '[orange1]nothing removable without elevation[/]' }
+    foreach ($w in $work) { Write-PSMMLine "  $(ConvertTo-PSMMSafe $w.Name) v$($w.Version) [grey66]($($w.Scope))[/]" }
+    if (-not (Read-SpectreConfirm -Message "Remove these $($work.Count) old version(s)?" -DefaultAnswer 'n')) { return '[grey66]cleanup cancelled[/]' }
     $ok = 0; $failed = 0
     foreach ($w in $work) {
         Write-PSMMLine "[$script:PSMM_ColAccent]removing $(ConvertTo-PSMMSafe $w.Name) v$($w.Version)...[/]"
         try { Uninstall-PSMMModuleVersion -Name $w.Name -Version "$($w.Version)"; $ok++ }
-        catch { $failed++; Write-PSMMLine "[red]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+        catch { $failed++; Write-PSMMLine "[indianred1]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
     }
-    if ($failed) { "[yellow]removed $ok, $failed failed[/]" } else { "[green]removed $ok old version(s)[/]" }
+    if ($failed) { "[orange1]removed $ok, $failed failed[/]" } else { "[green3]removed $ok old version(s)[/]" }
 }

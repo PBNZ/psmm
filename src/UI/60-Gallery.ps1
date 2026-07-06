@@ -46,19 +46,19 @@ function script:Show-PSMMGallery {
         # prompt for a (new) search
         Clear-PSMMScreen
         Write-PSMMLine "[$script:PSMM_ColAccent]Search the PowerShell Gallery[/]"
-        Write-PSMMLine "[grey]name or wildcard pattern, e.g. 'excel', 'Az.*', 'Microsoft.Graph*'; empty cancels[/]"
+        Write-PSMMLine "[grey66]name or wildcard pattern, e.g. 'excel', 'Az.*', 'Microsoft.Graph*'; empty cancels[/]"
         $query = Read-SpectreText -Message 'Search' -AllowEmpty
         if ([string]::IsNullOrWhiteSpace($query)) { return }
         Write-PSMMLine "[$script:PSMM_ColAccent]searching the gallery for '$(ConvertTo-PSMMSafe $query)'...[/]"
         $results = @(Find-PSMMGalleryModule -Query $query)
         if (-not $results.Count) {
-            Write-PSMMLine '[yellow]No results.[/]'
+            Write-PSMMLine '[orange1]No results.[/]'
             if (-not (Wait-PSMMKey -Message 'search again')) { return }
             continue
         }
 
         $st = New-PSMMListState
-        $st.Status = "[green]$($results.Count) result(s)[/]"
+        $st.Status = "[green3]$($results.Count) result(s)[/]"
         $action = @{ Name = $null }
         Clear-PSMMScreen
         Invoke-PSMMLive -Body {

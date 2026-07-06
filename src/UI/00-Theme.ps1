@@ -1,12 +1,16 @@
 ﻿# 00-Theme.ps1 — palette, markup helpers, console plumbing, alternate screen.
 #
-# Palette (unchanged from the original psmm - part of the look to preserve):
-#   key    = keyboard shortcuts (purple-ish)
-#   mute   = action labels / separators / hints
+# Palette (2026-07-06 refresh, Claude-Code-inspired warm scheme; the blue
+# accent is the original look and stays):
+#   key    = keyboard shortcuts (coral)
+#   mute   = action labels / separators / hints (bright enough to read!)
 #   accent = cursor row, titles
+# Status colours across the UI are explicit 256-colour names (green3 /
+# orange1 / indianred1 / steelblue1) so they render identically in every
+# terminal instead of following the terminal's ANSI scheme.
 
-$script:PSMM_ColKey    = 'mediumpurple1'
-$script:PSMM_ColMute   = 'grey'
+$script:PSMM_ColKey    = 'salmon1'
+$script:PSMM_ColMute   = 'grey66'
 $script:PSMM_ColAccent = 'deepskyblue1'
 
 # The console every UI write goes through. Production: the real AnsiConsole.

@@ -37,30 +37,30 @@ function script:Build-PSMMGrid {
         $e = $entries[$idx]
         $isCur = ($v -eq $ui.Cursor)
         $isUnmanaged = [bool]$e.PSObject.Properties['Unmanaged']
-        $box = if ($ui.Sel.Contains($idx)) { '[green][[x]][/]' } else { "[$script:PSMM_ColMute][[ ]][/]" }
-        $state = if ($isUnmanaged) { '[dodgerblue1]unmanaged[/]' }
-                 elseif ($e.Loaded) { '[green]loaded[/]' }
-                 elseif ($e.Installed) { '[yellow]installed[/]' }
-                 else { '[red]missing[/]' }
+        $box = if ($ui.Sel.Contains($idx)) { '[green3][[x]][/]' } else { "[$script:PSMM_ColMute][[ ]][/]" }
+        $state = if ($isUnmanaged) { '[steelblue1]unmanaged[/]' }
+                 elseif ($e.Loaded) { '[green3]loaded[/]' }
+                 elseif ($e.Installed) { '[orange1]installed[/]' }
+                 else { '[indianred1]missing[/]' }
         $src = switch ($e.Source) {
             '<profile inline>' { 'profile' }
             '<unmanaged>'      { '-' }
             default            { Split-Path $e.Source -Leaf }
         }
-        $rw = if ($isUnmanaged) { '' } elseif ($e.Writable) { ' [grey]rw[/]' } else { ' [grey]ro[/]' }
+        $rw = if ($isUnmanaged) { '' } elseif ($e.Writable) { ' [grey66]rw[/]' } else { ' [grey66]ro[/]' }
         $name = ConvertTo-PSMMSafe (Get-PSMMTrunc $e.Name $nameCap)
         if ($isCur) { $name = "[$script:PSMM_ColAccent]$name[/]" }
         $scope = switch ($e.InstallScope) {
             'CurrentUser' { 'user' }
-            'AllUsers'    { if ($ui.Elevated) { 'all' } else { 'all [grey]ro[/]' } }
-            'mixed'       { '[yellow]mixed[/]' }
+            'AllUsers'    { if ($ui.Elevated) { 'all' } else { 'all [grey66]ro[/]' } }
+            'mixed'       { '[orange1]mixed[/]' }
             default       { '-' }
         }
         $ver = if ($e.LoadedVersion) { "$($e.LoadedVersion)" } elseif ($e.InstalledVersion) { "$($e.InstalledVersion)" } else { '-' }
-        if ($e.UpdateAvailable) { $ver = "$ver [yellow]^[/]" }
-        if ($e.PinnedExact) { $ver = "$ver [grey]pin[/]" }
+        if ($e.UpdateAvailable) { $ver = "$ver [orange1]^[/]" }
+        if ($e.PinnedExact) { $ver = "$ver [grey66]pin[/]" }
         $cur = if ($isCur) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }
-        $flag = if ($e.Issues.Count) { '[red]![/]' } else { ' ' }
+        $flag = if ($e.Issues.Count) { '[indianred1]![/]' } else { ' ' }
         $rows.Add([string[]]@(
                 $cur, $box, $name, "$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))$rw",
                 $e.Mode, $e.Install, $scope, $state, $ver, $flag))
@@ -93,7 +93,7 @@ function script:Build-PSMMGrid {
     $sel = $ui.Sel.Count
     $pos = Get-PSMMPositionMarkup -State $ui -Count $n -Viewport $vp
     $flt = Get-PSMMFilterMarkup -State $ui
-    $head = if ($sel) { "[green]$sel selected[/]$pos$flt" } else { "[$script:PSMM_ColMute]none selected[/]$pos$flt" }
+    $head = if ($sel) { "[green3]$sel selected[/]$pos$flt" } else { "[$script:PSMM_ColMute]none selected[/]$pos$flt" }
 
     # two short hint rows (a single long row collapses to '...' when narrow)
     $hintNav, $hintAct = if ($ui.FilterMode) {
@@ -118,7 +118,7 @@ function script:Build-PSMMGrid {
     # background tasks side overlay (#25) - one unobtrusive line
     $ts = Get-PSMMTaskSummary
     if ($ts) {
-        $spin = if ($ts.RunningCount) { '[deepskyblue1]~[/] ' } else { '' }
+        $spin = if ($ts.RunningCount) { '[steelblue1]~[/] ' } else { '' }
         $items.Add([Spectre.Console.Markup]::new("$spin[$script:PSMM_ColMute]tasks: $(ConvertTo-PSMMSafe $ts.Text)  (t=details)[/]"))
     }
 
@@ -128,7 +128,7 @@ function script:Build-PSMMGrid {
     }
 
     $warnings = Get-PSMMWarning
-    if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[yellow]$($warnings.Count) config warning(s) - press f or c for details[/]")) }
+    if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[orange1]$($warnings.Count) config warning(s) - press f or c for details[/]")) }
     if ($ui.Status) { $items.Add([Spectre.Console.Markup]::new($ui.Status)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -145,10 +145,10 @@ function script:Get-PSMMStartupJobMarkup {
     if ($j.State -eq 'Completed') {
         $out = @(); try { $out = @(Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue) } catch { }
         $fails = @($out | Where-Object { "$_" -like 'FAILED *' } | ForEach-Object { if ("$_" -match '^FAILED\s+([^:]+)') { $Matches[1] } })
-        if ($fails.Count) { return "[yellow]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (Ctrl+P on the row retries)[/]" }
-        return "[green]background startup: all $total module task(s) ok[/]"
+        if ($fails.Count) { return "[orange1]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (Ctrl+P on the row retries)[/]" }
+        return "[green3]background startup: all $total module task(s) ok[/]"
     }
-    if ($j.State -in 'Failed', 'Stopped') { return '[red]background startup job failed - see t (tasks)[/]' }
+    if ($j.State -in 'Failed', 'Stopped') { return '[indianred1]background startup job failed - see t (tasks)[/]' }
     ''
 }
 
@@ -175,7 +175,7 @@ function script:Invoke-PSMMBulk {
     }
     $ui.Sel.Clear()
     $verb = if ($Action -eq 'Load') { 'loaded' } else { 'unloaded' }
-    $ui.Status = if ($fail) { "[yellow]$verb $ok, $fail failed[/]" } else { "[green]$verb $ok[/]" }
+    $ui.Status = if ($fail) { "[orange1]$verb $ok, $fail failed[/]" } else { "[green3]$verb $ok[/]" }
 }
 
 # Launch install/update of the targeted rows as a BACKGROUND task (#25):
@@ -215,7 +215,7 @@ function script:Start-PSMMInstallTask {
 function script:Start-PSMMUpdateCheckTask {
     $ui = $script:PSMM_UI
     $installed = @($ui.Entries | Where-Object { $_.Installed -and -not $_.PSObject.Properties['Unmanaged'] })
-    if (-not $installed.Count) { $ui.Status = '[yellow]no installed modules to check[/]'; return }
+    if (-not $installed.Count) { $ui.Status = '[orange1]no installed modules to check[/]'; return }
     $payload = @($installed | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Installed = "$($_.InstalledVersion)" } })
     $null = Start-PSMMTask -Label "update check ($($payload.Count) modules)" -Kind 'updatecheck' -ArgumentList (, $payload) -ScriptBlock {
         param($mods)
@@ -305,9 +305,9 @@ function script:Invoke-PSMMGrid {
                         if ($ui.Unmanaged) {
                             $ui.ShowUnmanaged = -not $ui.ShowUnmanaged
                             Sync-PSMMUIEntries
-                            $ui.Status = if ($ui.ShowUnmanaged) { "[green]showing $(@($ui.Unmanaged).Count) unmanaged module(s)[/]" } else { '[grey]unmanaged modules hidden[/]' }
+                            $ui.Status = if ($ui.ShowUnmanaged) { "[green3]showing $(@($ui.Unmanaged).Count) unmanaged module(s)[/]" } else { '[grey66]unmanaged modules hidden[/]' }
                         } else {
-                            $ui.Status = '[yellow]unmanaged scan still running (t=details)[/]'
+                            $ui.Status = '[orange1]unmanaged scan still running (t=details)[/]'
                         }
                     }
                     continue
