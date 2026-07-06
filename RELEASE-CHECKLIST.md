@@ -108,32 +108,36 @@ for full-history publish.
    *Limit to prior contributors* (max 6 months, renewable), and/or
    Settings → Features → untick Issues until you're ready.
 
-## E. Publish 0.1.0-beta1 to the PowerShell Gallery (prerelease)
+## E. Publish to the PowerShell Gallery
 
-The name `psmm` was verified free on PSGallery on 2026-07-04. The manifest
-already carries `Prerelease = 'beta1'` — the Gallery shows it as
-**0.1.0-beta1** and hides it from anyone not asking for prereleases.
+**0.1.0-beta1 was published manually on 2026-07-06.** Every release after
+it goes through the tag-triggered pipeline
+(`.github/workflows/release.yml`), which refuses to publish unless the tag
+matches the manifest version and the full quality gate (PSSA + the whole
+Pester suite) passes first.
 
-1. Sign in at powershellgallery.com, create an API key scoped to `psmm`.
-2. Stage the shippable content as in section C (packaging is validated
-   against a local repository — the staged nupkg is `psmm.0.1.0-beta1.nupkg`).
-3. Dry run first:
-   `Publish-PSResource -Path $stage -Repository PSGallery -ApiKey $key -WhatIf`
-4. Real publish:
-   `Publish-PSResource -Path $stage -Repository PSGallery -ApiKey $key`
-   (fallback if needed: `Publish-Module -Path $stage -NuGetApiKey $key -AllowPrerelease`)
-5. Verify: `Find-PSResource psmm -Prerelease -Repository PSGallery`, then
-   install on a clean machine (`Install-PSResource psmm -Prerelease`) and
-   run section A's quick pass.
-6. Iterate betas by bumping only the label (`beta2`, `beta3`...) — burned
-   prerelease numbers are painless, `0.1.0` stays reserved for stable.
+One-time setup:
+- [ ] Repo Settings → Secrets and variables → Actions → new repository
+      secret **`PSGALLERY_API_KEY`** (the same key used for beta1, scoped
+      to `psmm`).
+
+Per release (beta2, beta3, ... and eventually stable):
+1. Bump `Prerelease` (and/or `ModuleVersion`) in `psmm.psd1`, update
+   CHANGELOG, commit and push.
+2. `git tag v<version>[-<prerelease>]` (e.g. `v0.1.0-beta2`), then
+   `git push --tags`.
+3. Watch the *Release to PowerShell Gallery* workflow; its final step
+   polls the Gallery until the new version is findable.
+
+Iterate betas by bumping only the label (`beta2`, `beta3`...) — burned
+prerelease numbers are painless, `0.1.0` stays reserved for stable.
 
 ## E2. Later: promote to stable 0.1.0
 
 1. Remove the `Prerelease` line from `psmm.psd1`, update `ReleaseNotes` +
-   CHANGELOG heading, commit, tag `v0.1.0`.
-2. Stage + publish as in E. Testers on `-Prerelease` update to stable
-   automatically (0.1.0 > 0.1.0-betaN).
+   CHANGELOG heading, commit, push.
+2. `git tag v0.1.0` and `git push --tags` — same pipeline. Testers on
+   `-Prerelease` update to stable automatically (0.1.0 > 0.1.0-betaN).
 
 ## F. Optional: auto-resume scheduled task for future long builds
 

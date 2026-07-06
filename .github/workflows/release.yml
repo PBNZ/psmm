@@ -1,0 +1,83 @@
+name: Release to PowerShell Gallery
+
+# Publish flow: bump ModuleVersion / Prerelease in psmm.psd1, commit, then
+#   git tag v<ModuleVersion>[-<Prerelease>]   (e.g. v0.1.0-beta2, v0.1.0)
+#   git push --tags
+# The workflow refuses to publish if the tag doesn't match the manifest,
+# and never publishes without the full quality gate passing first.
+# Requires the repo secret PSGALLERY_API_KEY (scoped to the psmm package).
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    name: Gate + publish
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag must match the manifest version
+        shell: pwsh
+        run: |
+          $manifest = Import-PowerShellDataFile ./psmm.psd1
+          $pre = $manifest.PrivateData.PSData.Prerelease
+          $expected = "v$($manifest.ModuleVersion)$(if ($pre) { "-$pre" })"
+          $tag = '${{ github.ref_name }}'
+          if ($tag -ne $expected) {
+            throw "Tag '$tag' does not match the manifest ('$expected'). Bump psmm.psd1 or fix the tag."
+          }
+          Write-Host "Tag $tag matches the manifest."
+
+      - name: Install tooling
+        shell: pwsh
+        run: |
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository
+          Install-PSResource -Name Pester -Scope CurrentUser -TrustRepository
+          Install-PSResource -Name PwshSpectreConsole -Scope CurrentUser -TrustRepository
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity Error, Warning
+          $results | Format-Table -AutoSize | Out-String | Write-Host
+          if (@($results).Count) { throw "PSScriptAnalyzer found $(@($results).Count) issue(s)" }
+
+      - name: Pester (full suite)
+        shell: pwsh
+        run: |
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = './Tests'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg
+
+      - name: Stage shippable content
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP 'psmm-stage/psmm'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          'psmm.psd1','psmm.psm1','src','Configs','LICENSE','README.md','CHANGELOG.md' |
+              ForEach-Object { Copy-Item $_ $stage -Recurse }
+          "STAGE=$stage" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Publish to PSGallery
+        shell: pwsh
+        run: |
+          Publish-PSResource -Path $env:STAGE -Repository PSGallery -ApiKey '${{ secrets.PSGALLERY_API_KEY }}'
+
+      - name: Verify it landed
+        shell: pwsh
+        run: |
+          $manifest = Import-PowerShellDataFile ./psmm.psd1
+          $pre = $manifest.PrivateData.PSData.Prerelease
+          $expected = "$($manifest.ModuleVersion)$(if ($pre) { "-$pre" })"
+          # the gallery can take a moment to index a fresh push
+          foreach ($try in 1..10) {
+            $found = Find-PSResource -Name psmm -Prerelease -Repository PSGallery -ErrorAction SilentlyContinue |
+                     Where-Object { "$($_.Version)" -like "$($manifest.ModuleVersion)*" -and "$($_.Prerelease)" -eq "$pre" }
+            if ($found) { Write-Host "Published and findable: psmm $expected"; exit 0 }
+            Start-Sleep -Seconds 30
+          }
+          throw "psmm $expected not findable on PSGallery after 5 minutes"
