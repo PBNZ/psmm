@@ -119,6 +119,7 @@ Describe 'prerelease-aware module update' -Tag Engine {
         # psmm itself is imported from the repo and carries a Prerelease
         # label; a random built-in module does not
         InModuleScope psmm {
+            Mock Get-Module { }   # default: not installed (newer Pester throws without a fallback mock)
             Mock Get-Module {
                 [pscustomobject]@{
                     Version = [version]'0.1.0'
