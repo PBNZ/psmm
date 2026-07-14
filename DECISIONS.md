@@ -121,3 +121,25 @@ Existing `psmm-config.json` files work byte-for-byte unchanged. New features
 (auth status, scope display, unmanaged modules) derive everything at runtime;
 no new config fields were needed, so none were added. If a future feature needs
 one, extend with optional fields + defaults (never a silent break).
+
+## D-DOCS — RepoKit doc-style adopted; living-docs add-on evaluated and not adopted (2026-07-14)
+
+RepoKit 0.3.0 (2026-07-13) added two documentation standards. Applied to psmm
+as follows:
+
+**doc-style (adopted).** The deterministic formatting rules — one table style
+(`|---|` separators, no alignment padding), ISO `YYYY-MM-DD` dates, fixed
+status vocabulary, sentence-case headings, structure changes as their own
+commit — now govern all psmm docs. An audit found the existing docs already
+compliant, so adoption cost nothing; the rules bind future edits. Reference:
+RepoKit `repo-standard/standard/doc-style.md`.
+
+**living-docs (not adopted).** The add-on (docs/STATE.json + state blocks +
+check-docs.ps1 in CI) targets repos whose docs track live operational state
+and whose volatile facts would otherwise be stated in several places. psmm's
+volatile facts already have exactly one canonical source each: version and
+prerelease flag in `psmm.psd1`, history in `CHANGELOG.md`, release state in
+`RELEASE-CHECKLIST.md`. Introducing STATE.json would create a *second* source
+of truth for those facts, which contradicts the pattern's own core rule
+("every volatile fact lives in exactly one place"). Revisit only if psmm docs
+ever start duplicating status across files.
