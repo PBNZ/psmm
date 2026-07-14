@@ -72,6 +72,7 @@ BeforeAll {
                 Status = ''; Dirty = $false; HardQuit = $false
                 Unmanaged = $null; ShowUnmanaged = $false
                 Elevated = $false; Engine = Get-PSMMInstallEngine
+                Version = Get-PSMMVersionString; SelfUpdate = $null
             }
             foreach ($e in (Get-PSMMEntry)) { $script:PSMM_UI.Entries.Add($e) }
         }
@@ -87,6 +88,22 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
     BeforeEach { Set-UITestConfig }
     AfterEach {
         Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'the grid header shows the running psmm version, and the self-update notice when one is cached' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $manifest = Import-PowerShellDataFile (Join-Path $PSScriptRoot '..' 'psmm.psd1')
+        $text | Should -Match ([regex]::Escape("psmm v$($manifest.ModuleVersion)-$($manifest.PrivateData.PSData.Prerelease)"))
+        InModuleScope psmm {
+            $script:PSMM_UI.SelfUpdate = [pscustomobject]@{
+                Current = '0.1.0-beta3'; Latest = '0.1.0-beta4'
+                Command = 'Install-PSResource psmm -Prerelease -Reinstall'
+            }
+        }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match 'psmm v0\.1\.0-beta4 is available'
+        $text | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
+        InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
     }
 
     It 'renders the main grid with title, rows, position indicator and hints' {

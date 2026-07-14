@@ -3,6 +3,31 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+- **Version display**: the running psmm version now shows next to the name
+  in the profile-load report header, the main screen's title line, and the
+  terminal window title.
+- **Self update check**: a background gallery check runs at most once a day
+  (fire-and-forget task; the result is cached next to the main config, so
+  profile load never pays network cost). When a newer psmm exists, the
+  profile report and a standing grid line show the exact update command;
+  `$PSMM_UpdateCheck = $false` disables the check.
+- **Prerelease-aware updates**: `u`/update on any module whose installed
+  copy is a prerelease now uses `Install-PSResource -Prerelease -Reinstall`,
+  because `Update-PSResource` cannot see a prerelease-label-only bump
+  (beta2 → beta3 share the base version folder; verified against
+  PSResourceGet 1.2.0). This makes `u` on psmm's own row a working
+  user-driven self-update.
+- README/help: an "Updating psmm" section with the verified commands
+  (no `Remove-Module` needed; restart pwsh or `Import-Module psmm -Force`
+  to pick up the new version).
+
+### Fixed
+- The startup report's retry hint still said `Ctrl+P`; it now names the
+  current key (`i` on the row).
+
 ## [0.1.0-beta3] — 2026-07-14
 
 Metadata-only release; code identical to 0.1.0-beta2.

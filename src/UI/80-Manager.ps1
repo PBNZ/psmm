@@ -10,7 +10,7 @@ function script:Invoke-PSMMManagerLoop {
         # alternate screen buffer: whatever the terminal showed before psmm
         # is exactly restored on exit (#4)
         Enter-PSMMAltScreen
-        try { $oldTitle = $Host.UI.RawUI.WindowTitle; $Host.UI.RawUI.WindowTitle = 'psmm - PS Session Module Manager' } catch { }
+        try { $oldTitle = $Host.UI.RawUI.WindowTitle; $Host.UI.RawUI.WindowTitle = "psmm v$($script:PSMM_UI.Version) - PS Session Module Manager" } catch { }
 
         while ($true) {
             $ui = $script:PSMM_UI

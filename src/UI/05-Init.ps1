@@ -71,10 +71,14 @@ function script:Initialize-PSMMUIState {
         ShowUnmanaged = $false     # 'm' toggles unmanaged rows in the grid
         Elevated      = Test-PSMMElevated
         Engine        = Get-PSMMInstallEngine
+        Version       = Get-PSMMVersionString
         # OneDrive-backed primary module location? (cached: grid renders a
         # standing notice, and per-frame path checks would be too slow)
         OneDrivePrimary = [bool](@(Get-PSMMModulePathInfo) | Where-Object { $_.First -and $_.OneDrive })
+        # newer psmm on the gallery, per the daily cached background check
+        SelfUpdate    = Test-PSMMUpdateAvailable
     }
+    $null = Start-PSMMSelfUpdateCheck   # throttled to once a day
     Initialize-PSMMMainConfig
     Sync-PSMMUIEntries -FullScan
 }

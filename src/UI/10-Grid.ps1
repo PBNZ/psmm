@@ -132,7 +132,7 @@ function script:Build-PSMMGrid {
     }
 
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]PS Session Module Manager[/] [$script:PSMM_ColMute](psmm · $($ui.Engine)$(if ($ui.Elevated) { ' · elevated' }))[/]"))
+    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]PS Session Module Manager[/] [$script:PSMM_ColMute](psmm v$($ui.Version) · $($ui.Engine)$(if ($ui.Elevated) { ' · elevated' }))[/]"))
     $items.Add($T)
     $items.Add([Spectre.Console.Markup]::new($head))
     foreach ($hr in $hintRows) { $items.Add([Spectre.Console.Markup]::new($hr)) }
@@ -151,6 +151,13 @@ function script:Build-PSMMGrid {
     # unmanaged notice, once the scan is in and the rows are hidden
     if ($ui.Unmanaged -and -not $ui.ShowUnmanaged -and @($ui.Unmanaged).Count) {
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - m shows them[/]"))
+    }
+
+    # newer psmm available (daily cached check): the verified update command,
+    # or just press u on psmm's own row - the update path handles the
+    # prerelease-label case
+    if ($ui.SelfUpdate) {
+        $items.Add([Spectre.Console.Markup]::new("[orange1]psmm v$($ui.SelfUpdate.Latest) is available (you have v$($ui.SelfUpdate.Current)) - update: $(ConvertTo-PSMMSafe $ui.SelfUpdate.Command), then restart pwsh[/]"))
     }
 
     # standing OneDrive diagnosis (cached at init - no per-frame path checks)
@@ -248,8 +255,17 @@ function script:Start-PSMMInstallTask {
             try {
                 $psrg = [bool](Get-Command Install-PSResource -ErrorAction SilentlyContinue)
                 if ($psrg) {
+                    # prerelease label of the newest installed copy: a
+                    # label-only bump needs Install -Prerelease -Reinstall,
+                    # Update-PSResource cannot see it (same logic as
+                    # Install-PSMMModule; module functions are out of reach
+                    # in this thread job)
+                    $pre = $null
+                    $newest = @(Get-Module -ListAvailable -Name $m.Name -ErrorAction SilentlyContinue | Sort-Object Version -Descending) | Select-Object -First 1
+                    if ($newest) { try { $pre = $newest.PrivateData.PSData.Prerelease } catch { } }
                     if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -TrustRepository -Reinstall:$m.Update -ErrorAction Stop }
-                    elseif ($m.Update -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name $m.Name)) { Update-PSResource -Name $m.Name -ErrorAction Stop }
+                    elseif ($m.Update -and $newest -and $pre) { Install-PSResource -Name $m.Name -Prerelease -Reinstall -Scope CurrentUser -TrustRepository -ErrorAction Stop }
+                    elseif ($m.Update -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue) -and $newest) { Update-PSResource -Name $m.Name -ErrorAction Stop }
                     else { Install-PSResource -Name $m.Name -Scope CurrentUser -TrustRepository -ErrorAction Stop }
                 } else {
                     Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop

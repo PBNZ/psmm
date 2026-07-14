@@ -23,6 +23,8 @@ prelude = (
     f"$global:PSMM_MainConfigPath='{tmp}\\a\\psmm-config.json'; "
     f"$global:PSMM_ProfileConfigPath='{tmp}\\b\\psmm-config.json'; "
     f"$global:PSMM_JsonPath=@('{tmp}\\c\\*.json'); "
+    "$global:PSMM_UpdateCheck=$false; "   # deterministic: no gallery call
+
     f"Import-Module '{REPO}\\.tools\\PwshSpectreConsole'; "
     f"Import-Module '{REPO}\\psmm.psd1'; "
     "Show-PSModuleManager; "
@@ -90,6 +92,8 @@ ESC = "\x1b"
 
 # 1. the grid appears (UI sourced, deps loaded, state initialised, no crash)
 wait_for("PS Session Module Manager", 90, "grid opened")
+# 1a. the header carries the running version next to the name
+wait_for_re(r"psmm v\d+\.\d+\.\d+", 10, "version shown in the grid header")
 # 1b. zero configs -> the main config was auto-created, seeded with psmm's
 #     own UI dependency as a managed entry (2026-07-05 feedback)
 wait_for("UI dependency is managed there", 15, "main config auto-created on first run")

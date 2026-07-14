@@ -28,6 +28,19 @@ function Get-PSMMScopeForPath {
     if ($Path.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) { 'CurrentUser' } else { 'AllUsers' }
 }
 
+# Is the newest installed copy of a module a prerelease? (the label lives in
+# the manifest's PSData, not in the [version])
+function Test-PSMMInstalledPrerelease {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name)
+    $newest = @(Get-Module -ListAvailable -Name $Name -ErrorAction SilentlyContinue |
+        Sort-Object Version -Descending) | Select-Object -First 1
+    if (-not $newest) { return $false }
+    $pre = $null
+    try { $pre = $newest.PrivateData.PSData.Prerelease } catch { }
+    [bool]$pre
+}
+
 # Install or update one module. Honours an optional version pin (exact or
 # NuGet range) and the target scope. Throws on failure — callers decide how
 # to report; a bulk operation must survive one module failing.
@@ -43,6 +56,13 @@ function Install-PSMMModule {
         if ($Version) {
             # A pin always installs the pinned version/range, update or not.
             Install-PSResource -Name $Name -Version $Version -Scope $Scope -TrustRepository -Reinstall:$Update -ErrorAction Stop
+        } elseif ($Update -and (Get-Module -ListAvailable -Name $Name) -and (Test-PSMMInstalledPrerelease -Name $Name)) {
+            # Prerelease installed: Update-PSResource is blind to a
+            # prerelease-label-only bump (beta2 -> beta3 shares the base
+            # version folder) - Install -Prerelease -Reinstall is the only
+            # command that moves it (verified against PSResourceGet 1.2.0,
+            # see src/Engine/SelfUpdate.ps1).
+            Install-PSResource -Name $Name -Prerelease -Reinstall -Scope $Scope -TrustRepository -ErrorAction Stop
         } elseif ($Update -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name $Name)) {
             Update-PSResource -Name $Name -Scope $Scope -ErrorAction Stop
         } else {
@@ -58,6 +78,7 @@ function Install-PSMMModule {
         }
         $params = @{ Name = $Name; Scope = $Scope; Force = $true; AllowClobber = $true; ErrorAction = 'Stop' }
         if ($exact) { $params.RequiredVersion = $Version }
+        if ($Update -and (Test-PSMMInstalledPrerelease -Name $Name)) { $params.AllowPrerelease = $true }
         Install-Module @params
     }
 }

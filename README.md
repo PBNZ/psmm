@@ -50,6 +50,30 @@ Import-Module .\psmm\psmm.psd1
 (Clone/copy the folder into `~\Documents\PowerShell\Modules\psmm` instead
 and plain `Import-Module psmm` plus autoloading work as if installed.)
 
+### Updating psmm
+
+While psmm is in prerelease, beta-to-beta updates need a forced reinstall —
+`Update-PSResource` cannot see a prerelease-label-only bump (`0.1.0-beta2` →
+`0.1.0-beta3` share the same base version, verified against PSResourceGet
+1.2.0):
+
+```powershell
+Install-PSResource psmm -Prerelease -Reinstall
+```
+
+Then restart pwsh (or `Import-Module psmm -Force` in the current session).
+No `Remove-Module` needed first — the reinstall succeeds while psmm is
+loaded; your session simply keeps running the old copy until the reload.
+Once psmm is stable, a plain `Update-PSResource psmm` does the job.
+
+psmm also checks for updates itself: a background check runs at most once a
+day (never delaying your prompt — the result is cached and shown at the
+*next* profile load and in the UI). When a newer version exists you get the
+exact command above, or just press `u` on psmm's own row in the grid —
+psmm's update path knows about the prerelease quirk. Set
+`$PSMM_UpdateCheck = $false` before `Import-Module psmm` to disable the
+check entirely.
+
 ## Quickstart
 
 **1. Bootstrap your profile.** Add two lines to `$PROFILE`:
@@ -110,8 +134,9 @@ the UI never blocks. Exiting restores your terminal exactly as it was.
 
 Optional `$PROFILE` knobs (set **before** `Import-Module psmm`):
 `$PSMM_StartupReport = $false`, `$PSMM_BackgroundStartup = $false`,
-`$PSMM_InlineJson = '<json>'`, `$PSMM_JsonPath = @('C:\dir\*.json')`,
-`$PSMM_MainConfigPath`, `$PSMM_ProfileConfigPath`.
+`$PSMM_UpdateCheck = $false`, `$PSMM_InlineJson = '<json>'`,
+`$PSMM_JsonPath = @('C:\dir\*.json')`, `$PSMM_MainConfigPath`,
+`$PSMM_ProfileConfigPath`.
 
 ## Config
 

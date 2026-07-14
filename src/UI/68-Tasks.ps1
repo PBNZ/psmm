@@ -44,6 +44,11 @@ function script:Receive-PSMMUITask {
             'updatehelp' {
                 $ui.Status = if ($t.Failed) { '[orange1]Update-Help finished with errors (t=details)[/]' } else { '[green3]Update-Help done[/]' }
             }
+            'selfupdate' {
+                # silent: the standing grid notice covers it; just refresh
+                # the verdict from the freshly written cache
+                $ui.SelfUpdate = Test-PSMMUpdateAvailable
+            }
             default {
                 $ui.Status = if ($t.Failed) { "[orange1]task '$(ConvertTo-PSMMSafe $t.Label)' failed (t=details)[/]" }
                              else { "[green3]task '$(ConvertTo-PSMMSafe $t.Label)' done[/]" }

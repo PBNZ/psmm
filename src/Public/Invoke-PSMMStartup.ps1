@@ -51,7 +51,11 @@
 
     $entries = Get-PSMMEntry
     $report  = (-not $Quiet -and (Get-PSMMSetting -Name 'PSMM_StartupReport' -Default $true))
-    if ($report) { Write-Host "`nPS Session Module Manager priority managed" }
+    if ($report) {
+        Write-Host "`npsmm " -NoNewline
+        Write-Host "v$(Get-PSMMVersionString)" -NoNewline -ForegroundColor DarkGray
+        Write-Host ' - PS Session Module Manager priority managed'
+    }
     $failed = [System.Collections.Generic.List[string]]::new()
 
     # Partition: Mode=Load must run in THIS session (imports do not cross job
@@ -124,10 +128,23 @@
     }
 
     if ($failed.Count -and $report) {
-        Write-Host ("[{0} failed: {1}]  Run 'psmm' and press Ctrl+P to retry." -f $failed.Count, ($failed -join ', ')) -ForegroundColor Yellow
+        Write-Host ("[{0} failed: {1}]  Run 'psmm' and press i on the row to retry." -f $failed.Count, ($failed -join ', ')) -ForegroundColor Yellow
     }
     $warnings = Get-PSMMWarning
     if ($warnings.Count -and -not $Quiet) {
         foreach ($w in $warnings) { Write-Host "psmm config: $w" -ForegroundColor Yellow }
     }
+
+    # Self-update: print the cached result of a PREVIOUS session's background
+    # check (never a network call in the profile hot path), then kick the
+    # once-a-day background re-check. $PSMM_UpdateCheck = $false disables both.
+    if (-not $Quiet) {
+        $u = Test-PSMMUpdateAvailable
+        if ($u) {
+            Write-Host "psmm: v$($u.Latest) is available (you have v$($u.Current)) - update: " -NoNewline -ForegroundColor Yellow
+            Write-Host $u.Command -NoNewline -ForegroundColor Cyan
+            Write-Host ', then restart pwsh' -ForegroundColor Yellow
+        }
+    }
+    $null = Start-PSMMSelfUpdateCheck
 }

@@ -195,7 +195,17 @@ function script:Get-PSMMHelpText {
     $lines.Add('  Import-Module psmm; Invoke-PSMMStartup')
     $lines.Add('')
     $lines.Add('  Knobs (set before Import-Module): $PSMM_StartupReport = $false,')
-    $lines.Add('  $PSMM_BackgroundStartup = $false, $PSMM_InlineJson, $PSMM_JsonPath.')
+    $lines.Add('  $PSMM_BackgroundStartup = $false, $PSMM_UpdateCheck = $false,')
+    $lines.Add('  $PSMM_InlineJson, $PSMM_JsonPath.')
+    $lines.Add('')
+    $lines.Add('UPDATING PSMM ITSELF')
+    $lines.Add('--------------------')
+    $lines.Add('  A daily background check caches whether a newer psmm exists; the')
+    $lines.Add('  profile report and the grid tell you when one does. While psmm is in')
+    $lines.Add('  prerelease, beta-to-beta updates need a forced reinstall:')
+    $lines.Add('      Install-PSResource psmm -Prerelease -Reinstall')
+    $lines.Add('  then restart pwsh. (Update-PSResource cannot see a prerelease-label')
+    $lines.Add('  bump; u on psmm''s own grid row handles this correctly.)')
     $lines
 }
 
