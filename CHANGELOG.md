@@ -3,13 +3,15 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [Unreleased]
+## [0.1.0-beta3] — 2026-07-14
+
+Metadata-only release; code identical to 0.1.0-beta2.
 
 ### Changed
 - Module metadata: `Author` and the copyright holder are now the `PBNZ`
   handle (`(c) 2026 PBNZ` in the manifest and LICENSE); the
   "All rights reserved." boilerplate is gone since it read contradictory
-  next to the MIT license. Lands on the Gallery with the next release.
+  next to the MIT license.
 
 ## [0.1.0-beta2] — 2026-07-14
 
