@@ -50,7 +50,7 @@ function Get-PSMMCloudOnlyFile {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
     if (-not $IsWindows) { return @() }
-    if (-not (Test-Path -LiteralPath $Path)) { return @() }
+    if (-not (Test-Path -LiteralPath $Path -ErrorAction Ignore)) { return @() }
     @(Get-ChildItem -LiteralPath $Path -File -Recurse -Force -ErrorAction SilentlyContinue |
         Where-Object { Test-PSMMCloudOnlyAttribute -Attributes ([int]$_.Attributes) })
 }
@@ -116,7 +116,9 @@ function Get-PSMMModulePathInfo {
             Order       = $i
             Path        = $p
             First       = ($i -eq 0)
-            Exists      = (Test-Path -LiteralPath $p)
+            # -ErrorAction Ignore: an entry we cannot even stat (e.g. under
+            # /root on CI) must count as not-ours, not crash the listing
+            Exists      = (Test-Path -LiteralPath $p -ErrorAction Ignore)
             OneDrive    = (Test-PSMMOneDrivePath -Path $p)
             UserDefault = ($userDefault -and ($p.TrimEnd('\', '/') -eq $userDefault.TrimEnd('\', '/')))
         }
@@ -182,7 +184,7 @@ function Invoke-PSMMPinPath {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
     if (-not $IsWindows) { throw 'pinning is a Windows / OneDrive feature' }
-    if (-not (Test-Path -LiteralPath $Path)) { throw "path not found: $Path" }
+    if (-not (Test-Path -LiteralPath $Path -ErrorAction Ignore)) { throw "path not found: $Path" }
     & "$env:SystemRoot\System32\attrib.exe" +p -u "$Path\*" /s /d
     if ($LASTEXITCODE -ne 0) { throw "attrib.exe failed with exit code $LASTEXITCODE" }
 }
