@@ -20,10 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            Prerelease   = 'beta1'
+            Prerelease   = 'beta2'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0-beta1 - first public prerelease. See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta2 - design-system key scheme (i/u install/update, ^=ctrl, g h home), OneDrive module-location diagnostics with cloud-only download/pin, too-small-window message, copy help to clipboard. See CHANGELOG.md.'
         }
     }
 }

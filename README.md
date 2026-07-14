@@ -1,7 +1,14 @@
 # psmm — PowerShell Session Module Manager
 
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/psmm?include_prereleases&label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/psmm)
+[![Downloads](https://img.shields.io/powershellgallery/dt/psmm?label=downloads)](https://www.powershellgallery.com/packages/psmm)
+[![CI](https://github.com/PBNZ/psmm/actions/workflows/ci.yml/badge.svg)](https://github.com/PBNZ/psmm/actions/workflows/ci.yml)
+
 Fast, declarative module loading at shell start, plus a keyboard-driven
 terminal UI to manage it all.
+
+**On the [PowerShell Gallery](https://www.powershellgallery.com/packages/psmm):**
+`Install-PSResource psmm -Prerelease`
 
 You describe the modules you care about in small JSON files — *load this at
 startup, just keep that installed, leave those alone* — and psmm makes your
