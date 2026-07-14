@@ -1,0 +1,29 @@
+name: Unlist a Gallery version
+
+# Manually unlist one published psmm version from the PowerShell Gallery
+# (hides it from search and the version list; exact-version installs keep
+# working - the Gallery has no owner-side hard delete). Uses the same
+# PSGALLERY_API_KEY secret as the release pipeline.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Full version to unlist (e.g. 0.1.0-beta2)'
+        required: true
+        type: string
+
+jobs:
+  unlist:
+    name: Unlist psmm ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send unlist request
+        shell: pwsh
+        run: |
+          $v = '${{ inputs.version }}'
+          if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "'$v' does not look like a version" }
+          Invoke-RestMethod -Method Delete `
+            -Uri "https://www.powershellgallery.com/api/v2/package/psmm/$v" `
+            -Headers @{ 'X-NuGet-ApiKey' = '${{ secrets.PSGALLERY_API_KEY }}' }
+          Write-Host "Unlist request for psmm $v accepted."
