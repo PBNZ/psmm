@@ -27,6 +27,7 @@ function script:Invoke-PSMMManagerLoop {
                 'add'       { New-PSMMEntry }
                 'conflicts' { Show-PSMMConflicts }
                 'files'     { Show-PSMMFiles }
+                'paths'     { Show-PSMMPaths }
                 'gallery'   { Show-PSMMGallery }
                 'cleanup'   { Show-PSMMCleanup }
                 'tasks'     { Show-PSMMTasks }

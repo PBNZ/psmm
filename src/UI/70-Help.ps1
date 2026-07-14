@@ -30,6 +30,7 @@ function script:Get-PSMMHelpSection {
             '  a        add a new entry   g  search the PowerShell Gallery'
             '  x        clean up duplicate module versions   t  background tasks'
             '  m        show/hide unmanaged modules   f  config files   c  conflicts'
+            '  p        module locations (PSModulePath, OneDrive diagnostics)'
             '  r        reload everything from disk'
         ) }
         'module' { @(
@@ -70,6 +71,31 @@ function script:Get-PSMMHelpSection {
             ''
             'A disabled file''s entries are kept in the file untouched - disabling'
             'is how you park a whole module set ("work", "lab", ...).'
+        ) }
+        'paths' { @(
+            'MODULE LOCATIONS'
+            '----------------'
+            'Every folder PowerShell searches for modules ($env:PSModulePath), in'
+            'search order. The FIRST entry is the CurrentUser location, which'
+            'PowerShell derives from your Documents folder - when OneDrive backs'
+            'up Documents (a common org policy), your modules silently live in'
+            'OneDrive, and "Files On-Demand" can make them cloud-only'
+            'placeholders that stall or fail module loading.'
+            ''
+            '  d        scan the highlighted path and download (hydrate) every'
+            '           cloud-only file, with progress'
+            '  k        keep on this device: pin the folder so OneDrive keeps all'
+            '           files local from now on (downloads in the background)'
+            '  s        set the primary (CurrentUser) module location - writes the'
+            '           documented PSModulePath override to your user'
+            '           powershell.config.json. New pwsh sessions look there.'
+            '           Caveat: Install-Module/Install-PSResource still install to'
+            '           the default Documents location.'
+            '  r        remove that override again'
+            ''
+            'psmm also checks for cloud-only files before loading a module (with'
+            'a prompt in the module menu / apply, silently with a status line in'
+            'grid bulk loads).'
         ) }
         'gallery' { @(
             'GALLERY SEARCH'

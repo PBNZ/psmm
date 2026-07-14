@@ -84,6 +84,11 @@ background job; the report tells you what happened.
 - `x` clean up stacked old module versions
 - `m` reveal installed-but-unmanaged modules and adopt them into a config
 - `f` config file manager · `c` conflicts & validation · `t` background tasks
+- `p` module locations: see `$env:PSModulePath`, get warned when your
+  CurrentUser module folder lives inside OneDrive (PowerShell's default when
+  OneDrive backs up Documents), download or pin cloud-only module files, and
+  move the primary location via the documented `powershell.config.json`
+  override
 
 Long operations run as background tasks with an unobtrusive progress line —
 the UI never blocks. Exiting restores your terminal exactly as it was.

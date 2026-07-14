@@ -127,7 +127,7 @@ function script:Build-PSMMGrid {
         @(
             (Get-PSMMHint -Pairs @('up/dn=move', 'space=select', 'enter=actions', '/=search', '?=help', 'esc=quit')),
             (Get-PSMMHint -Pairs @('^l=load', '^u=unload', 'i=install', 'u=update', 'k=check updates', 'r=reload')),
-            (Get-PSMMHint -Pairs @('a=add', 'g=gallery', 'x=cleanup', 'f=files', 'c=conflicts', 't=tasks', 'm=unmanaged'))
+            (Get-PSMMHint -Pairs @('a=add', 'g=gallery', 'x=cleanup', 'f=files', 'p=paths', 'c=conflicts', 't=tasks', 'm=unmanaged'))
         )
     }
 
@@ -151,6 +151,11 @@ function script:Build-PSMMGrid {
     # unmanaged notice, once the scan is in and the rows are hidden
     if ($ui.Unmanaged -and -not $ui.ShowUnmanaged -and @($ui.Unmanaged).Count) {
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - m shows them[/]"))
+    }
+
+    # standing OneDrive diagnosis (cached at init - no per-frame path checks)
+    if ($ui.OneDrivePrimary) {
+        $items.Add([Spectre.Console.Markup]::new('[orange1]primary module location is inside OneDrive - cloud-only files can break loading (p=details)[/]'))
     }
 
     $warnings = Get-PSMMWarning
@@ -191,6 +196,16 @@ function script:Invoke-PSMMBulk {
         $verbing = if ($Action -eq 'Load') { 'loading' } else { 'unloading' }
         $ui.Status = "[$script:PSMM_ColAccent]$verbing $(ConvertTo-PSMMSafe $e.Name) ($i/$($targets.Count))...[/]"
         if ($Context) { $Context.UpdateTarget((Build-PSMMGrid)); $Context.Refresh() }
+        # cloud-only files hydrate silently here (no prompt inside the live
+        # grid) - the status line shows what is happening and why it may wait
+        if ($Action -eq 'Load') {
+            $cloud = @(Get-PSMMModuleCloudOnlyFile -Name $e.Name)
+            if ($cloud.Count) {
+                $ui.Status = "[orange1]downloading $($cloud.Count) cloud-only file(s) for $(ConvertTo-PSMMSafe $e.Name) from OneDrive...[/]"
+                if ($Context) { $Context.UpdateTarget((Build-PSMMGrid)); $Context.Refresh() }
+                $null = Invoke-PSMMFileHydration -Files $cloud
+            }
+        }
         try {
             if ($Action -eq 'Load') { $null = Import-Module -Name $e.Name -Force -ErrorAction Stop -WarningAction SilentlyContinue }
             else { Remove-Module -Name $e.Name -Force -ErrorAction Stop }
@@ -330,6 +345,7 @@ function script:Invoke-PSMMGrid {
                 }
                 ([ConsoleKey]::I) { if (-not $ctrl) { Start-PSMMInstallTask }; continue }
                 ([ConsoleKey]::K) { if (-not $ctrl) { Start-PSMMUpdateCheckTask }; continue }
+                ([ConsoleKey]::P) { if (-not $ctrl) { $result.Cmd = 'paths'; return }; continue }
                 ([ConsoleKey]::A) { if (-not $ctrl) { $result.Cmd = 'add'; return }; continue }
                 ([ConsoleKey]::C) { if (-not $ctrl) { $result.Cmd = 'conflicts'; return }; continue }
                 ([ConsoleKey]::R) { if (-not $ctrl) { $result.Cmd = 'reload'; return }; continue }

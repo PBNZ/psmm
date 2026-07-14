@@ -109,6 +109,17 @@ function script:Invoke-PSMMApply {
     $activeEntries = @(Get-PSMMEntry)
     $active = @{}; foreach ($e in $activeEntries) { if ($e.Name) { $active[$e.Name] = $e } }
     $managed = @{}; foreach ($e in (Get-PSMMAllEntries)) { if ($e.Name) { $managed[$e.Name] = $true } }
+    # cloud-only check up front, one confirm for the whole batch (per-module
+    # prompts would be noise): cancelling skips the apply entirely
+    foreach ($e in $activeEntries) {
+        if ($e.Mode -eq 'Load' -and -not (Get-Module -Name $e.Name)) {
+            if (-not (Confirm-PSMMCloudHydration -ModuleName $e.Name)) {
+                Write-PSMMLine '[grey66]apply cancelled (cloud-only files not downloaded)[/]'
+                $null = Wait-PSMMKey
+                return
+            }
+        }
+    }
     $did = 0
     foreach ($e in $activeEntries) {
         if ($e.Mode -eq 'Load' -and -not (Get-Module -Name $e.Name)) {

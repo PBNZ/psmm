@@ -6,6 +6,22 @@ All notable changes to psmm. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- **Module locations screen (`p`) with OneDrive diagnostics**: lists every
+  `$env:PSModulePath` entry in search order and flags the first/CurrentUser
+  entry when it lives inside OneDrive — which is PowerShell's *default*
+  whenever OneDrive backs up the Documents folder (verified against
+  about_PSModulePath, the PowerShell source, and the OneDrive Known Folder
+  Move docs). From there: `d` downloads (hydrates) all cloud-only
+  placeholder files with progress, `k` pins the folder "always keep on this
+  device" (`attrib +p`), `s` sets a different primary (CurrentUser) module
+  location via the documented `powershell.config.json` `PSModulePath`
+  override (with backup and a corrupt-file guard), `r` removes it again.
+- **Cloud-only pre-load checks**: before loading a module whose files are
+  OneDrive Files On-Demand placeholders, psmm warns, asks, and downloads
+  them with per-file progress (module menu and apply-to-session); grid bulk
+  loads hydrate silently with a status line. Prevents the stalls/"Access to
+  the cloud file is denied" failures that placeholder recalls cause
+  mid-import.
 - **Design system** (`docs/design-system.md`): palette, hint style, and a
   key registry so every screen binds the same verb to the same key.
 - **Go home from anywhere**: `g` then `h` jumps straight back to the module

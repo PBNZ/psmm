@@ -363,6 +363,34 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         }
     }
 
+    It 'the paths screen lists PSModulePath entries with flags and OneDrive guidance' {
+        $text = Get-RenderedText {
+            $infos = @(
+                [pscustomobject]@{ Order = 0; Path = 'C:\Users\p\OneDrive\Documents\PowerShell\Modules'; First = $true; Exists = $true; OneDrive = $true; UserDefault = $true }
+                [pscustomobject]@{ Order = 1; Path = 'C:\Program Files\PowerShell\Modules'; First = $false; Exists = $true; OneDrive = $false; UserDefault = $false }
+            )
+            Build-PSMMPathsView -State (New-PSMMListState) -Infos $infos
+        }
+        $text | Should -Match 'Module locations'
+        $text | Should -Match 'first'
+        $text | Should -Match 'user default'
+        $text | Should -Match 'onedrive'
+        $text | Should -Match 'primary module location is inside OneDrive'
+        $text | Should -Match 'd download cloud-only files'
+        $text | Should -Match 'k keep on device'
+        $text | Should -Match 's set primary location'
+    }
+
+    It 'the grid offers p=paths and shows the OneDrive notice when the primary location is cloud-backed' {
+        InModuleScope psmm { $script:PSMM_UI.OneDrivePrimary = $true }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match 'p paths'
+        $text | Should -Match 'primary module location is inside OneDrive'
+        InModuleScope psmm { $script:PSMM_UI.OneDrivePrimary = $false }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Not -Match 'primary module location is inside OneDrive'
+    }
+
     It 'alt-screen helpers no-op safely without a real console' {
         InModuleScope psmm {
             { Enter-PSMMAltScreen; Exit-PSMMAltScreen } | Should -Not -Throw

@@ -21,6 +21,7 @@ $psmmEngineFiles = @(
     'src/Engine/Tasks.ps1'
     'src/Engine/Auth.ps1'
     'src/Engine/Gallery.ps1'
+    'src/Engine/CloudFiles.ps1'
 )
 $psmmPublicFiles = @(
     'src/Public/Invoke-PSMMStartup.ps1'

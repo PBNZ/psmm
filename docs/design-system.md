@@ -51,9 +51,9 @@ Status colours are explicit 256-colour names so they render identically in every
 | `c` | copy | help/pager screens: copy the visible content to the clipboard |
 | `r` | reload / rescan | re-read from disk |
 
-Screen-local keys (`g=gallery`, `f=files`, `t=tasks`, `m=unmanaged`, `n=new config`, ...) may
-reuse letters across screens as long as the *verb* differs per screen and no global verb is
-shadowed.
+Screen-local keys (`g=gallery`, `f=files`, `p=paths`, `t=tasks`, `m=unmanaged`,
+`n=new config`, `d=download`/`k=keep on device` on the paths screen, ...) may reuse letters
+across screens as long as the *verb* differs per screen and no global verb is shadowed.
 
 ## Keys that work everywhere
 

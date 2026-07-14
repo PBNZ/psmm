@@ -90,11 +90,15 @@ function script:Show-PSMMModuleMenu {
         switch ($k.Key) {
             ([ConsoleKey]::L) {
                 Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
-                try {
-                    Import-PSMMModuleTimed -Entry $Entry
-                    $status = "[green3]loaded ($($Entry.ImportMs) ms)[/]"
-                } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
-                Update-PSMMLoaded -Entries $ui.Entries
+                if (-not (Confirm-PSMMCloudHydration -ModuleName $Entry.Name)) {
+                    $status = '[grey66]load cancelled (cloud-only files not downloaded)[/]'
+                } else {
+                    try {
+                        Import-PSMMModuleTimed -Entry $Entry
+                        $status = "[green3]loaded ($($Entry.ImportMs) ms)[/]"
+                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                    Update-PSMMLoaded -Entries $ui.Entries
+                }
             }
             ([ConsoleKey]::U) {
                 if ($ctrl) {

@@ -125,6 +125,26 @@ else:
     sys.exit(1)
 print("OK   esc returned from help to the grid")
 
+# 5b. 'p' -> module locations screen (PSModulePath + OneDrive diagnostics)
+proc.write("p")
+wait_for("Module locations", 20, "'p' opened the module locations screen")
+wait_for("set primary location", 10, "paths screen shows its actions")
+# 5c. 'g' then 'h' -> the goto-home chord returns to the grid from a sub-screen
+before = len(stream())
+proc.write("g")
+time.sleep(0.3)
+proc.write("h")
+deadline = time.time() + 20
+while time.time() < deadline:
+    if "PS Session Module Manager" in stream()[before:]:
+        break
+    time.sleep(0.25)
+else:
+    print("FAIL 'g h' did not return to the grid")
+    proc.terminate()
+    sys.exit(1)
+print("OK   'g h' chord jumped home from a sub-screen")
+
 # 6. 'a' -> add a new entry end-to-end: the screen must CLEAR (no append
 #    below the grid - the Clear() no-op bug) and the wizard must run since a
 #    config file now exists (auto-created in step 1b)
