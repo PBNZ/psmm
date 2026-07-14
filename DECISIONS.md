@@ -14,12 +14,17 @@ alias.
 
 ## D2 — License: MIT
 
-Copyright (c) 2026 Peter Braun. Permissive, the community norm for PowerShell
-modules.
+Copyright (c) 2026 PBNZ. Permissive, the community norm for PowerShell
+modules. *(Amended 2026-07-14: copyright holder changed from the legal name
+to the PBNZ handle in LICENSE and the manifest, and the meaningless "All
+rights reserved." boilerplate dropped - the Copyright manifest field is
+free-form and optional per about_Module_Manifests, and pseudonymous
+copyright is recognized.)*
 
 ## D3 — Author / identifiers
 
-- Author: `Peter Braun`
+- Author: `PBNZ` *(amended 2026-07-14, was `Peter Braun` - the Gallery
+  Author field is a free-form string, often a handle or org name)*
 - Manifest GUID (generated once 2026-07-04, never change it):
   `ed4c75e5-4d5b-43b1-a0ed-3c46fe4bcdee`
 - `ProjectUri`/`LicenseUri` are placeholders until the GitHub repo exists —

@@ -2,8 +2,8 @@
     RootModule           = 'psmm.psm1'
     ModuleVersion        = '0.1.0'
     GUID                 = 'ed4c75e5-4d5b-43b1-a0ed-3c46fe4bcdee'
-    Author               = 'Peter Braun'
-    Copyright            = '(c) 2026 Peter Braun. All rights reserved.'
+    Author               = 'PBNZ'
+    Copyright            = '(c) 2026 PBNZ'
     Description          = 'PowerShell Session Module Manager: fast, declarative module loading at shell start (JSON config), plus a keyboard-driven terminal UI to manage modules, browse commands, resolve config conflicts, check updates, and manage config files.'
     PowerShellVersion    = '7.0'
     CompatiblePSEditions = @('Core')

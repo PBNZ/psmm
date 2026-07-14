@@ -16,7 +16,7 @@ Describe 'Module manifest' -Tag Module, Engine {
         $m = Test-ModuleManifest -Path $script:ManifestPath
         $m.Version | Should -Not -BeNullOrEmpty
         $m.Guid | Should -Be 'ed4c75e5-4d5b-43b1-a0ed-3c46fe4bcdee'
-        $m.Author | Should -Be 'Peter Braun'
+        $m.Author | Should -Be 'PBNZ'
         $m.Description | Should -Not -BeNullOrEmpty
         $m.PowerShellVersion | Should -Be ([version]'7.0')
         $m.CompatiblePSEditions | Should -Contain 'Core'
