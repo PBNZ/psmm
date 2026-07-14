@@ -15,6 +15,7 @@ function script:Invoke-PSMMManagerLoop {
         while ($true) {
             $ui = $script:PSMM_UI
             if ($ui.HardQuit) { return }
+            $ui.GoHome = $false   # the grid IS home - the chord has unwound
             $r = Invoke-PSMMGrid
             if ($script:PSMM_UI.HardQuit) { return }
             switch ($r.Cmd) {

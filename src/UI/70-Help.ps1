@@ -14,16 +14,19 @@ function script:Get-PSMMHelpSection {
             '           unmanaged (installed but in no config file - toggle with m)'
             '  Scope    user (CurrentUser) / all (AllUsers) / mixed. "all ro" means'
             '           the session is not elevated, so AllUsers copies are read-only.'
-            '  Ver      version loaded (or newest installed). ^ = update available'
-            '           (after a u check). pin = version pinned in the config.'
+            '  Ver      version loaded (or newest installed). ' + [char]0x2191 + ' = update available'
+            '           (after a k check). pin = version pinned in the config.'
             '  !        the entry has validation issues (c shows details).'
             ''
             '  space    select/deselect row (bulk actions target the selection,'
             '           or just the cursor row when nothing is selected)'
             '  enter    open the module action menu (right-arrow does the same;'
             '           left-arrow backs out of any menu)'
-            '  Ctrl+L   load      Ctrl+U unload      Ctrl+P install/update (background)'
-            '  u        check the gallery for updates (background)'
+            '  ^l load    ^u unload    (^ means ctrl)'
+            '  i        install the targeted modules that are missing (background)'
+            '  u        update the targeted installed modules (background) -'
+            '           install and update are always separate keys'
+            '  k        check the gallery for updates (background)'
             '  a        add a new entry   g  search the PowerShell Gallery'
             '  x        clean up duplicate module versions   t  background tasks'
             '  m        show/hide unmanaged modules   f  config files   c  conflicts'
@@ -36,22 +39,25 @@ function script:Get-PSMMHelpSection {
             'are offered (e.g. no edit for read-only sources, no disconnect when'
             'not signed in).'
             ''
-            '  L/U/P    load / unload / install+update (foreground, with progress)'
-            '  B        browse the module''s commands with full help'
-            '  V        pin the entry to a version: exact "1.2.3" or a NuGet range'
+            '  ^l / ^u  load / unload in this session (^ means ctrl)'
+            '  i / u    install (when missing) / update (when installed) -'
+            '           foreground, with progress; always separate keys'
+            '  b        browse the module''s commands with full help'
+            '  v        pin the entry to a version: exact "1.2.3" or a NuGet range'
             '           like "[1.0,2.0)". Pinned modules are never nagged to update.'
-            '  K        remove all but the newest installed version'
-            '  I        check connection status (Connect-* modules: Graph, Az, EXO,'
-            '           PnP, Teams)   O  disconnect the active session'
-            '  A        (unmanaged modules) add to a config file'
-            '  E/D/M    edit fields / delete entry / move entry to another file'
+            '  x        remove all but the newest installed version'
+            '  s        check connection status (Connect-* modules: Graph, Az, EXO,'
+            '           PnP, Teams)   o  disconnect the active session'
+            '  a        (unmanaged modules) add to a config file'
+            '  e/d/m    edit fields / delete entry / move entry to another file'
         ) }
         'commands' { @(
             'COMMAND BROWSER'
             '---------------'
             'All commands the module exports. / filters (same as everywhere);'
             'enter opens tabbed help: Overview | Parameters | Examples,'
-            'left/right switches tab, up/down scrolls.'
+            'left/right switches tab, up/down scrolls, c copies the tab you'
+            'are viewing to the clipboard.'
             'Tip: help is much richer once the module is imported.'
         ) }
         'files' { @(
@@ -79,15 +85,15 @@ function script:Get-PSMMHelpSection {
             'Update-Module and Update-PSResource never delete old versions - they'
             'accumulate on disk forever. This screen lists every module with more'
             'than one installed version; enter prunes one module to its newest'
-            'version, Shift+A prunes all. Without elevation, AllUsers copies are'
+            'version, ctrl+a prunes all. Without elevation, AllUsers copies are'
             'skipped automatically.'
         ) }
         'tasks' { @(
             'BACKGROUND TASKS'
             '----------------'
-            'Everything psmm runs in the background lands here: install/update'
-            'batches (Ctrl+P), update checks (u), the unmanaged-module scan, and'
-            'Update-Help (start it with u on this screen). enter shows a task''s'
+            'Everything psmm runs in the background lands here: install batches'
+            '(i), update batches (u), update checks (k), the unmanaged-module'
+            'scan, and Update-Help (start it with u on this screen). enter shows a task''s'
             'full output. The grid keeps working while tasks run; a one-line'
             'overlay shows progress.'
         ) }
@@ -105,11 +111,16 @@ function script:Get-PSMMHelpText {
     $lines.Add('')
     $lines.Add('KEYS THAT WORK EVERYWHERE')
     $lines.Add('-------------------------')
-    $lines.Add('  up/down, PgUp/PgDn, Home/End   move / scroll')
+    $lines.Add('  In key hints, ^ means ctrl: ^q is ctrl+q. Keys are shown lowercase.')
+    $lines.Add('')
+    $lines.Add('  up/down, pgup/pgdn, home/end   move / scroll (home = top of list)')
     $lines.Add('  /        search: type to filter, enter keeps it, esc clears it')
     $lines.Add('  esc      back (clears an active filter first)')
+    $lines.Add('  g then h go straight to the home screen (the module grid) from any')
+    $lines.Add('           sub-screen; ctrl+h works too in Windows Terminal/conhost')
     $lines.Add('  ?        help for the current screen')
-    $lines.Add('  Ctrl+Q or Ctrl+X   quit psmm immediately, from anywhere')
+    $lines.Add('  c        (help and other text pages) copy the page to the clipboard')
+    $lines.Add('  ^q or ^x quit psmm immediately, from anywhere')
     $lines.Add('')
     $lines.Add('  Every list shows "row X/n"; every action reports its progress in')
     $lines.Add('  the status line - if nothing changed, the keypress did nothing.')

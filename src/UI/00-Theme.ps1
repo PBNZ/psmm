@@ -125,13 +125,36 @@ function script:Get-PSMMWinSize {
 }
 
 # Render "key=action" pairs as one consistently-styled hint line.
+# Design system: keys are always lowercase; '^' before a key means ctrl, and
+# any line using a '^' chord starts with the muted legend '^=ctrl'.
 function script:Get-PSMMHint {
     param([Parameter(Mandatory)][string[]]$Pairs)
     $parts = foreach ($p in $Pairs) {
         $k, $v = $p -split '=', 2
-        "[$script:PSMM_ColKey]$k[/] [$script:PSMM_ColMute]$v[/]"
+        "[$script:PSMM_ColKey]$($k.ToLowerInvariant())[/] [$script:PSMM_ColMute]$v[/]"
+    }
+    if (@($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
+        $parts = @("[$script:PSMM_ColMute]^=ctrl[/]") + @($parts)
     }
     $parts -join " [$script:PSMM_ColMute]·[/] "
+}
+
+# Minimum terminal size a table screen needs; below it Spectre collapses the
+# table to '...'. Screens render Get-PSMMTooSmallView instead of the table.
+function script:Test-PSMMWinTooSmall {
+    param([int]$MinWidth = 60, [int]$MinHeight = 14)
+    $win = Get-PSMMWinSize
+    ($win.Width -lt $MinWidth) -or ($win.Height -lt $MinHeight)
+}
+
+function script:Get-PSMMTooSmallView {
+    param([int]$MinWidth = 60, [int]$MinHeight = 14)
+    $win = Get-PSMMWinSize
+    $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
+    $items.Add([Spectre.Console.Markup]::new("[orange1]window too small to draw this screen[/]"))
+    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]current $($win.Width)x$($win.Height), need at least ${MinWidth}x${MinHeight} - enlarge the terminal[/]"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('esc=back', '^q=quit'))))
+    [Spectre.Console.Rows]::new($items)
 }
 
 # Two-column label/value grid for detail panels.

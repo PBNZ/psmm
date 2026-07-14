@@ -3,6 +3,37 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+- **Design system** (`docs/design-system.md`): palette, hint style, and a
+  key registry so every screen binds the same verb to the same key.
+- **Go home from anywhere**: `g` then `h` jumps straight back to the module
+  grid from any sub-screen (the vim-style goto chord used by yazi/ranger/
+  spotify_player; ctrl+h works too in Windows Terminal/conhost).
+- **Copy help to the clipboard**: `c` in the tabbed command help copies the
+  tab you are viewing; `c` in any text page (help, conflicts, task output)
+  copies the whole page.
+- **Clear too-small message**: when the terminal is too narrow/short for a
+  screen's table, psmm now says so (current vs required size) instead of
+  rendering a bare `...`. The grid computes the required width exactly and
+  flexes the Name column before giving up.
+
+### Changed
+- **Key hints are lowercase everywhere**, and `^` now denotes ctrl
+  (`^q=quit`); any hint line using a chord starts with a `^=ctrl` legend.
+- **Install and update are separate actions with fixed keys**: `i` installs
+  (missing targets), `u` updates (installed targets) — on the grid
+  (background) and in the module menu (foreground). The gallery update
+  *check* moved from `u` to `k`; the old combined `Ctrl+P` install/update
+  and the module menu's `P` are gone.
+- Module menu rebinds for consistency: load/unload are `^l`/`^u` (matching
+  the grid), version cleanup is `x` (matching the grid's cleanup screen,
+  was `K`), connection check is `s` (was `I`).
+- Cleanup screen: clean-all is `^a` (was `Shift+A`).
+- The update-available marker in the Ver column and the list scroll
+  indicators are now `↑`/`↓` (the `^` glyph is reserved for ctrl).
+
 ## [0.1.0-beta1] — Unreleased (first public prerelease)
 
 First release as a proper module. Everything below is relative to the

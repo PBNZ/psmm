@@ -76,8 +76,10 @@ background job; the report tells you what happened.
 
 - one grid row per module: loaded/installed/missing, source file, mode,
   install policy, scope (CurrentUser/AllUsers), version, update marker
-- `space` select · `Ctrl+L/U/P` load/unload/install · `u` update check
-- `/` search (everywhere) · `?` help (everywhere) · `Ctrl+Q` quit (anywhere)
+- `space` select · `^l`/`^u` load/unload (`^` = ctrl) · `i` install · `u` update
+  · `k` check for updates
+- `/` search (everywhere) · `?` help (everywhere) · `g h` home (anywhere) ·
+  `^q` quit (anywhere)
 - `g` search the PowerShell Gallery and add modules to your config
 - `x` clean up stacked old module versions
 - `m` reveal installed-but-unmanaged modules and adopt them into a config

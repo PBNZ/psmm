@@ -8,6 +8,7 @@ function script:Build-PSMMCleanupView {
         [Parameter(Mandatory)] $Dupes,
         [string]$StatusMarkup
     )
+    if (Test-PSMMWinTooSmall) { return (Get-PSMMTooSmallView) }
     $n = $Dupes.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
@@ -31,7 +32,7 @@ function script:Build-PSMMCleanupView {
     if (-not $script:PSMM_UI.Elevated) {
         $items.Add([Spectre.Console.Markup]::new('[grey66]session is not elevated: AllUsers copies are skipped automatically[/]'))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=clean this module', 'A=clean ALL', 'r=rescan', '?=help', 'esc=back', 'Ctrl+Q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=clean this module', '^a=clean all', 'r=rescan', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -43,7 +44,7 @@ function script:Show-PSMMCleanup {
     $dupes = @(Get-PSMMDuplicateVersion)
     $status = ''
     while ($true) {
-        if ($ui.HardQuit) { return }
+        if ($ui.HardQuit -or $ui.GoHome) { return }
         if (-not $dupes.Count) {
             Clear-PSMMScreen
             Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old module versions[/]"
@@ -64,11 +65,16 @@ function script:Show-PSMMCleanup {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $dupes.Count) { continue }
                 switch ($k.Key) {
                     ([ConsoleKey]::Enter)  { $action.Name = 'one'; return }
-                    ([ConsoleKey]::A)      { if (($k.Modifiers -band [ConsoleModifiers]::Shift) -ne 0) { $action.Name = 'all'; return }; continue }
+                    ([ConsoleKey]::A)      {
+                        # ^a per the design system; shift+a kept as a legacy alias
+                        if (($k.Modifiers -band ([ConsoleModifiers]::Control -bor [ConsoleModifiers]::Shift)) -ne 0) { $action.Name = 'all'; return }
+                        continue
+                    }
                     ([ConsoleKey]::R)      { $action.Name = 'rescan'; return }
                     ([ConsoleKey]::Escape) { $action.Name = 'back'; return }
                     default { if ($k.KeyChar -eq '?') { $action.Name = 'help'; return } }

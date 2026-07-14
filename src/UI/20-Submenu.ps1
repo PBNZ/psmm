@@ -46,18 +46,22 @@ function script:Build-PSMMModuleMenuView {
     $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
     $items.Add($panel)
 
-    $pairs = @('L=load', 'U=unload', 'P=install/update', 'B=browse commands')
-    if ($Entry.Installed -and @($Entry.InstalledVersions).Count -gt 1) { $pairs += 'K=clean old versions' }
-    if ($isUnmanaged) { $pairs += 'A=add to config' }
-    elseif ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { $pairs += @('E=edit', 'V=pin version', 'D=delete', 'M=move to file') }
+    # verb keys match the grid (design system): ^l/^u load/unload, i install,
+    # u update - install and update are always separate keys.
+    $pairs = @('^l=load', '^u=unload')
+    if ($Entry.Installed) { $pairs += 'u=update' } else { $pairs += 'i=install' }
+    $pairs += 'b=browse commands'
+    if ($Entry.Installed -and @($Entry.InstalledVersions).Count -gt 1) { $pairs += 'x=clean old versions' }
+    if ($isUnmanaged) { $pairs += 'a=add to config' }
+    elseif ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { $pairs += @('e=edit', 'v=pin version', 'd=delete', 'm=move to file') }
     if ($Auth -and $Auth.Supported) {
-        $pairs += 'I=re-check connection'
-        if ($Auth.Connected) { $pairs += 'O=disconnect' }
+        $pairs += 's=re-check connection'
+        if ($Auth.Connected) { $pairs += 'o=disconnect' }
     } elseif (Get-PSMMAuthProvider -ModuleName $Entry.Name) {
-        $pairs += 'I=check connection'
+        $pairs += 's=check connection'
     }
-    $pairs += @('?=help', 'esc=back', 'Ctrl+Q=quit')
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs $pairs)))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('?=help', 'esc=back', 'g h=home', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -74,13 +78,15 @@ function script:Show-PSMMModuleMenu {
 
     $status = ''
     while ($true) {
-        if ($ui.HardQuit) { return }
+        if ($ui.HardQuit -or $ui.GoHome) { return }
         Clear-PSMMScreen
         Write-PSMMRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth -StatusMarkup $status)
         $status = ''
 
         $k = [Console]::ReadKey($true)
         if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
+        if (Test-PSMMHomeKey $k) { $ui.GoHome = $true; return }
+        $ctrl = ($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0
         switch ($k.Key) {
             ([ConsoleKey]::L) {
                 Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
@@ -91,28 +97,45 @@ function script:Show-PSMMModuleMenu {
                 Update-PSMMLoaded -Entries $ui.Entries
             }
             ([ConsoleKey]::U) {
-                Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
-                try { Remove-Module -Name $Entry.Name -Force -ErrorAction Stop; $status = '[green3]unloaded[/]' }
-                catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
-                Update-PSMMLoaded -Entries $ui.Entries
+                if ($ctrl) {
+                    Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
+                    try { Remove-Module -Name $Entry.Name -Force -ErrorAction Stop; $status = '[green3]unloaded[/]' }
+                    catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                    Update-PSMMLoaded -Entries $ui.Entries
+                } elseif (-not $Entry.Installed) {
+                    $status = '[orange1]not installed - i installs it first[/]'
+                } else {
+                    Clear-PSMMScreen
+                    Write-PSMMLine "[$script:PSMM_ColAccent]updating $(ConvertTo-PSMMSafe $Entry.Name)... (this can take a while)[/]"
+                    try {
+                        Install-PSMMModule -Name $Entry.Name -Update -Version $Entry.Version
+                        $status = '[green3]update done[/]'
+                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                    Update-PSMMAvailable -Entries $ui.Entries -Name $Entry.Name
+                }
             }
-            ([ConsoleKey]::P) {
-                Clear-PSMMScreen
-                Write-PSMMLine "[$script:PSMM_ColAccent]installing/updating $(ConvertTo-PSMMSafe $Entry.Name)... (this can take a while)[/]"
-                try {
-                    Install-PSMMModule -Name $Entry.Name -Update:([bool]$Entry.Installed) -Version $Entry.Version
-                    $status = '[green3]install/update done[/]'
-                } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
-                Update-PSMMAvailable -Entries $ui.Entries -Name $Entry.Name
+            ([ConsoleKey]::I) {
+                if ($ctrl) { continue }
+                if ($Entry.Installed) {
+                    $status = '[orange1]already installed - u updates it[/]'
+                } else {
+                    Clear-PSMMScreen
+                    Write-PSMMLine "[$script:PSMM_ColAccent]installing $(ConvertTo-PSMMSafe $Entry.Name)... (this can take a while)[/]"
+                    try {
+                        Install-PSMMModule -Name $Entry.Name -Version $Entry.Version
+                        $status = '[green3]install done[/]'
+                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                    Update-PSMMAvailable -Entries $ui.Entries -Name $Entry.Name
+                }
             }
             ([ConsoleKey]::B) { Show-PSMMCommands -Entry $Entry }
-            ([ConsoleKey]::K) {
+            ([ConsoleKey]::X) {
                 if ($Entry.Installed -and @($Entry.InstalledVersions).Count -gt 1) {
                     $status = Invoke-PSMMVersionCleanup -Entry $Entry
                     Update-PSMMAvailable -Entries $ui.Entries -Name $Entry.Name
                 }
             }
-            ([ConsoleKey]::I) {
+            ([ConsoleKey]::S) {
                 if ($provider) {
                     Write-PSMMLine "[$script:PSMM_ColAccent]checking connection status$(if ($provider.Slow) { ' (network - may take a moment)' })...[/]"
                     $auth = Get-PSMMConnectionStatus -ModuleName $Entry.Name

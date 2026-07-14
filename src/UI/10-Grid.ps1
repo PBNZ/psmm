@@ -22,15 +22,16 @@ function script:Build-PSMMGrid {
     } elseif ($entries.Count) { @(0..($entries.Count - 1)) } else { @() }
     $n = $ui.View.Count
     $win = Get-PSMMWinSize
-    $vp = Get-PSMMViewport -State $ui -Count $n -Rows ($win.Height - 11)   # heading + footer + overlay rows
-
-    # name column width budget from window width (scope column costs ~6)
-    $nameCap = [Math]::Max(14, $win.Width - 84)
+    $vp = Get-PSMMViewport -State $ui -Count $n -Rows ($win.Height - 12)   # heading + footer + overlay rows
 
     # Build EVERY row of the filtered view (not just the viewport) so column
     # widths come from ALL content: scrolling never resizes the table
     # (2026-07-05 live-run feedback: width jitter). ponytail: O(rows) markup
     # strip per frame - fine to a few hundred entries.
+    # The Name cell stays RAW here; it is capped, escaped and styled below,
+    # once the other columns' widths are known - the old fixed "width - 84"
+    # budget under-reserved and let the table outgrow the terminal, which
+    # Spectre renders as a bare '...'.
     $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($v = 0; $v -lt $n; $v++) {
         $idx = $ui.View[$v]
@@ -48,8 +49,7 @@ function script:Build-PSMMGrid {
             default            { Split-Path $e.Source -Leaf }
         }
         $rw = if ($isUnmanaged) { '' } elseif ($e.Writable) { ' [grey66]rw[/]' } else { ' [grey66]ro[/]' }
-        $name = ConvertTo-PSMMSafe (Get-PSMMTrunc $e.Name $nameCap)
-        if ($isCur) { $name = "[$script:PSMM_ColAccent]$name[/]" }
+        $name = "$($e.Name)"
         $scope = switch ($e.InstallScope) {
             'CurrentUser' { 'user' }
             'AllUsers'    { if ($ui.Elevated) { 'all' } else { 'all [grey66]ro[/]' } }
@@ -57,7 +57,8 @@ function script:Build-PSMMGrid {
             default       { '-' }
         }
         $ver = if ($e.LoadedVersion) { "$($e.LoadedVersion)" } elseif ($e.InstalledVersion) { "$($e.InstalledVersion)" } else { '-' }
-        if ($e.UpdateAvailable) { $ver = "$ver [orange1]^[/]" }
+        # '↑', not '^': the design system reserves '^' for the ctrl legend
+        if ($e.UpdateAvailable) { $ver = "$ver [orange1]$([char]0x2191)[/]" }
         if ($e.PinnedExact) { $ver = "$ver [grey66]pin[/]" }
         $cur = if ($isCur) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }
         $flag = if ($e.Issues.Count) { '[indianred1]![/]' } else { ' ' }
@@ -66,20 +67,40 @@ function script:Build-PSMMGrid {
                 $e.Mode, $e.Install, $scope, $state, $ver, $flag))
     }
 
+    $headers = @(' ', 'Sel', 'Name', 'Src', 'Mode', 'Inst', 'Scope', 'State', 'Ver', '!')
+    $widths = @(foreach ($h in $headers) { $h.Length })
+    for ($ci = 0; $ci -lt $headers.Count; $ci++) {
+        foreach ($r in $rows) {
+            # column 2 (Name) is still raw text, everything else is markup
+            $len = if ($ci -eq 2) { $r[2].Length } else { [Spectre.Console.Markup]::Remove($r[$ci]).Length }
+            if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
+        }
+    }
+    # Exact fit: content + 2 padding per column + 11 border verticals. The
+    # Name column flexes down to 14 chars; below the resulting minimum,
+    # Spectre would collapse the table to a bare '...' - render a clear
+    # too-small message instead (design system: too-small terminal).
+    $overhead = (2 * $headers.Count) + $headers.Count + 1
+    $fixed = ($widths | Measure-Object -Sum).Sum - $widths[2]
+    $minName = [Math]::Min($widths[2], 14)
+    if ($win.Width -lt ($fixed + $overhead + $minName) -or $win.Height -lt 14) {
+        return (Get-PSMMTooSmallView -MinWidth ($fixed + $overhead + $minName) -MinHeight 14)
+    }
+    $nameCap = [Math]::Min($widths[2], [Math]::Max(14, $win.Width - $overhead - $fixed))
+    $widths[2] = $nameCap
+    for ($v = 0; $v -lt $n; $v++) {
+        $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $rows[$v][2] $nameCap)
+        if ($v -eq $ui.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
+        $rows[$v][2] = $nm
+    }
+
     $T = [Spectre.Console.Table]::new()
     $T.Border = [Spectre.Console.TableBorder]::Rounded
-    $ci = 0
-    foreach ($h in ' ', 'Sel', 'Name', 'Src', 'Mode', 'Inst', 'Scope', 'State', 'Ver', '!') {
-        $w = $h.Length
-        foreach ($r in $rows) {
-            $len = [Spectre.Console.Markup]::Remove($r[$ci]).Length
-            if ($len -gt $w) { $w = $len }
-        }
-        $col = [Spectre.Console.TableColumn]::new($h)
-        $col.Width = $w
+    for ($ci = 0; $ci -lt $headers.Count; $ci++) {
+        $col = [Spectre.Console.TableColumn]::new($headers[$ci])
+        $col.Width = $widths[$ci]
         $col.NoWrap = $true
         [void]$T.AddColumn($col)
-        $ci++
     }
     for ($v = $vp.First; $v -le $vp.Last; $v++) {
         [void][Spectre.Console.TableExtensions]::AddRow($T, $rows[$v])
@@ -95,21 +116,26 @@ function script:Build-PSMMGrid {
     $flt = Get-PSMMFilterMarkup -State $ui
     $head = if ($sel) { "[green3]$sel selected[/]$pos$flt" } else { "[$script:PSMM_ColMute]none selected[/]$pos$flt" }
 
-    # two short hint rows (a single long row collapses to '...' when narrow)
-    $hintNav, $hintAct = if ($ui.FilterMode) {
-        (Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter')),
-        (Get-PSMMHint -Pairs @('up/dn=move'))
+    # short hint rows (a single long row collapses to '...' when narrow):
+    # navigation, module verbs, screen switching (design system row order)
+    $hintRows = if ($ui.FilterMode) {
+        @(
+            (Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter')),
+            (Get-PSMMHint -Pairs @('up/dn=move'))
+        )
     } else {
-        (Get-PSMMHint -Pairs @('up/dn=move', 'space=select', 'enter=actions', '/=search', '?=help', 'esc=quit')),
-        (Get-PSMMHint -Pairs @('^L=load', '^U=unload', '^P=install', 'u=updates', 'a=add', 'g=gallery', 'x=cleanup', 'f=files', 'c=conflicts', 't=tasks', 'm=unmanaged', 'r=reload'))
+        @(
+            (Get-PSMMHint -Pairs @('up/dn=move', 'space=select', 'enter=actions', '/=search', '?=help', 'esc=quit')),
+            (Get-PSMMHint -Pairs @('^l=load', '^u=unload', 'i=install', 'u=update', 'k=check updates', 'r=reload')),
+            (Get-PSMMHint -Pairs @('a=add', 'g=gallery', 'x=cleanup', 'f=files', 'c=conflicts', 't=tasks', 'm=unmanaged'))
+        )
     }
 
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]PS Session Module Manager[/] [$script:PSMM_ColMute](psmm · $($ui.Engine)$(if ($ui.Elevated) { ' · elevated' }))[/]"))
     $items.Add($T)
     $items.Add([Spectre.Console.Markup]::new($head))
-    $items.Add([Spectre.Console.Markup]::new($hintNav))
-    $items.Add([Spectre.Console.Markup]::new($hintAct))
+    foreach ($hr in $hintRows) { $items.Add([Spectre.Console.Markup]::new($hr)) }
 
     # deferred-startup job status (from Invoke-PSMMStartup)
     $jline = Get-PSMMStartupJobMarkup
@@ -145,7 +171,7 @@ function script:Get-PSMMStartupJobMarkup {
     if ($j.State -eq 'Completed') {
         $out = @(); try { $out = @(Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue) } catch { }
         $fails = @($out | Where-Object { "$_" -like 'FAILED *' } | ForEach-Object { if ("$_" -match '^FAILED\s+([^:]+)') { $Matches[1] } })
-        if ($fails.Count) { return "[orange1]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (Ctrl+P on the row retries)[/]" }
+        if ($fails.Count) { return "[orange1]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (i on the row retries)[/]" }
         return "[green3]background startup: all $total module task(s) ok[/]"
     }
     if ($j.State -in 'Failed', 'Stopped') { return '[indianred1]background startup job failed - see t (tasks)[/]' }
@@ -178,19 +204,30 @@ function script:Invoke-PSMMBulk {
     $ui.Status = if ($fail) { "[orange1]$verb $ok, $fail failed[/]" } else { "[green3]$verb $ok[/]" }
 }
 
-# Launch install/update of the targeted rows as a BACKGROUND task (#25):
-# the grid stays fully usable; the overlay shows progress; state refreshes
-# when the task lands (see Receive-PSMMUITask).
+# Launch install (or update, with -Update) of the targeted rows as a
+# BACKGROUND task (#25): the grid stays fully usable; the overlay shows
+# progress; state refreshes when the task lands (see Receive-PSMMUITask).
+# Install and update are separate actions on separate keys (design system):
+# 'i' installs the targets that are missing, 'u' updates the installed ones.
 function script:Start-PSMMInstallTask {
+    param([switch]$Update)
     $ui = $script:PSMM_UI
-    $targets = Get-PSMMTargets
-    if (-not $targets.Count) { return }
+    $verb = if ($Update) { 'update' } else { 'install' }
+    $targets = @(Get-PSMMTargets | Where-Object {
+        $e = $ui.Entries[$_]
+        if ($Update) { [bool]$e.Installed } else { -not $e.Installed }
+    })
+    if (-not $targets.Count) {
+        $ui.Status = if ($Update) { '[orange1]nothing to update - no installed module targeted (i installs missing ones)[/]' }
+                     else { '[orange1]nothing to install - every targeted module is already installed (u updates)[/]' }
+        return
+    }
     $mods = @(foreach ($t in $targets) {
         $e = $ui.Entries[$t]
-        [pscustomobject]@{ Name = $e.Name; Update = [bool]$e.Installed; Version = $e.Version }
+        [pscustomobject]@{ Name = $e.Name; Update = [bool]$Update; Version = $e.Version }
     })
     $names = @($mods.Name)
-    $null = Start-PSMMTask -Label "install/update: $($names -join ', ')" -Kind 'install' -Data $names -ArgumentList (, $mods) -ScriptBlock {
+    $null = Start-PSMMTask -Label "${verb}: $($names -join ', ')" -Kind 'install' -Data $names -ArgumentList (, $mods) -ScriptBlock {
         param($mods)
         foreach ($m in $mods) {
             try {
@@ -207,10 +244,10 @@ function script:Start-PSMMInstallTask {
         }
     }
     $ui.Sel.Clear()
-    $ui.Status = "[$script:PSMM_ColAccent]install/update of $($names.Count) module(s) started in the background - grid stays usable[/]"
+    $ui.Status = "[$script:PSMM_ColAccent]$verb of $($names.Count) module(s) started in the background - grid stays usable[/]"
 }
 
-# Opt-in update check (key 'u') as a background task - network-bound, so it
+# Opt-in update check (key 'k') as a background task - network-bound, so it
 # never blocks the grid and never runs automatically.
 function script:Start-PSMMUpdateCheckTask {
     $ui = $script:PSMM_UI
@@ -288,10 +325,11 @@ function script:Invoke-PSMMGrid {
                 }
                 ([ConsoleKey]::L) { if ($ctrl) { Invoke-PSMMBulk -Action Load -Context $ctx }; continue }
                 ([ConsoleKey]::U) {
-                    if ($ctrl) { Invoke-PSMMBulk -Action Unload -Context $ctx } else { Start-PSMMUpdateCheckTask }
+                    if ($ctrl) { Invoke-PSMMBulk -Action Unload -Context $ctx } else { Start-PSMMInstallTask -Update }
                     continue
                 }
-                ([ConsoleKey]::P) { if ($ctrl) { Start-PSMMInstallTask }; continue }
+                ([ConsoleKey]::I) { if (-not $ctrl) { Start-PSMMInstallTask }; continue }
+                ([ConsoleKey]::K) { if (-not $ctrl) { Start-PSMMUpdateCheckTask }; continue }
                 ([ConsoleKey]::A) { if (-not $ctrl) { $result.Cmd = 'add'; return }; continue }
                 ([ConsoleKey]::C) { if (-not $ctrl) { $result.Cmd = 'conflicts'; return }; continue }
                 ([ConsoleKey]::R) { if (-not $ctrl) { $result.Cmd = 'reload'; return }; continue }

@@ -87,8 +87,9 @@ function script:Get-PSMMPositionMarkup {
     if (-not $Count) { return '' }
     $pos = "[$script:PSMM_ColMute]  row $($State.Cursor + 1)/$Count[/]"
     if ($Count -gt $Viewport.Rows) {
-        $up = if ($Viewport.First -gt 0) { ' ^' } else { '' }
-        $dn = if ($Viewport.Last -lt $Count - 1) { ' v' } else { '' }
+        # arrows, not '^'/'v': the design system reserves '^' for the ctrl legend
+        $up = if ($Viewport.First -gt 0) { " $([char]0x2191)" } else { '' }
+        $dn = if ($Viewport.Last -lt $Count - 1) { " $([char]0x2193)" } else { '' }
         $pos += "[$script:PSMM_ColMute]  showing $($Viewport.First + 1)-$($Viewport.Last + 1)$up$dn[/]"
     }
     $pos
@@ -112,7 +113,8 @@ function script:Build-PSMMPagerView {
         # blank lines every text document contains
         [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup,
-        [string[]]$HintPairs = @('up/dn=scroll', 'esc=back', 'Ctrl+Q=quit'),
+        [string[]]$HintPairs = @('up/dn=scroll', 'c=copy', 'esc=back', 'g h=home', '^q=quit'),
+        [string]$StatusMarkup,
         [int]$ReservedRows = 7
     )
     $win  = Get-PSMMWinSize
@@ -129,7 +131,19 @@ function script:Build-PSMMPagerView {
     $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
     $items.Add($panel)
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs $HintPairs)))
+    if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
+}
+
+# Copy text to the OS clipboard; returns a status markup line either way.
+function script:Copy-PSMMText {
+    param([AllowEmptyString()][string]$Text)
+    try {
+        Set-Clipboard -Value $Text -ErrorAction Stop
+        '[green3]copied to clipboard[/]'
+    } catch {
+        "[indianred1]clipboard copy failed: $(ConvertTo-PSMMSafe $_.Exception.Message)[/]"
+    }
 }
 
 # Handle a pager key. Returns $true when handled.
@@ -158,19 +172,22 @@ function script:Show-PSMMPager {
         [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup
     )
-    $st = @{ Scroll = 0 }
+    $st = @{ Scroll = 0; Status = '' }
     Clear-PSMMScreen
     Invoke-PSMMLive -Body {
         param($ctx)
         while ($true) {
             if ($script:PSMM_UI.HardQuit) { return }
-            $ctx.UpdateTarget((Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup))
+            $ctx.UpdateTarget((Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -StatusMarkup $st.Status))
             $ctx.Refresh()
             $k = Read-PSMMKeyResize
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
+            if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+            $st.Status = ''
             if (Invoke-PSMMPagerNav -State $st -KeyInfo $k) { continue }
             if ($k.Key -eq [ConsoleKey]::Escape) { return }
+            if ($k.KeyChar -eq 'c') { $st.Status = Copy-PSMMText -Text ($Lines -join [Environment]::NewLine) }
         }
     }
     Clear-PSMMScreen

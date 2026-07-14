@@ -9,6 +9,7 @@ function script:Build-PSMMCommandListView {
         [Parameter(Mandatory)] $View,       # filtered list
         [Parameter(Mandatory)][string]$ModuleName
     )
+    if (Test-PSMMWinTooSmall) { return (Get-PSMMTooSmallView) }
     $n = $View.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 9)
@@ -30,7 +31,7 @@ function script:Build-PSMMCommandListView {
     $hint = if ($State.FilterMode) {
         Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter', 'up/dn=move')
     } else {
-        Get-PSMMHint -Pairs @('up/dn=move', 'enter=details', '/=search', '?=help', 'esc=back', 'Ctrl+Q=quit')
+        Get-PSMMHint -Pairs @('up/dn=move', 'enter=details', '/=search', '?=help', 'esc=back', 'g h=home', '^q=quit')
     }
     $items.Add([Spectre.Console.Markup]::new($hint))
     [Spectre.Console.Rows]::new($items)
@@ -52,7 +53,7 @@ function script:Show-PSMMCommands {
     $st = New-PSMMListState
     $pick = @{ Name = $null }
     while ($true) {
-        if ($ui.HardQuit) { return }
+        if ($ui.HardQuit -or $ui.GoHome) { return }
         $pick.Name = $null
         Clear-PSMMScreen
         Invoke-PSMMLive -Body {
@@ -71,6 +72,7 @@ function script:Show-PSMMCommands {
                     $null = Invoke-PSMMListNav -State $st -KeyInfo $k -Count $view.Count
                     continue
                 }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $view.Count) { continue }
                 switch ($k.Key) {
                     ([ConsoleKey]::Escape) {
@@ -106,7 +108,7 @@ function script:Show-PSMMCommands {
 # adapts to the window with a hard minimum.
 function script:Build-PSMMCommandDetailView {
     param(
-        [Parameter(Mandatory)] $State,      # @{ Tab; Scroll }
+        [Parameter(Mandatory)] $State,      # @{ Tab; Scroll; Status }
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)] $Content,    # @{ Overview; Parameters; Examples }
         [Parameter(Mandatory)][string[]]$Tabs
@@ -129,7 +131,8 @@ function script:Build-PSMMCommandDetailView {
     $panel.Border = [Spectre.Console.BoxBorder]::Rounded
     $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
     $items.Add($panel)
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('left/right=switch tab', 'up/dn=scroll', 'esc=back', 'Ctrl+Q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('left/right=switch tab', 'up/dn=scroll', 'c=copy tab', 'esc=back', 'g h=home', '^q=quit'))))
+    if ($State.Status) { $items.Add([Spectre.Console.Markup]::new($State.Status)) }
     [Spectre.Console.Rows]::new($items)
 }
 
@@ -146,7 +149,7 @@ function script:Show-PSMMCommandDetail {
     }
     foreach ($t in $tabs) { if (-not $content[$t]) { $content[$t] = '(no content - module may need importing for full help)' } }
 
-    $st = @{ Tab = 0; Scroll = 0 }
+    $st = @{ Tab = 0; Scroll = 0; Status = '' }
     Clear-PSMMScreen
     Invoke-PSMMLive -Body {
         param($ctx)
@@ -157,12 +160,15 @@ function script:Show-PSMMCommandDetail {
             $k = Read-PSMMKeyResize
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
+            if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+            $st.Status = ''
             switch ($k.Key) {
                 ([ConsoleKey]::LeftArrow)  { $st.Tab = ($st.Tab + $tabs.Count - 1) % $tabs.Count; $st.Scroll = 0 }
                 ([ConsoleKey]::RightArrow) { $st.Tab = ($st.Tab + 1) % $tabs.Count; $st.Scroll = 0 }
                 ([ConsoleKey]::Escape)     { return }
                 default {
-                    $null = Invoke-PSMMPagerNav -State $st -KeyInfo $k
+                    if ($k.KeyChar -eq 'c') { $st.Status = Copy-PSMMText -Text $content[$tabs[$st.Tab]] }
+                    else { $null = Invoke-PSMMPagerNav -State $st -KeyInfo $k }
                 }
             }
         }

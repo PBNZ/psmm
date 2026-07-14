@@ -8,6 +8,7 @@ function script:Build-PSMMGalleryView {
         [Parameter(Mandatory)][string]$Query,
         [string]$StatusMarkup
     )
+    if (Test-PSMMWinTooSmall) { return (Get-PSMMTooSmallView) }
     $n = $Results.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
@@ -32,7 +33,7 @@ function script:Build-PSMMGalleryView {
         $cur = $Results[$State.Cursor]
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe (Get-PSMMTrunc "by $($cur.Author) - $($cur.Description -replace '\s+', ' ')" ($win.Width - 6)))[/]"))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=add to config', '/=new search', '?=help', 'esc=back', 'Ctrl+Q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=add to config', '/=new search', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -42,7 +43,7 @@ function script:Show-PSMMGallery {
     $query = ''
     $results = @()
     while ($true) {
-        if ($ui.HardQuit) { return }
+        if ($ui.HardQuit -or $ui.GoHome) { return }
         # prompt for a (new) search
         Clear-PSMMScreen
         Write-PSMMLine "[$script:PSMM_ColAccent]Search the PowerShell Gallery[/]"
@@ -70,6 +71,7 @@ function script:Show-PSMMGallery {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $results.Count) { continue }
                 switch ($k.Key) {

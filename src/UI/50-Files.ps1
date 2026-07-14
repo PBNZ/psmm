@@ -7,6 +7,7 @@ function script:Build-PSMMFilesView {
         [Parameter(Mandatory)] $Metas,
         [string]$StatusMarkup
     )
+    if (Test-PSMMWinTooSmall) { return (Get-PSMMTooSmallView) }
     $n = $Metas.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 12)
@@ -33,7 +34,7 @@ function script:Build-PSMMFilesView {
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $cur.Path)[/]"))
         if ($cur.IncludesIgnored) { $items.Add([Spectre.Console.Markup]::new('[orange1]! this file has an Includes section that is being ignored (main config only)[/]')) }
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'space=enable/disable+save', 'a=apply to session', '?=help', 'esc=back', 'Ctrl+Q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'space=enable/disable+save', 'a=apply to session', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('n=new config (templates)', 'm=move file', 'c=conflicts'))))
     foreach ($w in @(Get-PSMMWarning | Select-Object -First 4)) { $items.Add([Spectre.Console.Markup]::new("[orange1]$(ConvertTo-PSMMSafe $w)[/]")) }
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
@@ -46,7 +47,7 @@ function script:Show-PSMMFiles {
     $st = New-PSMMListState
     $st.Status = ''
     while ($true) {
-        if ($ui.HardQuit) { return }
+        if ($ui.HardQuit -or $ui.GoHome) { return }
         $cmd = @{ Name = $null }
         Clear-PSMMScreen
         Invoke-PSMMLive -Body {
@@ -59,6 +60,7 @@ function script:Show-PSMMFiles {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $metas.Count) { continue }
                 switch ($k.Key) {

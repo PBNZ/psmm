@@ -247,6 +247,122 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $files | Should -Match 'CONFIG FILES'
     }
 
+    It 'grid hints follow the design system: lowercase keys, ^=ctrl legend, i/u/k verbs' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match '\^=ctrl'          # legend at the start of the chord row
+        $text | Should -Match '\^l load'
+        $text | Should -Match '\^u unload'
+        $text | Should -Match 'i install'
+        $text | Should -Match 'u update'
+        $text | Should -Match 'k check updates'
+        $text | Should -Not -Match 'Ctrl\+'      # the old uppercase chord style is gone
+    }
+
+    It 'Get-PSMMHint lowercases keys and only adds the ^=ctrl legend when a chord is present' {
+        InModuleScope psmm {
+            $plain = [Spectre.Console.Markup]::Remove((Get-PSMMHint -Pairs @('I=install', 'esc=back')))
+            $plain | Should -Match 'i install'
+            $plain | Should -Not -Match '\^=ctrl'
+            $chord = [Spectre.Console.Markup]::Remove((Get-PSMMHint -Pairs @('^Q=quit')))
+            $chord | Should -Match '^\^=ctrl'
+            $chord | Should -Match '\^q quit'
+        }
+    }
+
+    It 'module menu offers i=install for a missing module and u=update for an installed one' {
+        $missing = Get-RenderedText {
+            Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null
+        }
+        $missing | Should -Match 'i install'
+        $missing | Should -Not -Match 'u update'
+        $missing | Should -Match '\^l load'
+        $missing | Should -Match 'g h home'
+        $installed = Get-RenderedText {
+            $e = $script:PSMM_UI.Entries[0]
+            $e.Installed = $true; $e.InstalledVersion = [version]'1.0'
+            Build-PSMMModuleMenuView -Entry $e -Auth $null
+        }
+        $installed | Should -Match 'u update'
+        $installed | Should -Not -Match 'i install'
+    }
+
+    It 'cleanup screen binds clean-all to ^a (no shift bindings in hints)' {
+        $text = Get-RenderedText {
+            $st = New-PSMMListState
+            Build-PSMMCleanupView -State $st -Dupes @([pscustomobject]@{
+                Name = 'FatModule'; Latest = [version]'3.0'
+                Obsolete = @([pscustomobject]@{ Version = [version]'2.0'; Path = 'x'; Scope = 'CurrentUser' })
+            })
+        }
+        $text | Should -Match '\^a clean all'
+        $text | Should -Not -MatchExactly 'clean ALL'
+    }
+
+    It 'a too-small window renders a clear message instead of a collapsed table' {
+        Mock -ModuleName psmm Get-PSMMWinSize { [pscustomobject]@{ Height = 10; Width = 40 } }
+        foreach ($build in @(
+            { Build-PSMMGrid },
+            { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) },
+            { Build-PSMMTasksView -State (New-PSMMListState) -Tasks @() }
+        )) {
+            $text = Get-RenderedText $build
+            $text | Should -Match 'window too small'
+            $text | Should -Match 'need at least'
+            $text | Should -Match 'current 40x10'
+        }
+    }
+
+    It 'the grid update marker and scroll indicators use arrows, not ^ (reserved for ctrl)' {
+        InModuleScope psmm {
+            $e = $script:PSMM_UI.Entries[0]
+            $e.Installed = $true; $e.InstalledVersion = [version]'1.0'; $e.UpdateAvailable = $true
+        }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match ([regex]::Escape("1.0 $([char]0x2191)"))
+        InModuleScope psmm {
+            $pos = [Spectre.Console.Markup]::Remove((Get-PSMMPositionMarkup -State @{ Cursor = 0 } -Count 50 -Viewport @{ First = 0; Last = 9; Rows = 10 }))
+            $pos | Should -Match ([regex]::Escape([string][char]0x2193))
+            $pos | Should -Not -Match '\sv\s*$'
+        }
+    }
+
+    It 'i/u guard statuses: install skips installed targets, update skips missing ones' {
+        InModuleScope psmm {
+            # fixture entries are not installed: update has nothing to do
+            $script:PSMM_UI.Cursor = 0
+            Start-PSMMInstallTask -Update
+            $script:PSMM_UI.Status | Should -Match 'nothing to update'
+            # mark everything installed: install has nothing to do
+            foreach ($e in $script:PSMM_UI.Entries) { $e.Installed = $true }
+            Start-PSMMInstallTask
+            $script:PSMM_UI.Status | Should -Match 'nothing to install'
+        }
+    }
+
+    It 'Test-PSMMHomeKey accepts ctrl+h and rejects plain letters' {
+        InModuleScope psmm {
+            $ctrlH = [ConsoleKeyInfo]::new([char]8, [ConsoleKey]::H, $false, $false, $true)
+            Test-PSMMHomeKey -KeyInfo $ctrlH | Should -BeTrue
+            $plainH = [ConsoleKeyInfo]::new('h', [ConsoleKey]::H, $false, $false, $false)
+            Test-PSMMHomeKey -KeyInfo $plainH | Should -BeFalse
+        }
+    }
+
+    It 'the pager and command help offer c=copy and copy reports success' {
+        $pager = Get-RenderedText {
+            Build-PSMMPagerView -State @{ Scroll = 0 } -Lines @('line') -TitleMarkup 'T'
+        }
+        $pager | Should -Match 'c copy'
+        $detail = Get-RenderedText {
+            Build-PSMMCommandDetailView -State @{ Tab = 0; Scroll = 0; Status = '' } -Name 'Get-Thing' -Tabs @('Overview') -Content @{ Overview = 'x' }
+        }
+        $detail | Should -Match 'c copy tab'
+        InModuleScope psmm {
+            Mock Set-Clipboard { }
+            [Spectre.Console.Markup]::Remove((Copy-PSMMText -Text 'hello')) | Should -Match 'copied to clipboard'
+        }
+    }
+
     It 'alt-screen helpers no-op safely without a real console' {
         InModuleScope psmm {
             { Enter-PSMMAltScreen; Exit-PSMMAltScreen } | Should -Not -Throw

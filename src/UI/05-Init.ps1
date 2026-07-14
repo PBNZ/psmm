@@ -66,6 +66,7 @@ function script:Initialize-PSMMUIState {
         Status        = ''
         Dirty         = $false
         HardQuit      = $false
+        GoHome        = $false     # set by the 'g h' chord: unwind to the grid
         Unmanaged     = $null      # results of the background scan (#26)
         ShowUnmanaged = $false     # 'm' toggles unmanaged rows in the grid
         Elevated      = Test-PSMMElevated

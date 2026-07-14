@@ -39,7 +39,7 @@ function script:Receive-PSMMUITask {
                     }
                     if ($e.UpdateAvailable) { $found++ }
                 }
-                $ui.Status = if ($found) { "[orange1]$found update(s) available (^ in the Ver column)[/]" } else { '[green3]everything up to date[/]' }
+                $ui.Status = if ($found) { "[orange1]$found update(s) available ($([char]0x2191) in the Ver column - u updates the selection)[/]" } else { '[green3]everything up to date[/]' }
             }
             'updatehelp' {
                 $ui.Status = if ($t.Failed) { '[orange1]Update-Help finished with errors (t=details)[/]' } else { '[green3]Update-Help done[/]' }
@@ -73,6 +73,7 @@ function script:Build-PSMMTasksView {
         [Parameter(Mandatory)] $Tasks,
         [string]$StatusMarkup
     )
+    if (Test-PSMMWinTooSmall) { return (Get-PSMMTooSmallView) }
     $n = $Tasks.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 10)
@@ -96,7 +97,7 @@ function script:Build-PSMMTasksView {
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Background tasks[/]$pos"))
     $items.Add($T)
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=view output', 'u=run Update-Help', 'c=clear finished', '?=help', 'esc=back', 'Ctrl+Q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=view output', 'u=run update-help', 'c=clear finished', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -105,7 +106,7 @@ function script:Show-PSMMTasks {
     $ui = $script:PSMM_UI
     $status = ''
     while ($true) {
-        if ($ui.HardQuit) { return }
+        if ($ui.HardQuit -or $ui.GoHome) { return }
         Update-PSMMTask
         $tasks = @(Get-PSMMTask)
         $st = New-PSMMListState
@@ -116,7 +117,7 @@ function script:Show-PSMMTasks {
             Clear-PSMMScreen
             Write-PSMMLine "[$script:PSMM_ColAccent]Background tasks[/]"
             Write-PSMMLine '[grey66]No tasks yet. u starts a background Update-Help; installs/updates/scans appear here too.[/]'
-            Write-PSMMLine (Get-PSMMHint -Pairs @('u=run Update-Help', 'esc=back'))
+            Write-PSMMLine (Get-PSMMHint -Pairs @('u=run update-help', 'esc=back'))
             $k = [Console]::ReadKey($true)
             if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
             if ($k.Key -eq [ConsoleKey]::U) { Start-PSMMUpdateHelpTask; continue }
@@ -134,6 +135,7 @@ function script:Show-PSMMTasks {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $tasks.Count) { continue }
                 switch ($k.Key) {
