@@ -28,6 +28,22 @@ function Get-PSMMVersionString {
     "$($m.Version)$(if ($pre) { "-$pre" })"
 }
 
+# The psmm version currently ON DISK in this module's install folder, e.g.
+# '0.1.0-beta4'. May differ from Get-PSMMVersionString after an in-session
+# `Install-PSResource psmm -Prerelease -Reinstall` (prerelease labels share
+# the base-version folder, so the files are replaced in place while the
+# session keeps running the old copy - see the header of this file).
+# Empty string when the manifest cannot be read.
+function Get-PSMMOnDiskVersionString {
+    [CmdletBinding()] param()
+    try {
+        $d = Import-PowerShellDataFile (Join-Path $script:PSMMRoot 'psmm.psd1')
+        $pre = $null
+        try { $pre = $d.PrivateData.PSData.Prerelease } catch { }
+        "$($d.ModuleVersion)$(if ($pre) { "-$pre" })"
+    } catch { '' }
+}
+
 # NuGet-style semver comparison of two version strings (may carry prerelease
 # labels). Returns -1 / 0 / 1 for $A <, ==, > $B. Rules: base [version]
 # first; a stable version outranks any prerelease of the same base;

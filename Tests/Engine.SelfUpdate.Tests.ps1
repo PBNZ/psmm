@@ -135,3 +135,29 @@ Describe 'prerelease-aware module update' -Tag Engine {
         }
     }
 }
+
+Describe 'in-session version skew (lazy UI guard)' -Tag Engine {
+
+    It 'the on-disk version matches the running version after a fresh import' {
+        InModuleScope psmm {
+            Get-PSMMOnDiskVersionString | Should -Be (Get-PSMMVersionString)
+        }
+    }
+
+    It 'Show-PSModuleManager refuses to source the UI over a different on-disk version' {
+        # the colleague scenario: Install-PSResource -Reinstall replaced the
+        # files while the session still runs the old engine; sourcing the new
+        # UI then dies with "Get-PSMM* is not recognized" (2026-07-15 report)
+        InModuleScope psmm {
+            $prev = $script:PSMMUISourced
+            $script:PSMMUISourced = $false
+            Mock Get-PSMMOnDiskVersionString { '99.0.0' }
+            try {
+                $warnings = Show-PSModuleManager 3>&1
+                "$warnings" | Should -Match 'still running psmm'
+                "$warnings" | Should -Match 'Import-Module psmm -Force'
+                $script:PSMMUISourced | Should -BeFalse
+            } finally { $script:PSMMUISourced = $prev }
+        }
+    }
+}

@@ -644,3 +644,64 @@ Describe 'Auth providers (engine)' -Tag Engine {
         { InModuleScope psmm { Disconnect-PSMMModule -ModuleName 'ImportExcel' } } | Should -Throw
     }
 }
+
+Describe 'Module locations screen (75-Paths)' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    It 'every literal Write-PSMMLine markup string in src parses (tags balanced PER LINE)' {
+        # regression for the 's' crash (2026-07-15): one [orange1] tag spanned
+        # three Write-PSMMLine calls; each call is its own Markup, so every
+        # line must balance on its own or Spectre throws "Unbalanced markup
+        # stack" and the whole TUI dies
+        $bad = foreach ($f in Get-ChildItem (Join-Path $PSScriptRoot '..' 'src') -Recurse -Filter '*.ps1') {
+            $i = 0
+            foreach ($line in Get-Content -LiteralPath $f.FullName) {
+                $i++
+                foreach ($m in [regex]::Matches($line, "Write-PSMMLine\s+'([^']*)'")) {
+                    try { $null = [Spectre.Console.Markup]::new($m.Groups[1].Value) }
+                    catch { "$($f.Name):${i}: $($m.Groups[1].Value)" }
+                }
+            }
+        }
+        $bad | Should -BeNullOrEmpty
+    }
+
+    It "set-primary ('s') renders its caveat lines without crashing and cancels on empty input" {
+        $status = InModuleScope psmm {
+            Mock Read-SpectreText { '' }
+            $sw = [System.IO.StringWriter]::new()
+            $settings = [Spectre.Console.AnsiConsoleSettings]::new()
+            $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
+            $settings.Interactive = [Spectre.Console.InteractionSupport]::No
+            $settings.Ansi = [Spectre.Console.AnsiSupport]::No
+            Set-PSMMConsole -Console ([Spectre.Console.AnsiConsole]::Create($settings))
+            try { Set-PSMMPrimaryLocationUI } finally { Set-PSMMConsole -Console $null }
+        }
+        $status | Should -Match 'cancelled'
+    }
+
+    It "set-primary ('s') creates the folder, writes the override and puts the path first in this session" {
+        $global:PSMMTestTarget = Join-Path $TestDrive 'UserProfileModules'
+        $prevPSMP = $env:PSModulePath
+        try {
+            $status = InModuleScope psmm {
+                Mock Read-SpectreText { $global:PSMMTestTarget }
+                Mock Read-SpectreConfirm { $true }
+                Mock Set-PSMMUserModulePath { }   # never touch the real powershell.config.json
+                $sw = [System.IO.StringWriter]::new()
+                $settings = [Spectre.Console.AnsiConsoleSettings]::new()
+                $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
+                $settings.Interactive = [Spectre.Console.InteractionSupport]::No
+                $settings.Ansi = [Spectre.Console.AnsiSupport]::No
+                Set-PSMMConsole -Console ([Spectre.Console.AnsiConsole]::Create($settings))
+                try { Set-PSMMPrimaryLocationUI } finally { Set-PSMMConsole -Console $null }
+                Should -Invoke Set-PSMMUserModulePath -Times 1 -Exactly
+            }
+            $status | Should -Match 'primary location set'
+            Test-Path -LiteralPath $global:PSMMTestTarget | Should -BeTrue
+            @($env:PSModulePath -split [System.IO.Path]::PathSeparator)[0] | Should -Be $global:PSMMTestTarget
+        } finally {
+            $env:PSModulePath = $prevPSMP
+            Remove-Variable -Name PSMMTestTarget -Scope Global -ErrorAction SilentlyContinue
+        }
+    }
+}

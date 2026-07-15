@@ -20,10 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            Prerelease   = 'beta3'
+            Prerelease   = 'beta4'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0-beta3 - metadata only: author/copyright now PBNZ. Code identical to beta2 (design-system key scheme, OneDrive module-location diagnostics, cloud-only download/pin). See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta4 - version in headers + daily self-update check; fix: set-primary-location crash (unbalanced markup); fix: in-session reinstall no longer breaks psmm (version-skew guard with restart guidance); set-primary now takes effect in the current session too. See CHANGELOG.md.'
         }
     }
 }

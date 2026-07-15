@@ -174,9 +174,10 @@ function script:Set-PSMMPrimaryLocationUI {
     $cfg = Get-PSMMUserConfigJsonPath
     Write-PSMMLine "[grey66]writes the documented PSModulePath override to $(ConvertTo-PSMMSafe "$cfg")[/]"
     Write-PSMMLine '[grey66]new pwsh sessions will LOOK for CurrentUser modules there.[/]'
-    Write-PSMMLine '[orange1]caveat (documented): Install-Module / Install-PSResource still INSTALL to the'
-    Write-PSMMLine 'default Documents-derived location - move existing module folders yourself, or'
-    Write-PSMMLine 'keep using d (download) / k (pin) to make the OneDrive copies reliable.[/]'
+    # each Write-PSMMLine is its own Markup: tags must balance PER LINE
+    Write-PSMMLine '[orange1]caveat (documented): Install-Module / Install-PSResource still INSTALL to the[/]'
+    Write-PSMMLine '[orange1]default Documents-derived location - move existing module folders yourself, or[/]'
+    Write-PSMMLine '[orange1]keep using d (download) / k (pin) to make the OneDrive copies reliable.[/]'
     $suggestion = if ($IsWindows) { Join-Path $HOME 'PowerShell\Modules' } else { '' }
     $path = Read-SpectreText -Message 'New primary module path (empty cancels)' -DefaultAnswer $suggestion -AllowEmpty
     if ([string]::IsNullOrWhiteSpace($path)) { return '[grey66]cancelled[/]' }
@@ -187,6 +188,14 @@ function script:Set-PSMMPrimaryLocationUI {
             }
         }
         $null = Set-PSMMUserModulePath -Path $path
-        "[green3]primary location set - takes effect in NEW pwsh sessions ($(ConvertTo-PSMMSafe $path))[/]"
+        # The config override only applies to NEW sessions; prepend to the
+        # live search path too so the new location is first - and visible in
+        # the locations table - right away.
+        $sep = [System.IO.Path]::PathSeparator
+        $norm = $path.TrimEnd('\', '/')
+        $rest = @($env:PSModulePath -split $sep |
+            Where-Object { $_ -and ($_.TrimEnd('\', '/') -ne $norm) })
+        $env:PSModulePath = (@($path) + $rest) -join $sep
+        "[green3]primary location set - first in this session now, and in every NEW pwsh session ($(ConvertTo-PSMMSafe $path))[/]"
     } catch { "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
 }

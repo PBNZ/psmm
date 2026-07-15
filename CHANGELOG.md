@@ -3,7 +3,7 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [Unreleased]
+## [0.1.0-beta4] — 2026-07-15
 
 ### Added
 - **Version display**: the running psmm version now shows next to the name
@@ -24,9 +24,32 @@ All notable changes to psmm. Format loosely follows
   (no `Remove-Module` needed; restart pwsh or `Import-Module psmm -Force`
   to pick up the new version).
 
+### Changed
+- **Set primary location (`s` on the paths screen)** now also puts the new
+  path first in the CURRENT session's `$env:PSModulePath` (the
+  `powershell.config.json` override alone only affects new sessions), so
+  the new location shows up as `first` in the table immediately. The flow
+  still suggests a folder in the user profile outside OneDrive
+  (`$HOME\PowerShell\Modules`) and offers to create it.
+
 ### Fixed
 - The startup report's retry hint still said `Ctrl+P`; it now names the
   current key (`i` on the row).
+- **Crash on `s` (set primary location)**: the flow's three-line caveat text
+  opened an `[orange1]` markup tag on the first `Write-PSMMLine` and closed
+  it two calls later - each call is its own Spectre `Markup`, so the screen
+  died with "Unbalanced markup stack" before the prompt ever appeared. Tags
+  now balance per line, and a test validates every literal `Write-PSMMLine`
+  markup string in `src` with Spectre's own parser.
+- **"Get-PSMMModulePathInfo is not recognized" after an in-session update**:
+  `Install-PSResource psmm -Prerelease -Reinstall` replaces the files on
+  disk (prerelease labels share the base-version folder) while the session
+  keeps running the engine it imported at startup; the first `psmm` call
+  then dot-sourced the NEW UI files into the OLD engine and every run ended
+  in "term not recognized" errors. `Show-PSModuleManager` now compares the
+  on-disk manifest version with the running version before sourcing the UI
+  and, on a mismatch, prints clear guidance (restart pwsh or
+  `Import-Module psmm -Force`) instead of crashing.
 
 ## [0.1.0-beta3] — 2026-07-14
 

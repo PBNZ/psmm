@@ -37,6 +37,19 @@
 
     # Parse the UI implementation on first use only (import stays cheap).
     if (-not $script:PSMMUISourced) {
+        # Version-skew guard: an in-session update/reinstall replaces the
+        # files on disk (prerelease labels even share one base-version
+        # folder) while this session keeps running the engine it imported at
+        # startup. Dot-sourcing the NEW UI files into the OLD engine then
+        # fails with confusing "term not recognized" errors, so refuse and
+        # say what to do instead.
+        $onDisk = Get-PSMMOnDiskVersionString
+        $running = Get-PSMMVersionString
+        if ($onDisk -and $running -and $onDisk -ne $running) {
+            Write-Warning ("psmm $onDisk has been installed on disk, but this session is still running psmm $running. " +
+                "Start a new PowerShell session (or run 'Import-Module psmm -Force') and try again.")
+            return
+        }
         foreach ($f in Get-ChildItem -LiteralPath (Join-Path $script:PSMMRoot 'src/UI') -Filter '*.ps1' | Sort-Object Name) {
             . $f.FullName
         }
