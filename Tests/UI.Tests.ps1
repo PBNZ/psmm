@@ -829,6 +829,47 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
+    It 'the first-run welcome marker lives next to the main config (welcome overlay)' {
+        InModuleScope psmm {
+            $p = Get-PSMMWelcomePath
+            Split-Path -Parent $p | Should -Be (Split-Path -Parent (Get-PSMMMainConfigPath))
+            Split-Path -Leaf $p | Should -Be 'psmm-welcome.json'
+        }
+    }
+
+    It 'welcome is due until the marker is written, then never again (welcome overlay)' {
+        InModuleScope psmm {
+            $p = Get-PSMMWelcomePath
+            Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+            Test-PSMMWelcomeDue | Should -BeTrue
+            Set-PSMMWelcomeShown
+            Test-PSMMWelcomeDue | Should -BeFalse
+            (Get-Content -LiteralPath $p -Raw | ConvertFrom-Json).ShownAt | Should -Not -BeNullOrEmpty
+            Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'the welcome panel leads with the g goto tip and says it shows once (welcome overlay)' {
+        $text = Get-RenderedText { Build-PSMMWelcomePanel }
+        $text | Should -Match 'welcome'
+        # tip 1 is the g goto layer - the whole point of the panel
+        $text | Should -Match 'g\s+goto'
+        $text | Should -Match 'jumps to any screen'
+        $text | Should -Match '\?\s+help'
+        $text | Should -Match 'enter\s+actions'
+        $text | Should -Match 'any key closes'
+        $text | Should -Match 'only once'
+    }
+
+    It 'the welcome panel is small enough to float over a modest terminal (welcome overlay)' {
+        InModuleScope psmm {
+            $lines = @(ConvertTo-PSMMTextLines -Renderable (Build-PSMMWelcomePanel) | Where-Object { "$_".TrimEnd() })
+            $lines.Count | Should -BeLessOrEqual 9
+            ($lines | ForEach-Object { "$_".TrimEnd().Length } | Measure-Object -Maximum).Maximum |
+                Should -BeLessOrEqual 78
+        }
+    }
+
     It 'grid hints: single letters are verbs only, navigation lives in the persistent goto row (step 4)' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $text | Should -Match 'i\s+install'

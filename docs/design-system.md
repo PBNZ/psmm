@@ -213,6 +213,13 @@ All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
   answers before assigning anything, so an abort never half-saves.
 - **`by` (author)**: a column in the gallery results and a facts row in the
   module menu (resolved once from the manifest, never in the render path).
+- **First-run welcome overlay** (live-run feedback 2026-07-20): nothing on
+  screen tells a new user that `g` hides the whole navigation layer, so the
+  very first grid paint floats a small tips panel (same VT overlay + accent
+  border as goto) with the three keys worth knowing: `g` goto, `?` help,
+  `enter` actions. Any key closes it; a marker file next to the main config
+  (`psmm-welcome.json`) makes it once-ever. Headless hosts skip it without
+  burning the marker.
 
 - The persistent row's pairs adapt to the screen type: the grid shows
   `g goto… · / filter · ? help · ^q quit`; sub-screens swap `/ filter` for

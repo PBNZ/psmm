@@ -4,6 +4,9 @@ function script:Invoke-PSMMManagerLoop {
     [CmdletBinding()] param()
     Initialize-PSMMUIState
     Start-PSMMUnmanagedScan
+    # first run ever: the grid floats the welcome tips over its first paint
+    # (checked once here - not per frame; the marker file is on disk)
+    $script:PSMM_UI.WelcomeDue = Test-PSMMWelcomeDue
 
     $oldTitle = $null
     try {

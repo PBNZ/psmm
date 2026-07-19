@@ -400,6 +400,14 @@ function script:Invoke-PSMMGrid {
         while ($true) {
             Receive-PSMMUITask
             $ctx.UpdateTarget((Build-PSMMGrid)); $ctx.Refresh()
+            # first run ever: float the welcome tips over the freshly painted
+            # grid; the next loop pass repaints whatever the erase left behind
+            if ($script:PSMM_UI.WelcomeDue) {
+                $script:PSMM_UI.WelcomeDue = $false
+                Show-PSMMWelcomeOverlay -BaseRenderable (Build-PSMMGrid)
+                if ($script:PSMM_UI.HardQuit) { $result.Cmd = 'quit'; return }
+                continue
+            }
             $k = Read-PSMMKeyResize
             if ($null -eq $k) { continue }   # resize or background activity: re-render
             $ui = $script:PSMM_UI

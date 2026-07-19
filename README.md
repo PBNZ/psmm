@@ -103,7 +103,8 @@ just write the JSON yourself:
 timings so you always know what's slow); `InstallOnly` work runs in a
 background job; the report tells you what happened.
 
-**4. Manage interactively.** Run `psmm`:
+**4. Manage interactively.** Run `psmm` (the very first launch floats a
+quick-tips panel over the grid — the three keys worth knowing, shown once):
 
 - one grid row per module: state (`●` loaded / `◐` installed / `○` missing /
   `◌` unmanaged), what happens at **startup**, what the **gallery** may do,
