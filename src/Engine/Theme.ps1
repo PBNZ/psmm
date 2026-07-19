@@ -34,7 +34,9 @@ function Get-PSMMThemeTable {
         dim     = @{ Markup = 'grey42';       Index = 242 }
         capsule = @{ Markup = 'grey19';       Index = 236 }
         rowbg   = @{ Markup = 'grey15';       Index = 235 }
-        border  = @{ Markup = 'grey27';       Index = 238 }
+        # grey35, not the spec's grey27: #444 had too little contrast on a
+        # black terminal background (live-run feedback 2026-07-20)
+        border  = @{ Markup = 'grey35';       Index = 240 }
         brandfg = @{ Markup = 'black';        Index = 0 }
         brandbg = @{ Markup = 'salmon1';      Index = 209 }
         capsdim = @{ Markup = 'grey11';       Index = 234 }

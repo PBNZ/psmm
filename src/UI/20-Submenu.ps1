@@ -9,7 +9,10 @@ function script:Build-PSMMModuleMenuView {
     param(
         [Parameter(Mandatory)] $Entry,
         $Auth,
-        [string]$StatusMarkup
+        [string]$StatusMarkup,
+        # module author when known (resolved once by the caller - manifest
+        # lookups do not belong in the render path)
+        [string]$Author
     )
     $isUnmanaged = [bool]$Entry.PSObject.Properties['Unmanaged']
     $mid = [char]0x00B7
@@ -38,6 +41,9 @@ function script:Build-PSMMModuleMenuView {
     } else { 'not imported' }
     $facts = [System.Collections.Generic.List[string[]]]::new()
     $facts.Add(@('what', $what))
+    if (-not [string]::IsNullOrWhiteSpace($Author)) {
+        $facts.Add(@('by', (ConvertTo-PSMMSafe $Author)))
+    }
     $facts.Add(@('entry', $entryTxt))
     $facts.Add(@('disk', $disk))
     $facts.Add(@('session', $session))
@@ -113,17 +119,28 @@ function script:Show-PSMMModuleMenu {
     $provider = Get-PSMMAuthProvider -ModuleName $Entry.Name
     if ($provider -and -not $provider.Slow) { $auth = Get-PSMMConnectionStatus -ModuleName $Entry.Name }
 
+    # author from the manifest, resolved once (loaded module first - free;
+    # else one ListAvailable lookup when the module is on disk)
+    $author = ''
+    try {
+        $m = Get-Module -Name $Entry.Name -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $m -and $Entry.Installed) {
+            $m = Get-Module -ListAvailable -Name $Entry.Name -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+        if ($m) { $author = "$($m.Author)" }
+    } catch { }
+
     $status = ''
     while ($true) {
         if ($ui.HardQuit -or $ui.Goto) { return }
         Clear-PSMMScreen
-        Write-PSMMRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth -StatusMarkup $status)
+        Write-PSMMRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth -StatusMarkup $status -Author $author)
         $status = ''
 
         $k = [Console]::ReadKey($true)
         if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
         if ($k.KeyChar -eq 'g') {
-            $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth)
+            $dest = Read-PSMMGotoKey
             if ($dest) { $ui.Goto = $dest; return }
             continue
         }
@@ -200,7 +217,7 @@ function script:Show-PSMMModuleMenu {
             ([ConsoleKey]::A) {
                 if ($isUnmanaged) { if (Add-PSMMUnmanagedEntry -Entry $Entry) { return } }
             }
-            ([ConsoleKey]::E) { if (-not $isUnmanaged -and $Entry.Writable) { Edit-PSMMEntry -Entry $Entry; return } }
+            ([ConsoleKey]::E) { if (-not $isUnmanaged -and $Entry.Writable) { if (Edit-PSMMEntry -Entry $Entry) { return }; $status = $script:PSMM_UI.Status } }
             ([ConsoleKey]::V) { if (-not $isUnmanaged -and $Entry.Writable) { if (Set-PSMMEntryPin -Entry $Entry) { return } } }
             ([ConsoleKey]::D) { if (-not $isUnmanaged -and $Entry.Writable) { if (Remove-PSMMEntryUI -Entry $Entry) { return } } }
             ([ConsoleKey]::M) { if (-not $isUnmanaged -and $Entry.Writable -and $Entry.Source -ne '<profile inline>') { if (Move-PSMMEntryUI -Entry $Entry) { return } } }
@@ -243,7 +260,8 @@ function script:Set-PSMMEntryPin {
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Pin $(ConvertTo-PSMMSafe $Entry.Name) to a version[/]"
     Write-PSMMLine "[$script:PSMM_ColMute]exact '1.2.3' or NuGet range '[[1.0,2.0)'; empty removes the pin[/]"
-    $v = Read-SpectreText -Message 'Version' -DefaultAnswer ($Entry.Version ?? '') -AllowEmpty
+    $v = Read-PSMMText -Message 'Version' -DefaultAnswer ($Entry.Version ?? '') -AllowEmpty
+    if ($null -eq $v) { $script:PSMM_UI.Status = "[$script:PSMM_ColMute]pin cancelled - nothing saved[/]"; return $false }
     $v = "$v".Trim()
     if ($v -eq "$($Entry.Version)") { return $false }
     $probe = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = $Entry.Name; Version = $v }) -Source $Entry.Source -Writable $true
@@ -298,19 +316,31 @@ function script:Add-PSMMUnmanagedEntry {
     $true
 }
 
-# Edit an entry's fields and save.
+# Edit an entry's fields and save. Esc on any text prompt aborts WITHOUT
+# touching the entry (live-run feedback); nothing is assigned until every
+# answer is in. Returns $true when the entry was saved.
 function script:Edit-PSMMEntry {
     param([Parameter(Mandatory)] $Entry)
-    if (-not $Entry.Writable) { return }
+    if (-not $Entry.Writable) { return $false }
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Edit $(ConvertTo-PSMMSafe $Entry.Name)[/]"
-    $Entry.Name         = Read-SpectreText -Message 'Name' -DefaultAnswer $Entry.Name
-    $Entry.FriendlyName = Read-SpectreText -Message 'Friendly name' -DefaultAnswer ($Entry.FriendlyName ?? '') -AllowEmpty
-    $Entry.Description  = Read-SpectreText -Message 'Description' -DefaultAnswer ($Entry.Description ?? '') -AllowEmpty
-    $Entry.Install      = Read-SpectreSelection -Message 'Install policy' -Choices (@($Entry.Install) + (@('IfMissing', 'CheckOnly', 'Latest') | Where-Object { $_ -ne $Entry.Install })) -Color $script:PSMM_ColAccent
-    $Entry.Mode         = Read-SpectreSelection -Message 'Mode'           -Choices (@($Entry.Mode) + (@('Load', 'InstallOnly', 'Ignore') | Where-Object { $_ -ne $Entry.Mode })) -Color $script:PSMM_ColAccent
+    $cancelled = "[$script:PSMM_ColMute]edit cancelled - nothing saved[/]"
+    $name = Read-PSMMText -Message 'Name' -DefaultAnswer $Entry.Name
+    if ($null -eq $name) { $script:PSMM_UI.Status = $cancelled; return $false }
+    $friendly = Read-PSMMText -Message 'Friendly name' -DefaultAnswer ($Entry.FriendlyName ?? '') -AllowEmpty
+    if ($null -eq $friendly) { $script:PSMM_UI.Status = $cancelled; return $false }
+    $desc = Read-PSMMText -Message 'Description' -DefaultAnswer ($Entry.Description ?? '') -AllowEmpty
+    if ($null -eq $desc) { $script:PSMM_UI.Status = $cancelled; return $false }
+    $install = Read-SpectreSelection -Message 'Install policy' -Choices (@($Entry.Install) + (@('IfMissing', 'CheckOnly', 'Latest') | Where-Object { $_ -ne $Entry.Install })) -Color $script:PSMM_ColAccent
+    $mode    = Read-SpectreSelection -Message 'Mode'           -Choices (@($Entry.Mode) + (@('Load', 'InstallOnly', 'Ignore') | Where-Object { $_ -ne $Entry.Mode })) -Color $script:PSMM_ColAccent
+    $Entry.Name         = $name
+    $Entry.FriendlyName = $friendly
+    $Entry.Description  = $desc
+    $Entry.Install      = $install
+    $Entry.Mode         = $mode
     Save-PSMMFile -Path $Entry.Source -Entries (Get-PSMMAllEntries)
     $script:PSMM_UI.Dirty = $true
+    $true
 }
 
 # Create a brand-new entry (grid key 'a').
@@ -320,10 +350,13 @@ function script:New-PSMMEntry {
     $targets = @(Get-PSMMAddTargets)
     if (-not $targets.Count) { $script:PSMM_UI.Status = "[$script:PSMM_ColMute]add cancelled - no config file[/]"; return }
     $target = if ($targets.Count -eq 1) { $targets[0] } else { Read-SpectreSelection -Message 'Add to which file?' -Choices $targets -Color $script:PSMM_ColAccent }
-    $name = Read-SpectreText -Message 'Module name'
-    if ([string]::IsNullOrWhiteSpace($name)) { return }
-    $friendly = Read-SpectreText -Message 'Friendly name' -AllowEmpty
-    $desc     = Read-SpectreText -Message 'Description' -AllowEmpty
+    $cancelled = "[$script:PSMM_ColMute]add cancelled - nothing saved[/]"
+    $name = Read-PSMMText -Message 'Module name'
+    if ($null -eq $name -or [string]::IsNullOrWhiteSpace($name)) { $script:PSMM_UI.Status = $cancelled; return }
+    $friendly = Read-PSMMText -Message 'Friendly name' -AllowEmpty
+    if ($null -eq $friendly) { $script:PSMM_UI.Status = $cancelled; return }
+    $desc = Read-PSMMText -Message 'Description' -AllowEmpty
+    if ($null -eq $desc) { $script:PSMM_UI.Status = $cancelled; return }
     $install  = Read-SpectreSelection -Message 'Install policy' -Choices 'IfMissing', 'CheckOnly', 'Latest' -Color $script:PSMM_ColAccent
     $mode     = Read-SpectreSelection -Message 'Mode' -Choices 'Load', 'InstallOnly', 'Ignore' -Color $script:PSMM_ColAccent
     $new = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = $name; FriendlyName = $friendly; Description = $desc; Install = $install; Mode = $mode }) -Source $target -Writable $true

@@ -48,7 +48,6 @@ function script:Invoke-PSMMManagerLoop {
                     $tab = if ($goto -eq 'help') { 'keys' } else { 'this screen' }
                     Show-PSMMHelpScreen -Topic 'grid' -InitialTab $tab
                 }
-                'unmanaged' { Invoke-PSMMUnmanagedToggle }
                 'reload'    { $script:PSMM_UI.Dirty = $true }
             }
             if ($script:PSMM_UI.HardQuit) { return }

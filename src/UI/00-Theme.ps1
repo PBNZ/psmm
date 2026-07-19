@@ -46,6 +46,63 @@ function script:Get-PSMMCursorMark {
     if ($IsCursor) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { ' ' }
 }
 
+# Draw a renderable ON TOP of the current frame, bottom-left, via raw VT
+# cursor positioning - Spectre's live display has no z-layers, and appending
+# the panel below a full-height frame pushed the screen (live-run feedback).
+# DECSC/DECRC keep the live display's cursor bookkeeping intact; the caller
+# erases the region (Clear-PSMMOverlay) before the next repaint. Returns the
+# drawn region (@{ Top; Count }) or $null when output is redirected.
+function script:Write-PSMMOverlay {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'Raw VT cursor positioning must bypass any host/stream formatting.')]
+    param([Parameter(Mandatory)] $Renderable)
+    try {
+        if ([Console]::IsOutputRedirected) { return $null }
+        $sw = [System.IO.StringWriter]::new()
+        $settings = [Spectre.Console.AnsiConsoleSettings]::new()
+        $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
+        $settings.Interactive = [Spectre.Console.InteractionSupport]::No
+        $settings.Ansi = [Spectre.Console.AnsiSupport]::Yes
+        $settings.ColorSystem = [Spectre.Console.ColorSystemSupport]::EightBit
+        $console = [Spectre.Console.AnsiConsole]::Create($settings)
+        $console.Profile.Width = [Math]::Max(40, (Get-PSMMWinSize).Width - 2)
+        $console.Write($Renderable)
+        $lines = @($sw.ToString() -split "`r?`n" | Where-Object { $_ -ne '' })
+        if (-not $lines.Count) { return $null }
+        $win = Get-PSMMWinSize
+        $top = [Math]::Max(1, $win.Height - $lines.Count)   # 1-based VT row
+        $esc = [char]27
+        $out = [System.Text.StringBuilder]::new()
+        [void]$out.Append("$esc" + '7')                     # DECSC save cursor
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            [void]$out.Append("$esc[$($top + $i);2H").Append($lines[$i]).Append("$esc[0m")
+        }
+        [void]$out.Append("$esc" + '8')                     # DECRC restore
+        [Console]::Write($out.ToString())
+        @{ Top = $top; Count = $lines.Count }
+    } catch { $null }
+}
+
+# Erase an overlay region drawn by Write-PSMMOverlay (whole lines; the
+# caller's next repaint restores any frame content underneath).
+function script:Clear-PSMMOverlay {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'Raw VT cursor positioning must bypass any host/stream formatting.')]
+    param($Region)
+    if (-not $Region) { return }
+    try {
+        if ([Console]::IsOutputRedirected) { return }
+        $esc = [char]27
+        $out = [System.Text.StringBuilder]::new()
+        [void]$out.Append("$esc" + '7')
+        for ($i = 0; $i -lt $Region.Count; $i++) {
+            [void]$out.Append("$esc[$($Region.Top + $i);1H").Append("$esc[2K")
+        }
+        [void]$out.Append("$esc" + '8')
+        [Console]::Write($out.ToString())
+    } catch { }
+}
+
 # The console every UI write goes through. Production: the real AnsiConsole.
 # Tests inject a StringWriter-backed console via Set-PSMMConsole and assert on
 # the rendered frames (see D-UI-ARCH).
@@ -97,7 +154,9 @@ function script:Enter-PSMMAltScreen {
     param()
     try {
         if (-not [Console]::IsOutputRedirected) {
-            [Console]::Write("$([char]27)[?1049h$([char]27)[H")
+            # ?25l: hide the console cursor for the TUI - it blinked over the
+            # frames (live-run feedback); text prompts show it again
+            [Console]::Write("$([char]27)[?1049h$([char]27)[H$([char]27)[?25l")
             $script:PSMM_AltScreenActive = $true
         }
     } catch { }
@@ -109,7 +168,7 @@ function script:Exit-PSMMAltScreen {
     param()
     try {
         if ($script:PSMM_AltScreenActive) {
-            [Console]::Write("$([char]27)[?1049l")
+            [Console]::Write("$([char]27)[?25h$([char]27)[?1049l")
             $script:PSMM_AltScreenActive = $false
         }
     } catch { }
@@ -273,6 +332,48 @@ function script:Get-PSMMTooSmallView {
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]current $($win.Width)x$($win.Height), need at least ${MinWidth}x${MinHeight} - enlarge the terminal[/]"))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('esc=back', '^q=quit'))))
     [Spectre.Console.Rows]::new($items)
+}
+
+# Minimal single-line text prompt: enter accepts (empty input returns the
+# default when one is set), ESC CANCELS and returns $null - the Spectre
+# prompts have no abort path (live-run feedback). The console cursor is
+# shown for the duration (hidden otherwise in the TUI).
+function script:Read-PSMMText {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'A raw key-by-key line editor (esc-cancel) needs direct console echo.')]
+    param(
+        [Parameter(Mandatory)][string]$Message,
+        [string]$DefaultAnswer = '',
+        [switch]$AllowEmpty
+    )
+    $hint = if ($DefaultAnswer) { " [$script:PSMM_ColDim]($(ConvertTo-PSMMSafe $DefaultAnswer))[/]" } else { '' }
+    Write-PSMMRenderable ([Spectre.Console.Markup]::new(
+            "[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $Message)[/]$hint[$script:PSMM_ColMute]:[/] [$script:PSMM_ColDim](esc cancels)[/] "))
+    $buf = [System.Text.StringBuilder]::new()
+    try {
+        try { [Console]::Write("$([char]27)[?25h") } catch { }
+        while ($true) {
+            $k = [Console]::ReadKey($true)
+            if ($k.Key -eq [ConsoleKey]::Escape) { [Console]::WriteLine(); return $null }
+            if ($k.Key -eq [ConsoleKey]::Enter) {
+                [Console]::WriteLine()
+                $text = $buf.ToString()
+                if (-not $text -and $DefaultAnswer) { return $DefaultAnswer }
+                if (-not $text -and -not $AllowEmpty) { return $null }   # nothing to accept
+                return $text
+            }
+            if ($k.Key -eq [ConsoleKey]::Backspace) {
+                if ($buf.Length) { $buf.Length--; [Console]::Write("`b `b") }
+                continue
+            }
+            if ($k.KeyChar -and -not [char]::IsControl($k.KeyChar)) {
+                [void]$buf.Append($k.KeyChar)
+                [Console]::Write($k.KeyChar)
+            }
+        }
+    } finally {
+        try { [Console]::Write("$([char]27)[?25l") } catch { }
+    }
 }
 
 # Two-column label/value grid for detail panels.

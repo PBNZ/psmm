@@ -613,7 +613,7 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $script:PSMM_ColDim     | Should -Be 'grey42'
             $script:PSMM_ColCapsule | Should -Be 'grey19'
             $script:PSMM_ColRowBg   | Should -Be 'grey15'
-            $script:PSMM_ColBorder  | Should -Be 'grey27'
+            $script:PSMM_ColBorder  | Should -Be 'grey35'   # lifted from grey27: more contrast on black (live-run feedback)
             $script:PSMM_ColOk      | Should -Be 'green3'
             $script:PSMM_ColWarn    | Should -Be 'orange1'
             $script:PSMM_ColErr     | Should -Be 'indianred1'
@@ -621,10 +621,10 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
-    It 'grid borders render grey27 and the cursor row paints a grey15 full-row background (step 1)' {
+    It 'grid borders render the border token and the cursor row paints a grey15 full-row background (step 1)' {
         $out = Get-RenderedAnsi { Build-PSMMGrid }
-        # grey27 = 238, grey15 = 235 in the xterm-256 palette
-        $out | Should -Match '38;5;238'
+        # grey35 = 240, grey15 = 235 in the xterm-256 palette
+        $out | Should -Match '38;5;240'
         $out | Should -Match '48;5;235'
         # the row background must span up to the cell edge, not just the text:
         # a painted cell ends with the background still open right before the reset
@@ -643,11 +643,16 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $ansi | Should -Match '38;5;242'               # grey42 dim headers
     }
 
-    It 'the cursor row shows the accent bar and bold accent name; the bare > cursor is retired (step 1)' {
+    It 'the grid cursor is the row background + bold name; column one is selection-only (step 1, live-run fix)' {
+        # the ▌ bar in column one read as a broken checkbox next to ▪ marks -
+        # on the grid the cursor is carried by the row bg and bold accent name
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match ([regex]::Escape([string][char]0x258C))   # ▌
-        # no data row starts with the old '>' cursor marker
+        $text | Should -Not -Match ([regex]::Escape([string][char]0x258C))
         @($text -split "`r?`n" | Where-Object { $_ -match '^\s*│\s*>' }).Count | Should -Be 0
+        # selecting the CURSOR row still shows its selection mark
+        InModuleScope psmm { [void]$script:PSMM_UI.Sel.Add(0); $script:PSMM_UI.Cursor = 0 }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match ([regex]::Escape([string][char]0x25AA))
     }
 
     It 'a selected row is marked with a filled square, and the status area counts the selection (step 1)' {
@@ -776,20 +781,29 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $t['t'].Target | Should -Be 'tasks'
             $t['c'].Target | Should -Be 'conflicts'
             $t['x'].Target | Should -Be 'cleanup'
-            $t['m'].Target | Should -Be 'unmanaged'
             $t['?'].Target | Should -Be 'help'
-            @($t.Keys).Count | Should -Be 9
+            # 'm' left the goto layer: unmanaged show/hide is a grid verb, not
+            # a place to go (live-run feedback)
+            $t.Contains('m') | Should -BeFalse
+            @($t.Keys).Count | Should -Be 8
         }
     }
 
     It 'the goto overlay panel names every destination and how to leave it (step 4)' {
         $text = Get-RenderedText { Build-PSMMGotoPanel }
         $text | Should -Match 'g\s+goto'
-        foreach ($label in 'home', 'gallery', 'files', 'paths', 'tasks', 'conflicts', 'cleanup', 'unmanaged', 'keys') {
+        foreach ($label in 'home', 'gallery', 'files', 'paths', 'tasks', 'conflicts', 'cleanup', 'keys') {
             $text | Should -Match $label
         }
         $text | Should -Match 'esc cancels'
         $text | Should -Match 'swallowed'
+    }
+
+    It 'the goto overlay draws on top of the current frame and no-ops headlessly (live-run fix)' {
+        InModuleScope psmm {
+            # headless (redirected output): must not throw and must not write
+            { Write-PSMMOverlay -Renderable (Build-PSMMGotoPanel) } | Should -Not -Throw
+        }
     }
 
     It 'grid hints: single letters are verbs only, navigation lives in the persistent goto row (step 4)' {
@@ -797,6 +811,7 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $text | Should -Match 'i\s+install'
         $text | Should -Match 'a\s+add'
         $text | Should -Match 'r\s+reload'
+        $text | Should -Match 'm\s+unmanaged'     # grid verb, back from the goto layer
         $text | Should -Match "g\s+goto$([char]0x2026)"
         $text | Should -Match '/\s+filter'
         $text | Should -Match '\?\s+help'
@@ -804,7 +819,6 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         # the screen-switch letters are gone from the hint rows
         $text | Should -Not -Match 'f\s+files'
         $text | Should -Not -Match 'x\s+cleanup'
-        $text | Should -Not -Match 'm\s+unmanaged'
         $text | Should -Not -Match 't\s+tasks'
         $text | Should -Not -Match 'c\s+conflicts'
         $text | Should -Not -Match 'p\s+paths'
@@ -903,7 +917,7 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
 
     It 'sub-screen tables carry the v2 chrome: grey27 border, lowercase headers, block cursor (review fix)' {
         $ansi = Get-RenderedAnsi { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
-        $ansi | Should -Match '38;5;238'                      # grey27 border
+        $ansi | Should -Match '38;5;240'                      # border token (grey35)
         foreach ($build in @(
             { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) },
             { Build-PSMMTasksView -State (New-PSMMListState) -Tasks @([pscustomobject]@{
@@ -921,6 +935,50 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
         $files | Should -Not -CMatch '│\s*File\s*│'           # headers lowercase
         $files | Should -Match '│\s*file\s*│'
+    }
+
+    # --- live-run feedback round -------------------------------------------
+
+    It 'the gallery table has a by column with the author (live-run fix)' {
+        $text = Get-RenderedText {
+            $st = New-PSMMListState
+            $results = @([pscustomobject]@{ Name = 'ImportExcel'; Version = '7.8.9'; Description = 'Excel without Excel'; Author = 'dfinke' })
+            Build-PSMMGalleryView -State $st -Results $results -Query 'excel'
+        }
+        $text | Should -Match '│\s*by\s*│'
+        $text | Should -Match 'dfinke'
+    }
+
+    It 'the module menu facts panel shows the author when known (live-run fix)' {
+        $text = Get-RenderedText {
+            Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null -Author 'Douglas Finke'
+        }
+        ($text -replace '\s+', ' ') | Should -Match 'by\s+Douglas Finke'
+        # and without an author the row is simply absent
+        $none = Get-RenderedText { Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null }
+        $none | Should -Not -Match '│ by '
+    }
+
+    It 'esc in the edit dialog aborts without saving (live-run fix)' {
+        InModuleScope psmm {
+            Mock Read-PSMMText { $null }   # esc pressed on the first prompt
+            Mock Save-PSMMFile { }
+            $e = $script:PSMM_UI.Entries[0]
+            $before = $e.Name
+            Edit-PSMMEntry -Entry $e
+            $e.Name | Should -Be $before
+            Should -Invoke Save-PSMMFile -Times 0 -Exactly
+            $script:PSMM_UI.Status | Should -Match 'cancelled'
+        }
+    }
+
+    It 'esc in the add dialog aborts without touching the config (live-run fix)' {
+        InModuleScope psmm {
+            Mock Read-PSMMText { $null }
+            Mock Save-PSMMFile { }
+            New-PSMMEntry
+            Should -Invoke Save-PSMMFile -Times 0 -Exactly
+        }
     }
 
     # --- step 8: theme variants --------------------------------------------
@@ -1089,7 +1147,7 @@ Describe 'Startup report v2 (docs/design-system-v2.md §8)' -Tag Engine {
             $t['accent'].Markup | Should -Be 'deepskyblue1'
             $t['accent'].Index | Should -Be 39
             $t['rowbg'].Index | Should -Be 235
-            $t['border'].Index | Should -Be 238
+            $t['border'].Index | Should -Be 240
             Get-PSMMAnsi -Token 'ok' | Should -Be "$([char]27)[38;5;34m"
             Get-PSMMAnsi -Token 'brandbg' -Background | Should -Be "$([char]27)[48;5;209m"
         }
@@ -1248,7 +1306,7 @@ Describe 'Module locations screen (75-Paths)' -Tag UI -Skip:(-not $SpectreAvaila
 
     It "set-primary ('s') renders its caveat lines without crashing and cancels on empty input" {
         $status = InModuleScope psmm {
-            Mock Read-SpectreText { '' }
+            Mock Read-PSMMText { '' }
             $sw = [System.IO.StringWriter]::new()
             $settings = [Spectre.Console.AnsiConsoleSettings]::new()
             $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
@@ -1265,7 +1323,7 @@ Describe 'Module locations screen (75-Paths)' -Tag UI -Skip:(-not $SpectreAvaila
         $prevPSMP = $env:PSModulePath
         try {
             $status = InModuleScope psmm {
-                Mock Read-SpectreText { $global:PSMMTestTarget }
+                Mock Read-PSMMText { $global:PSMMTestTarget }
                 Mock Read-SpectreConfirm { $true }
                 Mock Set-PSMMUserModulePath { }   # never touch the real powershell.config.json
                 $sw = [System.IO.StringWriter]::new()

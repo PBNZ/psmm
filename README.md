@@ -113,10 +113,11 @@ background job; the report tells you what happened.
   · `k` check for updates
 - `g` opens the **goto layer** (anywhere): `g h` home · `g g` gallery search ·
   `g f` config files · `g p` module locations · `g t` background tasks ·
-  `g c` conflicts · `g x` version cleanup · `g m` unmanaged modules
+  `g c` conflicts · `g x` version cleanup
 - `/` filter (everywhere) · `?` tabbed help (everywhere) · `^q` quit (anywhere)
 - gallery search adds modules straight into your config; cleanup prunes
-  stacked old module versions; unmanaged modules can be adopted into a config
+  stacked old module versions; `m` shows/hides installed-but-unmanaged
+  modules so you can adopt them into a config
 - module locations: see `$env:PSModulePath`, get warned when your
   CurrentUser module folder lives inside OneDrive (PowerShell's default when
   OneDrive backs up Documents), download or pin cloud-only module files, and

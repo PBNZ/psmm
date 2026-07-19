@@ -3,6 +3,30 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [0.1.0-beta7] — 2026-07-20
+
+Live-run feedback round on the v2 UI (thanks, first real session).
+
+### Changed
+- **The goto overlay actually overlays**: the panel is drawn on top of the
+  current frame (bottom-left, raw VT cursor positioning) instead of being
+  appended below it, which pushed a full-height screen out of the window.
+- **Table borders lifted to `grey35`**: grey27 (#444) had too little
+  contrast on a black terminal background.
+- **Grid column one is selection-only**: the `▌` cursor bar next to the `▪`
+  selection marks read as a broken checkbox; the cursor is now carried by
+  the full-row background and bold accent name alone.
+- **`m` (show/hide unmanaged) is a grid verb again**, not a goto chord —
+  it changes what home shows, it doesn't go anywhere.
+- **`by` (author)**: new column in the gallery results and a new facts row
+  in the module menu.
+- **The console cursor is hidden** while the TUI runs (it sat blinking over
+  the frames); text prompts show it for typing.
+- **Esc aborts the edit/add/pin/search prompts**: text input now runs
+  through a minimal line editor with a real cancel path, and the edit
+  dialog assigns nothing until every answer is in — an abort never
+  half-saves.
+
 ## [0.1.0-beta6] — 2026-07-20
 
 ### Changed — UI design system v2 ([docs/design-system.md](docs/design-system.md))

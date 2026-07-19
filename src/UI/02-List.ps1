@@ -189,7 +189,7 @@ function script:Show-PSMMPager {
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -Breadcrumb $Breadcrumb -StatusMarkup $st.Status) -Context $ctx
+                $dest = Read-PSMMGotoKey
                 if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                 continue
             }

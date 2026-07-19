@@ -75,10 +75,10 @@ function script:Build-PSMMGrid {
             }
         }
         $ver += $pin
-        # column one: cursor bar wins over the selection mark (design §6)
-        $mark = if ($isCur) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" }
-                elseif ($ui.Sel.Contains($idx)) { "[$script:PSMM_ColOk]$([char]0x25AA)[/]" }
-                else { ' ' }
+        # column one is selection-only; the cursor is carried by the row
+        # background + bold accent name (the ▌ bar read as a broken checkbox
+        # next to the marks - live-run feedback 2026-07-20)
+        $mark = if ($ui.Sel.Contains($idx)) { "[$script:PSMM_ColOk]$([char]0x25AA)[/]" } else { ' ' }
         $issueFlags.Add([bool]$e.Issues.Count)
         $rows.Add([string[]]@($mark, $name, $state, $startup, $gallery, $ver, $scope, $file))
     }
@@ -161,7 +161,7 @@ function script:Build-PSMMGrid {
     } else {
         @(
             (Get-PSMMHint -Pairs @('i=install', 'u=update', 'k=check updates', '^l=load', '^u=unload')),
-            (Get-PSMMHint -Pairs @('space=select', 'enter=actions', 'a=add', 'r=reload')),
+            (Get-PSMMHint -Pairs @('space=select', 'enter=actions', 'a=add', 'r=reload', 'm=unmanaged')),
             (Get-PSMMPersistentHint)
         )
     }
@@ -191,7 +191,7 @@ function script:Build-PSMMGrid {
 
     # unmanaged notice, once the scan is in and the rows are hidden
     if ($ui.Unmanaged -and -not $ui.ShowUnmanaged -and @($ui.Unmanaged).Count) {
-        $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - g m shows them[/]"))
+        $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - m shows them[/]"))
     }
 
     # newer psmm available: the header bar carries the compact ⇡ flag; the
@@ -263,8 +263,7 @@ function script:Get-PSMMStartupJobMarkup {
     ''
 }
 
-# Show/hide the unmanaged rows (the g m chord). Shared by the grid loop and
-# the manager loop (a g m pressed on any sub-screen lands here via Goto).
+# Show/hide the unmanaged rows (grid verb 'm').
 function script:Invoke-PSMMUnmanagedToggle {
     $ui = $script:PSMM_UI
     if ($ui.Unmanaged) {
@@ -422,10 +421,9 @@ function script:Invoke-PSMMGrid {
             # the g goto layer (v2 §4): overlay + second key; single letters
             # below are verbs only
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMGrid) -Context $ctx
+                $dest = Read-PSMMGotoKey
                 if ($script:PSMM_UI.HardQuit) { $result.Cmd = 'quit'; return }
-                if ($dest -eq 'unmanaged') { Invoke-PSMMUnmanagedToggle }
-                elseif ($dest -and $dest -ne 'home') {
+                if ($dest -and $dest -ne 'home') {
                     # route through Goto (not Cmd) so the manager knows the
                     # overlay was the source - g ? lands on help - keys
                     $script:PSMM_UI.Goto = $dest
@@ -466,6 +464,7 @@ function script:Invoke-PSMMGrid {
                 ([ConsoleKey]::K) { if (-not $ctrl) { Start-PSMMUpdateCheckTask }; continue }
                 ([ConsoleKey]::A) { if (-not $ctrl) { $result.Cmd = 'add'; return }; continue }
                 ([ConsoleKey]::R) { if (-not $ctrl) { $result.Cmd = 'reload'; return }; continue }
+                ([ConsoleKey]::M) { if (-not $ctrl) { Invoke-PSMMUnmanagedToggle }; continue }
                 ([ConsoleKey]::Oem2) {
                     # '/' and '?' share this key on most layouts - split by char
                     if ($k.KeyChar -eq '?') { $result.Cmd = 'help'; return }

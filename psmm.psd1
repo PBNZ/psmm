@@ -20,10 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            Prerelease   = 'beta6'
+            Prerelease   = 'beta7'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0-beta6 - UI design system v2: g goto layer replaces screen-switch letters, header bar with breadcrumb on every screen, plain-word startup/gallery columns with state glyphs and a context sentence, capsule key hints, tabbed help, restyled startup report, and three themes via $PSMM_Theme (glacier|ember|moss). See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta7 - v2 UI live-run fixes: the goto panel truly overlays the screen, higher-contrast borders, selection-only first column, m (unmanaged) back as a grid verb, by/author in gallery and module menu, hidden console cursor, esc aborts edit/add/pin/search prompts. See CHANGELOG.md.'
         }
     }
 }

@@ -1,7 +1,9 @@
 ﻿# 03-Goto.ps1 — the g goto layer (design-system-v2 §4): pressing g anywhere
-# re-renders the current view with a small accent-bordered panel appended;
-# the next key jumps to a named screen. Identical on every screen, so the
-# per-screen switch letters are freed for verbs.
+# draws a small accent-bordered panel OVER the current frame (bottom-left,
+# raw VT positioning via Write-PSMMOverlay); the next key jumps to a named
+# screen. Identical on every screen, so the per-screen switch letters are
+# freed for verbs. Show/hide unmanaged is NOT here - that is a grid verb
+# ('m'), not a place to go (live-run feedback 2026-07-20).
 
 # chord → destination registry. Tests assert completeness.
 function script:Get-PSMMGotoTable {
@@ -13,7 +15,6 @@ function script:Get-PSMMGotoTable {
         't' = @{ Target = 'tasks';     Label = 'tasks' }
         'c' = @{ Target = 'conflicts'; Label = 'conflicts' }
         'x' = @{ Target = 'cleanup';   Label = 'cleanup' }
-        'm' = @{ Target = 'unmanaged'; Label = 'unmanaged' }
         '?' = @{ Target = 'help';      Label = 'keys' }
     }
 }
@@ -30,8 +31,12 @@ function script:Build-PSMMGotoPanel {
         $col.Padding = [Spectre.Console.Padding]::new(0, 0, 4, 0)
         [void]$g.AddColumn($col)
     }
-    for ($r = 0; $r -lt 3; $r++) {
-        [void][Spectre.Console.GridExtensions]::AddRow($g, [string[]]@($cells[(3 * $r)..(3 * $r + 2)]))
+    for ($r = 0; $r * 3 -lt $cells.Count; $r++) {
+        $row = @(for ($c = 0; $c -lt 3; $c++) {
+            $j = 3 * $r + $c
+            if ($j -lt $cells.Count) { $cells[$j] } else { '' }
+        })
+        [void][Spectre.Console.GridExtensions]::AddRow($g, [string[]]$row)
     }
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new(
@@ -45,22 +50,15 @@ function script:Build-PSMMGotoPanel {
     $panel
 }
 
-# Show the overlay under the current view and read the second key.
+# Draw the overlay on top of whatever is on screen and read the second key.
 # Returns the destination string, or $null (esc / unknown key swallowed /
-# hard quit). $Context: a LiveDisplayContext when called from a live loop;
-# without one the frame is written directly (non-live screens).
+# hard quit). Every caller repaints its frame right after, which restores
+# anything the erased overlay rows covered.
 function script:Read-PSMMGotoKey {
-    param(
-        $BaseRenderable,
-        $Context
-    )
-    $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    if ($BaseRenderable) { $items.Add($BaseRenderable) }
-    $items.Add((Build-PSMMGotoPanel))
-    $frame = [Spectre.Console.Rows]::new($items)
-    if ($Context) { $Context.UpdateTarget($frame); $Context.Refresh() }
-    else { Clear-PSMMScreen; Write-PSMMRenderable $frame }
+    [CmdletBinding()] param()
+    $region = Write-PSMMOverlay -Renderable (Build-PSMMGotoPanel)
     $k2 = [Console]::ReadKey($true)
+    Clear-PSMMOverlay -Region $region
     if (Test-PSMMHardQuitKey $k2) { $script:PSMM_UI.HardQuit = $true; return $null }
     if ($k2.Key -eq [ConsoleKey]::Escape) { return $null }
     $table = Get-PSMMGotoTable

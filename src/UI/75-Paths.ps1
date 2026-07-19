@@ -67,7 +67,7 @@ function script:Show-PSMMPaths {
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
                 if ($k.KeyChar -eq 'g') {
-                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPathsView -State $st -Infos $infos -StatusMarkup $st.Status) -Context $ctx
+                    $dest = Read-PSMMGotoKey
                     if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                     continue
                 }
@@ -183,7 +183,7 @@ function script:Set-PSMMPrimaryLocationUI {
     Write-PSMMLine "[$script:PSMM_ColWarn]default Documents-derived location - move existing module folders yourself, or[/]"
     Write-PSMMLine "[$script:PSMM_ColWarn]keep using d (download) / k (pin) to make the OneDrive copies reliable.[/]"
     $suggestion = if ($IsWindows) { Join-Path $HOME 'PowerShell\Modules' } else { '' }
-    $path = Read-SpectreText -Message 'New primary module path (empty cancels)' -DefaultAnswer $suggestion -AllowEmpty
+    $path = Read-PSMMText -Message 'New primary module path (empty cancels)' -DefaultAnswer $suggestion -AllowEmpty
     if ([string]::IsNullOrWhiteSpace($path)) { return "[$script:PSMM_ColMute]cancelled[/]" }
     try {
         if (-not (Test-Path -LiteralPath $path)) {

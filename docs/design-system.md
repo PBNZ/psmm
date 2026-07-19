@@ -77,8 +77,11 @@ One line, full width, `on grey11`-style background:
 | g t | tasks |
 | g c | conflicts |
 | g x | cleanup |
-| g m | unmanaged toggle |
 | g ? | help › keys |
+
+Show/hide unmanaged is NOT a goto destination - it is the grid verb `m`
+(live-run feedback 2026-07-20: it changes what home shows, it doesn't go
+anywhere).
 
 - esc cancels; any other second key is swallowed (today's behaviour).
 - Grid letters `f p c t x m g` are freed; single letters on a screen are
@@ -184,8 +187,28 @@ context-line presence).
 
 ## Implementation notes (2026-07-20)
 
-All 8 steps shipped in 0.1.0-beta6. Deliberate deviations from the letter of
-this spec:
+All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
+0.1.0-beta7. Deliberate deviations from the letter of this spec:
+
+- **Border = `grey35` (240), not grey27**: #444 had too little contrast on a
+  black terminal background.
+- **The goto overlay really overlays**: the panel is drawn on top of the
+  current frame, bottom-left, with raw VT cursor positioning (DECSC/DECRC
+  around absolute moves) - appending it to the renderable pushed a
+  full-height frame off screen. The region is erased on dismissal and the
+  caller's repaint restores what was underneath.
+- **Grid column one is selection-only** (`▪`); the cursor is carried by the
+  full-row background + bold accent name. The `▌` bar next to the selection
+  marks read as a broken checkbox. `▌` remains the cursor mark on
+  sub-screen list tables (which have no selection column).
+- **`m` (show/hide unmanaged) is a grid verb**, not a goto chord.
+- **The console cursor is hidden** while the TUI runs (it blinked over the
+  frames); text prompts show it for the duration.
+- **Esc cancels text prompts**: `Read-PSMMText` is a minimal line editor
+  (enter accepts, esc returns `$null` = abort); edit/add flows collect all
+  answers before assigning anything, so an abort never half-saves.
+- **`by` (author)**: a column in the gallery results and a facts row in the
+  module menu (resolved once from the manifest, never in the render path).
 
 - The persistent row's pairs adapt to the screen type: the grid shows
   `g goto… · / filter · ? help · ^q quit`; sub-screens swap `/ filter` for

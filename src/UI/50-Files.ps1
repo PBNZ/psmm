@@ -59,7 +59,7 @@ function script:Show-PSMMFiles {
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
                 if ($k.KeyChar -eq 'g') {
-                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMFilesView -State $st -Metas $metas -StatusMarkup $st.Status) -Context $ctx
+                    $dest = Read-PSMMGotoKey
                     if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                     continue
                 }
@@ -166,7 +166,7 @@ function script:New-PSMMConfigFile {
     $path = switch -Wildcard ($pick) {
         'main:*'        { $main }
         'profile dir:*' { $prof }
-        default         { Read-SpectreText -Message 'Full path for the new .json' }
+        default         { Read-PSMMText -Message 'Full path for the new .json' }
     }
     if ([string]::IsNullOrWhiteSpace($path)) { return }
     if (Test-Path -LiteralPath $path) { Write-PSMMLine "[$script:PSMM_ColErr]File already exists - not overwriting.[/]"; $null = Wait-PSMMKey; return }
@@ -217,7 +217,7 @@ function script:Move-PSMMConfigFile {
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Move $(ConvertTo-PSMMSafe (Split-Path $Meta.Path -Leaf))[/]"
     if ($Meta.Kind -eq 'inline') { Write-PSMMLine "[$script:PSMM_ColErr]The inline profile block cannot be moved.[/]"; $null = Wait-PSMMKey; return }
-    $dir = Read-SpectreText -Message 'Target folder'
+    $dir = Read-PSMMText -Message 'Target folder'
     if ([string]::IsNullOrWhiteSpace($dir)) { return }
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) { Write-PSMMLine "[$script:PSMM_ColErr]Folder not found.[/]"; $null = Wait-PSMMKey; return }
     $new = Join-Path $dir (Split-Path $Meta.Path -Leaf)

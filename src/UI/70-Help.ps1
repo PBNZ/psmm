@@ -14,7 +14,7 @@ function script:Get-PSMMHelpSection {
             'Every module your config files declare, one row each.'
             ''
             '  state    ' + [char]0x25CF + ' loaded (this session) · ' + [char]0x25D0 + ' installed (on disk) ·'
-            '           ' + [char]0x25CB + ' missing · ' + [char]0x25CC + ' unmanaged (in no config file - g m shows them)'
+            '           ' + [char]0x25CB + ' missing · ' + [char]0x25CC + ' unmanaged (in no config file - m shows them)'
             '  startup  what happens at shell start: load / install (background) / off'
             '  gallery  what the gallery may do: if-missing / check-only / latest'
             '  version  loaded (or newest installed). ' + [char]0x21E1 + ' = update available (after'
@@ -37,6 +37,7 @@ function script:Get-PSMMHelpSection {
             '           install and update are always separate keys'
             '  k        check the gallery for updates (background)'
             '  a        add a new entry     r    reload everything from disk'
+            '  m        show/hide installed-but-unmanaged modules'
         ) }
         'module' { @(
             'MODULE MENU'
@@ -145,7 +146,7 @@ function script:Get-PSMMHelpKeysLines {
         (Get-PSMMHint -NoLegend -Pairs @("$([char]0x2192)=drill in", "$([char]0x2190)=back out"))
         ''
         "[$script:PSMM_ColAccent]go places[/]"
-        (Get-PSMMHint -NoLegend -Pairs @('g=goto: h g f p t c x m ?'))
+        (Get-PSMMHint -NoLegend -Pairs @('g=goto: h g f p t c x ?'))
         (Get-PSMMHint -NoLegend -Pairs @('esc=back one level'))
         (Get-PSMMHint -NoLegend -Pairs @('^q=quit from anywhere'))
         "[$script:PSMM_ColDim]^ = ctrl[/]"
@@ -158,6 +159,7 @@ function script:Get-PSMMHelpKeysLines {
         (Get-PSMMHint -NoLegend -Pairs @('k=check the gallery for updates'))
         (Get-PSMMHint -NoLegend -Pairs @('^l=load', '^u=unload'))
         (Get-PSMMHint -NoLegend -Pairs @('a=add entry', 'r=reload from disk'))
+        (Get-PSMMHint -NoLegend -Pairs @('m=show/hide unmanaged'))
         ''
         "[$script:PSMM_ColAccent]everywhere[/]"
         (Get-PSMMHint -NoLegend -Pairs @('?=help', 'c=copy (text screens)'))
@@ -372,7 +374,7 @@ function script:Show-PSMMHelpScreen {
                 continue
             }
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMHelpView -State $st -Tabs $tabs) -Context $ctx
+                $dest = Read-PSMMGotoKey
                 if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                 continue
             }

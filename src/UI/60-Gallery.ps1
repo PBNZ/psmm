@@ -12,8 +12,8 @@ function script:Build-PSMMGalleryView {
     $n = $Results.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
-    $descCap = [Math]::Max(20, $win.Width - 60)
-    $T = New-PSMMTable -Headers @(' ', 'name', 'version', 'description')
+    $descCap = [Math]::Max(20, $win.Width - 78)
+    $T = New-PSMMTable -Headers @(' ', 'name', 'version', 'by', 'description')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $r = $Results[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $r.Name 40)
@@ -21,6 +21,7 @@ function script:Build-PSMMGalleryView {
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
                 (Get-PSMMCursorMark ($i -eq $State.Cursor)),
                 $nm, (ConvertTo-PSMMSafe $r.Version),
+                (ConvertTo-PSMMSafe (Get-PSMMTrunc "$($r.Author)" 18)),
                 (ConvertTo-PSMMSafe (Get-PSMMTrunc ($r.Description -replace '\s+', ' ') $descCap))))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
@@ -47,7 +48,7 @@ function script:Show-PSMMGallery {
         Clear-PSMMScreen
         Write-PSMMLine "[$script:PSMM_ColAccent]Search the PowerShell Gallery[/]"
         Write-PSMMLine "[$script:PSMM_ColMute]name or wildcard pattern, e.g. 'excel', 'Az.*', 'Microsoft.Graph*'; empty cancels[/]"
-        $query = Read-SpectreText -Message 'Search' -AllowEmpty
+        $query = Read-PSMMText -Message 'Search' -AllowEmpty
         if ([string]::IsNullOrWhiteSpace($query)) { return }
         Write-PSMMLine "[$script:PSMM_ColAccent]searching the gallery for '$(ConvertTo-PSMMSafe $query)'...[/]"
         $results = @(Find-PSMMGalleryModule -Query $query)
@@ -71,7 +72,7 @@ function script:Show-PSMMGallery {
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
                 if ($k.KeyChar -eq 'g') {
-                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMGalleryView -State $st -Results $results -Query $query -StatusMarkup $st.Status) -Context $ctx
+                    $dest = Read-PSMMGotoKey
                     if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                     continue
                 }
