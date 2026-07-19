@@ -42,7 +42,12 @@ function script:Invoke-PSMMManagerLoop {
                 'gallery'   { Show-PSMMGallery }
                 'cleanup'   { Show-PSMMCleanup }
                 'tasks'     { Show-PSMMTasks }
-                'help'      { Show-PSMMHelpScreen -Topic 'grid' }
+                'help'      {
+                    # g ? lands on the key reference; the screen's own ? opens
+                    # "this screen" (the default tab)
+                    $tab = if ($goto -eq 'help') { 'keys' } else { 'this screen' }
+                    Show-PSMMHelpScreen -Topic 'grid' -InitialTab $tab
+                }
                 'unmanaged' { Invoke-PSMMUnmanagedToggle }
                 'reload'    { $script:PSMM_UI.Dirty = $true }
             }

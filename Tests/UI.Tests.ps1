@@ -123,8 +123,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             }
         }
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match 'psmm v0\.1\.0-beta4 is available'
-        $text | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
+        $text | Should -Match "$([char]0x21E1) update"   # header-bar flag; detail lives in help - about
         InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
     }
 
@@ -270,14 +269,14 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match '2 line\(s\)'
     }
 
-    It 'help text covers every topic plus config format and global keys (#13)' {
-        foreach ($topic in 'grid', 'module', 'commands', 'files', 'gallery', 'cleanup', 'tasks') {
-            $lines = InModuleScope psmm -Parameters @{ t = $topic } { Get-PSMMHelpText -Topic $t }
-            $text = $lines -join "`n"
-            $text | Should -Match 'KEYS THAT WORK EVERYWHERE'
-            $text | Should -Match 'CONFIG - FILE FORMAT'
-            $text | Should -Match 'Install and Mode are independent'
-            $lines.Count | Should -BeGreaterThan 40 -Because "topic '$topic' should produce a full help document"
+    It 'help covers every topic with five tabs; config and keys content present (#13, v2)' {
+        foreach ($topic in 'grid', 'module', 'commands', 'files', 'gallery', 'cleanup', 'tasks', 'paths') {
+            $tabs = InModuleScope psmm -Parameters @{ t = $topic } { Get-PSMMHelpTabs -Topic $t }
+            @($tabs.get_Keys()) | Should -Be @('this screen', 'keys', 'config', 'startup', 'about')
+            @($tabs['this screen']).Count | Should -BeGreaterThan 3 -Because "topic '$topic' should describe its screen"
+            $flat = (InModuleScope psmm -Parameters @{ t = $topic } { Get-PSMMHelpText -Topic $t }) -join "`n"
+            $flat | Should -Match 'Install and Mode are independent'
+            $flat | Should -Match 'psmm-config\.json'
         }
         # per-screen sections actually differ
         $grid = (InModuleScope psmm { Get-PSMMHelpText -Topic 'grid' }) -join "`n"
@@ -830,6 +829,63 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
         $files | Should -Match "g\s+goto$([char]0x2026)"
         $files | Should -Not -Match 'c\s+conflicts'
+    }
+
+    # --- step 6: tabbed help -----------------------------------------------
+
+    It 'the help screen renders tabs with the current one active, and tab content (step 6)' {
+        $text = Get-RenderedText {
+            $st = @{ Tab = 0; Scroll = 0; Filter = ''; FilterMode = $false; Status = '' }
+            Build-PSMMHelpView -State $st -Tabs (Get-PSMMHelpTabs -Topic 'grid')
+        }
+        ($text -replace '\s+', ' ') | Should -Match 'this screen\s+keys\s+config\s+startup\s+about'
+        $text | Should -Match "home $([char]0x203A) help"
+        $text | Should -Match 'MAIN SCREEN'
+        $text | Should -Match 'c\s+copy tab'
+        $text | Should -Match 'switch tab'
+    }
+
+    It 'the help keys tab groups the key reference and renders capsules (step 6)' {
+        $tabs = InModuleScope psmm { Get-PSMMHelpTabs -Topic 'grid' }
+        $keys = @($tabs['keys'])
+        $plain = @($keys | ForEach-Object { InModuleScope psmm -Parameters @{ l = $_ } { [Spectre.Console.Markup]::Remove($l) } }) -join "`n"
+        $plain | Should -Match 'navigate'
+        $plain | Should -Match 'act on modules'
+        $plain | Should -Match 'go places'
+        $plain | Should -Match 'everywhere'
+        $plain | Should -Match 'goto'
+        ($keys -join "`n") | Should -Match ([regex]::Escape('[salmon1 on grey19]'))   # capsules, not plain text
+        # every line must be valid markup (tabs render line by line)
+        InModuleScope psmm -Parameters @{ lines = $keys } {
+            foreach ($l in $lines) { { [void][Spectre.Console.Markup]::new($l) } | Should -Not -Throw }
+        }
+    }
+
+    It 'help filter narrows the visible tab to matching lines (step 6)' {
+        $text = Get-RenderedText {
+            $st = @{ Tab = 1; Scroll = 0; Filter = 'quit'; FilterMode = $false; Status = '' }
+            Build-PSMMHelpView -State $st -Tabs (Get-PSMMHelpTabs -Topic 'grid')
+        }
+        $text | Should -Match 'quit'
+        $text | Should -Not -Match 'install missing'
+        $text | Should -Match 'filter: quit'
+    }
+
+    It 'the about tab carries the version and the cached self-update command; the grid standing line is gone (step 6)' {
+        InModuleScope psmm {
+            $script:PSMM_UI.SelfUpdate = [pscustomobject]@{
+                Current = '0.1.0-beta3'; Latest = '0.1.0-beta4'
+                Command = 'Install-PSResource psmm -Prerelease -Reinstall'
+            }
+        }
+        $tabs = InModuleScope psmm { Get-PSMMHelpTabs -Topic 'grid' }
+        $about = @($tabs['about']) -join "`n"
+        $about | Should -Match 'v0\.1\.0-beta4 is available'
+        $about | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
+        $grid = Get-RenderedText { Build-PSMMGrid }
+        $grid | Should -Not -Match 'is available \(you have'   # detail moved to help - about
+        $grid | Should -Match "$([char]0x21E1) update"         # the header flag remains
+        InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
     }
 
     # --- step 5: header bar with breadcrumb --------------------------------

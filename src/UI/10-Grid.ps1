@@ -194,12 +194,8 @@ function script:Build-PSMMGrid {
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - g m shows them[/]"))
     }
 
-    # newer psmm available (daily cached check): the verified update command,
-    # or just press u on psmm's own row - the update path handles the
-    # prerelease-label case
-    if ($ui.SelfUpdate) {
-        $items.Add([Spectre.Console.Markup]::new("[orange1]psmm v$($ui.SelfUpdate.Latest) is available (you have v$($ui.SelfUpdate.Current)) - update: $(ConvertTo-PSMMSafe $ui.SelfUpdate.Command), then restart pwsh[/]"))
-    }
+    # newer psmm available: the header bar carries the compact ⇡ flag; the
+    # exact update command lives in help › about (v2 §2)
 
     # standing OneDrive diagnosis (cached at init - no per-frame path checks)
     if ($ui.OneDrivePrimary) {
