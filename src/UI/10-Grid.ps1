@@ -33,56 +33,73 @@ function script:Build-PSMMGrid {
     # budget under-reserved and let the table outgrow the terminal, which
     # Spectre renders as a bare '...'.
     $rows = [System.Collections.Generic.List[string[]]]::new()
+    $issueFlags = [System.Collections.Generic.List[bool]]::new()
+    $verCol = 5
+    $verGhost = 0   # widest version cell WITH its ⇡ target: targets render on
+                    # the cursor row only, but the column must reserve their
+                    # width so moving the cursor never resizes the table
     for ($v = 0; $v -lt $n; $v++) {
         $idx = $ui.View[$v]
         $e = $entries[$idx]
         $isCur = ($v -eq $ui.Cursor)
         $isUnmanaged = [bool]$e.PSObject.Properties['Unmanaged']
-        $state = if ($isUnmanaged) { "[$script:PSMM_ColInfo]unmanaged[/]" }
-                 elseif ($e.Loaded) { "[$script:PSMM_ColOk]loaded[/]" }
-                 elseif ($e.Installed) { "[$script:PSMM_ColWarn]installed[/]" }
-                 else { "[$script:PSMM_ColErr]missing[/]" }
+        $state = Get-PSMMStateMarkup -Entry $e
         $src = switch ($e.Source) {
             '<profile inline>' { 'profile' }
             '<unmanaged>'      { '-' }
-            default            { Split-Path $e.Source -Leaf }
+            default            { [System.IO.Path]::GetFileNameWithoutExtension($e.Source) }
         }
-        $rw = if ($isUnmanaged) { '' } elseif ($e.Writable) { " [$script:PSMM_ColDim]rw[/]" } else { " [$script:PSMM_ColDim]ro[/]" }
+        # read-only is the exception worth marking; rw is the silent default
+        $ro = if (-not $isUnmanaged -and -not $e.Writable) { " [$script:PSMM_ColDim]ro[/]" } else { '' }
+        $file = "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))[/]$ro"
         $name = "$($e.Name)"
         $scope = switch ($e.InstallScope) {
-            'CurrentUser' { 'user' }
-            'AllUsers'    { if ($ui.Elevated) { 'all' } else { "all [$script:PSMM_ColDim]ro[/]" } }
+            'CurrentUser' { "[$script:PSMM_ColDim]user[/]" }
+            'AllUsers'    { if ($ui.Elevated) { "[$script:PSMM_ColDim]all[/]" } else { "[$script:PSMM_ColDim]all ro[/]" } }
             'mixed'       { "[$script:PSMM_ColWarn]mixed[/]" }
-            default       { '-' }
+            default       { "[$script:PSMM_ColDim]-[/]" }
         }
-        $ver = if ($e.LoadedVersion) { "$($e.LoadedVersion)" } elseif ($e.InstalledVersion) { "$($e.InstalledVersion)" } else { '-' }
-        # '↑', not '^': the design system reserves '^' for the ctrl legend
-        if ($e.UpdateAvailable) { $ver = "$ver [$script:PSMM_ColWarn]$([char]0x2191)[/]" }
-        if ($e.PinnedExact) { $ver = "$ver [$script:PSMM_ColDim]pin[/]" }
+        $startupWord = Get-PSMMStartupWord $e.Mode
+        $startup = if ($startupWord -in 'off', '-') { "[$script:PSMM_ColDim]$startupWord[/]" } else { $startupWord }
+        $gallery = "[$script:PSMM_ColDim]$(Get-PSMMGalleryWord $e.Install)[/]"
+        $verBase = if ($e.LoadedVersion) { "$($e.LoadedVersion)" } elseif ($e.InstalledVersion) { "$($e.InstalledVersion)" } else { '-' }
+        $pin = if ($e.PinnedExact) { " [$script:PSMM_ColDim]pin[/]" } else { '' }
+        # '⇡', not '^': the design system reserves '^' for the ctrl legend
+        $ver = $verBase
+        if ($e.UpdateAvailable) {
+            $ver = if ($isCur -and $e.LatestVersion) { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1) $($e.LatestVersion)[/]" }
+                   else { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1)[/]" }
+            if ($e.LatestVersion) {
+                $wide = $verBase.Length + 3 + "$($e.LatestVersion)".Length + $(if ($pin) { 4 } else { 0 })
+                if ($wide -gt $verGhost) { $verGhost = $wide }
+            }
+        }
+        $ver += $pin
         # column one: cursor bar wins over the selection mark (design §6)
         $mark = if ($isCur) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" }
                 elseif ($ui.Sel.Contains($idx)) { "[$script:PSMM_ColOk]$([char]0x25AA)[/]" }
                 else { ' ' }
-        $flag = if ($e.Issues.Count) { "[$script:PSMM_ColErr]![/]" } else { ' ' }
-        $rows.Add([string[]]@(
-                $mark, $name, "$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))$rw",
-                $e.Mode, $e.Install, $scope, $state, $ver, $flag))
+        $issueFlags.Add([bool]$e.Issues.Count)
+        $rows.Add([string[]]@($mark, $name, $state, $startup, $gallery, $ver, $scope, $file))
     }
 
-    # lowercase + dim headers (design §5); plain text here for width maths,
-    # dim markup applied when the columns are created below
-    $headers = @(' ', 'name', 'src', 'mode', 'inst', 'scope', 'state', 'ver', '!')
+    # lowercase + dim headers, plain-word column names (design §5); plain text
+    # here for width maths, dim markup applied when the columns are created
+    $headers = @(' ', 'module', 'state', 'startup', 'gallery', 'version', 'scope', 'file')
     $nameCol = 1
     $widths = @(foreach ($h in $headers) { $h.Length })
     for ($ci = 0; $ci -lt $headers.Count; $ci++) {
-        foreach ($r in $rows) {
-            # the name column is still raw text, everything else is markup
-            $len = if ($ci -eq $nameCol) { $r[$nameCol].Length } else { [Spectre.Console.Markup]::Remove($r[$ci]).Length }
+        for ($ri = 0; $ri -lt $rows.Count; $ri++) {
+            # the module column is still raw text (styled after capping);
+            # issues add a trailing ' ⚠' the width must account for
+            $len = if ($ci -eq $nameCol) { $rows[$ri][$nameCol].Length + $(if ($issueFlags[$ri]) { 2 } else { 0 }) }
+                   else { [Spectre.Console.Markup]::Remove($rows[$ri][$ci]).Length }
             if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
         }
     }
+    if ($verGhost -gt $widths[$verCol]) { $widths[$verCol] = $verGhost }
     # Exact fit: content + 2 padding per column + border verticals. The
-    # name column flexes down to 14 chars; below the resulting minimum,
+    # module column flexes down to 14 chars; below the resulting minimum,
     # Spectre would collapse the table to a bare '...' - render a clear
     # too-small message instead (design system: too-small terminal).
     $overhead = (2 * $headers.Count) + $headers.Count + 1
@@ -94,8 +111,10 @@ function script:Build-PSMMGrid {
     $nameCap = [Math]::Min($widths[$nameCol], [Math]::Max(14, $win.Width - $overhead - $fixed))
     $widths[$nameCol] = $nameCap
     for ($v = 0; $v -lt $n; $v++) {
-        $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $rows[$v][$nameCol] $nameCap)
+        $cap = if ($issueFlags[$v]) { $nameCap - 2 } else { $nameCap }
+        $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $rows[$v][$nameCol] $cap)
         if ($v -eq $ui.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
+        if ($issueFlags[$v]) { $nm += " [$script:PSMM_ColErr]$([char]0x26A0)[/]" }
         $rows[$v][$nameCol] = $nm
     }
 
@@ -130,7 +149,7 @@ function script:Build-PSMMGrid {
     $sel = $ui.Sel.Count
     $pos = Get-PSMMPositionMarkup -State $ui -Count $n -Viewport $vp
     $flt = Get-PSMMFilterMarkup -State $ui
-    $head = if ($sel) { "[green3]$sel selected[/]$pos$flt" } else { "[$script:PSMM_ColMute]none selected[/]$pos$flt" }
+    $head = if ($sel) { "[$script:PSMM_ColOk]$([char]0x25AA) $sel selected[/]$pos$flt" } else { "[$script:PSMM_ColMute]none selected[/]$pos$flt" }
 
     # short hint rows (a single long row collapses to '...' when narrow):
     # navigation, module verbs, screen switching (design system row order)
@@ -151,6 +170,9 @@ function script:Build-PSMMGrid {
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]PS Session Module Manager[/] [$script:PSMM_ColMute](psmm v$($ui.Version) · $($ui.Engine)$(if ($ui.Elevated) { ' · elevated' }))[/]"))
     $items.Add($T)
     $items.Add([Spectre.Console.Markup]::new($head))
+    # context sentence for the cursor row (§5): the verbose explanation the
+    # plain-word columns don't have to carry
+    if ($n) { $items.Add([Spectre.Console.Markup]::new((Get-PSMMContextMarkup -Entry $entries[$ui.View[$ui.Cursor]]))) }
     foreach ($hr in $hintRows) { $items.Add([Spectre.Console.Markup]::new($hr)) }
 
     # deferred-startup job status (from Invoke-PSMMStartup)
@@ -185,6 +207,42 @@ function script:Build-PSMMGrid {
     if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[orange1]$($warnings.Count) config warning(s) - press f or c for details[/]")) }
     if ($ui.Status) { $items.Add([Spectre.Console.Markup]::new($ui.Status)) }
     [Spectre.Console.Rows]::new($items)
+}
+
+# One muted sentence explaining the cursor row in full words (§5): what the
+# entry does at shell start, whether it is imported now, and what is on disk.
+function script:Get-PSMMContextMarkup {
+    param([Parameter(Mandatory)] $Entry)
+    $isUnmanaged = [bool]$Entry.PSObject.Properties['Unmanaged']
+    $startup = if ($isUnmanaged) { 'installed but not in any config file' }
+               else {
+                   switch ("$($Entry.Mode)") {
+                       'Load' {
+                           switch ("$($Entry.Install)") {
+                               'Latest'    { 'imports at shell start, updating to latest first' }
+                               'CheckOnly' { 'imports at shell start, never auto-installed' }
+                               default     { 'imports at shell start, installing first when missing' }
+                           }
+                       }
+                       'InstallOnly' {
+                           switch ("$($Entry.Install)") {
+                               'Latest'    { 'background-updates to latest at shell start' }
+                               'CheckOnly' { 'checked at shell start, never installed' }
+                               default     { 'background-installs at shell start when missing' }
+                           }
+                       }
+                       'Ignore' { 'off - nothing happens at shell start' }
+                       default  { 'no startup action' }
+                   }
+               }
+    $session = if ($Entry.Loaded) { "imported this session (v$($Entry.LoadedVersion))" } else { 'not imported this session' }
+    $disk = if ($Entry.Installed) {
+        $d = "v$($Entry.InstalledVersion) on disk"
+        if ($Entry.UpdateAvailable -and $Entry.LatestVersion) { $d += ", v$($Entry.LatestVersion) available (u updates)" }
+        if ($Entry.Version) { $d += " - pinned to $($Entry.Version)" }
+        $d
+    } else { 'not installed' }
+    "[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Entry.Name)[/] [$script:PSMM_ColMute]$([char]0x2014) $startup $([char]0x00B7) $session $([char]0x00B7) $(ConvertTo-PSMMSafe $disk)[/]"
 }
 
 # Markup line for the deferred startup job ('' when idle/no job).

@@ -172,6 +172,37 @@ function script:Get-PSMMPersistentHint {
     $parts -join '  '
 }
 
+# v2 display language (§5): the JSON schema keeps the Mode/Install enums;
+# these are the plain words the UI shows for them.
+function script:Get-PSMMStartupWord {
+    param($Mode)
+    switch ("$Mode") {
+        'Load'        { 'load' }
+        'InstallOnly' { 'install' }
+        'Ignore'      { 'off' }
+        default       { '-' }
+    }
+}
+
+function script:Get-PSMMGalleryWord {
+    param($Install)
+    switch ("$Install") {
+        'IfMissing' { 'if-missing' }
+        'CheckOnly' { 'check-only' }
+        'Latest'    { 'latest' }
+        default     { '-' }
+    }
+}
+
+# State glyph + word (§5): glyph and word travel together, never glyph alone.
+function script:Get-PSMMStateMarkup {
+    param([Parameter(Mandatory)] $Entry)
+    if ($Entry.PSObject.Properties['Unmanaged']) { return "[$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/]" }
+    if ($Entry.Loaded)    { return "[$script:PSMM_ColOk]$([char]0x25CF) loaded[/]" }
+    if ($Entry.Installed) { return "[$script:PSMM_ColWarn]$([char]0x25D0) installed[/]" }
+    "[$script:PSMM_ColErr]$([char]0x25CB) missing[/]"
+}
+
 # Minimum terminal size a table screen needs; below it Spectre collapses the
 # table to '...'. Screens render Get-PSMMTooSmallView instead of the table.
 function script:Test-PSMMWinTooSmall {

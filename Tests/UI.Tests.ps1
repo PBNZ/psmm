@@ -357,7 +357,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             $e.Installed = $true; $e.InstalledVersion = [version]'1.0'; $e.UpdateAvailable = $true
         }
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match ([regex]::Escape("1.0 $([char]0x2191)"))
+        $text | Should -Match ([regex]::Escape("1.0 $([char]0x21E1)"))   # ⇡ update marker (v2)
         InModuleScope psmm {
             $pos = [Spectre.Console.Markup]::Remove((Get-PSMMPositionMarkup -State @{ Cursor = 0 } -Count 50 -Viewport @{ First = 0; Last = 9; Rows = 10 }))
             $pos | Should -Match ([regex]::Escape([string][char]0x2193))
@@ -636,10 +636,10 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
 
     It 'grid headers are lowercase + dim and the checkbox column is gone (step 1)' {
         $text = Get-RenderedText { Build-PSMMGrid }
-        $header = ($text -split "`r?`n" | Where-Object { $_ -cmatch 'name' } | Select-Object -First 1)
+        $header = ($text -split "`r?`n" | Where-Object { $_ -match '│.*module' } | Select-Object -First 1)
         $header | Should -Not -BeNullOrEmpty
-        $header | Should -CMatch 'name'
-        $header | Should -Not -CMatch 'Name'
+        $header | Should -CMatch 'module'
+        $header | Should -Not -CMatch 'Module'
         $text | Should -Not -CMatch 'Sel'
         $text | Should -Not -Match '\[\[x\]\]|\[ \]'   # checkbox cells retired
         $ansi = Get-RenderedAnsi { Build-PSMMGrid }
@@ -686,6 +686,102 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $plain | Should -Match '\^ = ctrl\s*$'   # chord visible -> legend, at the end
             { [void][Spectre.Console.Markup]::new($m) } | Should -Not -Throw
         }
+    }
+
+    # --- step 3: plain-word columns, state glyphs, context line -------------
+
+    It 'grid columns speak plain words: module state startup gallery version scope file (step 3)' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $header = ($text -split "`r?`n" | Where-Object { $_ -match '│.*module' } | Select-Object -First 1)
+        $header | Should -Match 'module\s*│\s*state\s*│\s*startup\s*│\s*gallery\s*│\s*version\s*│\s*scope\s*│\s*file'
+        $text | Should -Not -Match '│\s*mode\s*│'
+        $text | Should -Not -Match '│\s*inst\s*│'
+    }
+
+    It 'startup and gallery cells map the config enums to display words (step 3)' {
+        # fixture: AlphaMod = IfMissing/Ignore, BetaMod = CheckOnly/Ignore
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match 'off'
+        $text | Should -Match 'if-missing'
+        $text | Should -Match 'check-only'
+        $text | Should -Not -Match 'IfMissing'
+        $text | Should -Not -Match 'CheckOnly'
+        InModuleScope psmm {
+            $script:PSMM_UI.Entries[0].Mode = 'Load'
+            $script:PSMM_UI.Entries[1].Mode = 'InstallOnly'
+            $script:PSMM_UI.Entries[1].Install = 'Latest'
+        }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match '│\s*load\s*│'
+        $text | Should -Match '│\s*install\s*│'
+        $text | Should -Match 'latest'
+    }
+
+    It 'the state column pairs a glyph with the word, never the glyph alone (step 3)' {
+        InModuleScope psmm {
+            $script:PSMM_UI.Entries[0].Loaded = $true
+            $script:PSMM_UI.Entries[1].Installed = $true
+        }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match "$([char]0x25CF) loaded"      # ● loaded
+        $text | Should -Match "$([char]0x25D0) installed"   # ◐ installed
+        InModuleScope psmm { $script:PSMM_UI.Entries[0].Loaded = $false }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match "$([char]0x25CB) missing"     # ○ missing
+    }
+
+    It 'entry issues render as an err warning sign after the module name; the ! column is gone (step 3)' {
+        InModuleScope psmm { $script:PSMM_UI.Entries[0].Issues = @('Version pin is invalid') }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match "AlphaMod $([char]0x26A0)"    # ⚠ after the name
+        $text | Should -Not -Match '│\s*!\s*│'
+    }
+
+    It 'the update marker is an up arrow-from-bar and the cursor row names the target version (step 3)' {
+        InModuleScope psmm {
+            foreach ($e in $script:PSMM_UI.Entries) {
+                $e.Installed = $true; $e.InstalledVersion = [version]'1.0'
+                $e.UpdateAvailable = $true; $e.LatestVersion = '9.9.9'
+            }
+            $script:PSMM_UI.Cursor = 0
+        }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match ([regex]::Escape("1.0 $([char]0x21E1) 9.9.9"))   # cursor row: target shown
+        # non-cursor row keeps the bare marker
+        ($text -split "`r?`n" | Where-Object { $_ -match 'BetaMod' }) | Should -Match ([regex]::Escape("1.0 $([char]0x21E1)"))
+        ($text -split "`r?`n" | Where-Object { $_ -match 'BetaMod' }) | Should -Not -Match '9\.9\.9'
+    }
+
+    It 'the context line explains the cursor row in full words (step 3)' {
+        InModuleScope psmm {
+            $e = $script:PSMM_UI.Entries[0]
+            $e.Mode = 'InstallOnly'; $e.Install = 'IfMissing'
+            $e.Installed = $true; $e.InstalledVersion = [version]'7.8.10'
+            $e.UpdateAvailable = $true; $e.LatestVersion = '7.9.0'
+            $script:PSMM_UI.Cursor = 0
+        }
+        # the sentence may wrap at the console width - compare on one line
+        $flat = (Get-RenderedText { Build-PSMMGrid }) -replace '\s+', ' '
+        $flat | Should -Match 'AlphaMod .* background-installs at shell start when missing'
+        $flat | Should -Match 'not imported this session'
+        $flat | Should -Match 'v7\.8\.10 on disk, v7\.9\.0 available \(u updates\)'
+    }
+
+    It 'moving the cursor onto a row with a pending update does not change the table width (step 3)' {
+        InModuleScope psmm {
+            $e = $script:PSMM_UI.Entries[1]
+            $e.Installed = $true; $e.InstalledVersion = [version]'2.0.0'
+            $e.UpdateAvailable = $true; $e.LatestVersion = '2.0.1'
+            $script:PSMM_UI.Cursor = 0
+        }
+        $topBorder = { ($text -split "`r?`n" | Where-Object { $_ -match '^\s*╭' } | Select-Object -First 1).TrimEnd().Length }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $wOff = & $topBorder
+        InModuleScope psmm { $script:PSMM_UI.Cursor = 1 }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $wOn = & $topBorder
+        $wOn | Should -BeGreaterThan 0
+        $wOff | Should -Be $wOn
     }
 }
 
