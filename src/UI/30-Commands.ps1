@@ -45,7 +45,7 @@ function script:Show-PSMMCommands {
     if (-not $cmds.Count) {
         Clear-PSMMScreen
         Write-PSMMLine "[$script:PSMM_ColAccent]Commands in $(ConvertTo-PSMMSafe $Entry.Name)[/]"
-        Write-PSMMLine '[orange1]No commands available (install/import the module first).[/]'
+        Write-PSMMLine "[$script:PSMM_ColWarn]No commands available (install/import the module first).[/]"
         $null = Wait-PSMMKey -Message 'back'
         return
     }
@@ -134,7 +134,7 @@ function script:Build-PSMMCommandDetailView {
     $items.Add([Spectre.Console.Markup]::new($tabBar))
     $panel = [Spectre.Console.Panel]::new([Spectre.Console.Markup]::new($body))
     $panel.Border = [Spectre.Console.BoxBorder]::Rounded
-    $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
+    $panel.BorderStyle = Get-PSMMBorderStyle
     $items.Add($panel)
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('left/right=switch tab', 'up/dn=scroll', 'c=copy tab'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", 'esc=back', '^q=quit'))))

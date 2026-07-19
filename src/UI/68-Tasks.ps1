@@ -21,8 +21,8 @@ function script:Receive-PSMMUITask {
                     Update-PSMMLoaded -Entries $ui.Entries
                 }
                 $fails = @($t.Output | Where-Object { "$_" -like 'FAILED *' })
-                $ui.Status = if ($fails.Count) { "[orange1]install/update: $($fails.Count) of $($names.Count) failed (g t=details)[/]" }
-                             else { "[green3]install/update done: $($names -join ', ')[/]" }
+                $ui.Status = if ($fails.Count) { "[$script:PSMM_ColWarn]install/update: $($fails.Count) of $($names.Count) failed (g t=details)[/]" }
+                             else { "[$script:PSMM_ColOk]install/update done: $($names -join ', ')[/]" }
             }
             'updatecheck' {
                 $found = 0
@@ -39,10 +39,10 @@ function script:Receive-PSMMUITask {
                     }
                     if ($e.UpdateAvailable) { $found++ }
                 }
-                $ui.Status = if ($found) { "[orange1]$found update(s) available ($([char]0x21E1) in the version column - u updates the selection)[/]" } else { '[green3]everything up to date[/]' }
+                $ui.Status = if ($found) { "[$script:PSMM_ColWarn]$found update(s) available ($([char]0x21E1) in the version column - u updates the selection)[/]" } else { "[$script:PSMM_ColOk]everything up to date[/]" }
             }
             'updatehelp' {
-                $ui.Status = if ($t.Failed) { '[orange1]Update-Help finished with errors (g t=details)[/]' } else { '[green3]Update-Help done[/]' }
+                $ui.Status = if ($t.Failed) { "[$script:PSMM_ColWarn]Update-Help finished with errors (g t=details)[/]" } else { "[$script:PSMM_ColOk]Update-Help done[/]" }
             }
             'selfupdate' {
                 # silent: the standing grid notice covers it; just refresh
@@ -50,8 +50,8 @@ function script:Receive-PSMMUITask {
                 $ui.SelfUpdate = Test-PSMMUpdateAvailable
             }
             default {
-                $ui.Status = if ($t.Failed) { "[orange1]task '$(ConvertTo-PSMMSafe $t.Label)' failed (g t=details)[/]" }
-                             else { "[green3]task '$(ConvertTo-PSMMSafe $t.Label)' done[/]" }
+                $ui.Status = if ($t.Failed) { "[$script:PSMM_ColWarn]task '$(ConvertTo-PSMMSafe $t.Label)' failed (g t=details)[/]" }
+                             else { "[$script:PSMM_ColOk]task '$(ConvertTo-PSMMSafe $t.Label)' done[/]" }
             }
         }
         $t.Seen = $true
@@ -61,7 +61,7 @@ function script:Receive-PSMMUITask {
 # Kick off Update-Help for all installed modules in the background (#35).
 function script:Start-PSMMUpdateHelpTask {
     $running = @(Get-PSMMTask | Where-Object { $_.Kind -eq 'updatehelp' -and -not $_.Done })
-    if ($running.Count) { $script:PSMM_UI.Status = '[orange1]Update-Help is already running[/]'; return }
+    if ($running.Count) { $script:PSMM_UI.Status = "[$script:PSMM_ColWarn]Update-Help is already running[/]"; return }
     $null = Start-PSMMTask -Label 'Update-Help (all modules)' -Kind 'updatehelp' -ScriptBlock {
         try {
             Update-Help -Scope CurrentUser -Force -ErrorAction SilentlyContinue -ErrorVariable errs 3>$null
@@ -91,9 +91,9 @@ function script:Build-PSMMTasksView {
         $task = $Tasks[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $task.Label 44)
         if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
-        $state = if (-not $task.Done) { "[deepskyblue1]running[/]" }
-                 elseif ($task.Failed) { '[indianred1]failed[/]' }
-                 else { '[green3]done[/]' }
+        $state = if (-not $task.Done) { "[$script:PSMM_ColAccent]running[/]" }
+                 elseif ($task.Failed) { "[$script:PSMM_ColErr]failed[/]" }
+                 else { "[$script:PSMM_ColOk]done[/]" }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
                 $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
                 $nm, $state, $task.StartedAt.ToString('HH:mm:ss'), "$($task.Output.Count) line(s)"))
@@ -122,7 +122,7 @@ function script:Show-PSMMTasks {
         if (-not $tasks.Count) {
             Clear-PSMMScreen
             Write-PSMMLine "[$script:PSMM_ColAccent]Background tasks[/]"
-            Write-PSMMLine '[grey66]No tasks yet. u starts a background Update-Help; installs/updates/scans appear here too.[/]'
+            Write-PSMMLine "[$script:PSMM_ColMute]No tasks yet. u starts a background Update-Help; installs/updates/scans appear here too.[/]"
             Write-PSMMLine (Get-PSMMHint -Pairs @('u=run update-help', 'esc=back'))
             $k = [Console]::ReadKey($true)
             if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
@@ -157,7 +157,7 @@ function script:Show-PSMMTasks {
                 switch ($k.Key) {
                     ([ConsoleKey]::Enter)  { $action.Name = 'view'; return }
                     ([ConsoleKey]::U)      { Start-PSMMUpdateHelpTask; continue }
-                    ([ConsoleKey]::C)      { Clear-PSMMTask; $st.Cursor = 0; $st.Status = '[green3]finished tasks cleared[/]'; continue }
+                    ([ConsoleKey]::C)      { Clear-PSMMTask; $st.Cursor = 0; $st.Status = "[$script:PSMM_ColOk]finished tasks cleared[/]"; continue }
                     ([ConsoleKey]::Escape) { $action.Name = 'back'; return }
                     default { if ($k.KeyChar -eq '?') { $action.Name = 'help'; return } }
                 }

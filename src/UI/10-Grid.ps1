@@ -199,11 +199,11 @@ function script:Build-PSMMGrid {
 
     # standing OneDrive diagnosis (cached at init - no per-frame path checks)
     if ($ui.OneDrivePrimary) {
-        $items.Add([Spectre.Console.Markup]::new('[orange1]primary module location is inside OneDrive - cloud-only files can break loading (g p=details)[/]'))
+        $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]primary module location is inside OneDrive - cloud-only files can break loading (g p=details)[/]"))
     }
 
     $warnings = Get-PSMMWarning
-    if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[orange1]$($warnings.Count) config warning(s) - g f / g c show details[/]")) }
+    if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]$($warnings.Count) config warning(s) - g f / g c show details[/]")) }
     if ($ui.Status) { $items.Add([Spectre.Console.Markup]::new($ui.Status)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -256,10 +256,10 @@ function script:Get-PSMMStartupJobMarkup {
     if ($j.State -eq 'Completed') {
         $out = @(); try { $out = @(Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue) } catch { }
         $fails = @($out | Where-Object { "$_" -like 'FAILED *' } | ForEach-Object { if ("$_" -match '^FAILED\s+([^:]+)') { $Matches[1] } })
-        if ($fails.Count) { return "[orange1]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (i on the row retries)[/]" }
-        return "[green3]background startup: all $total module task(s) ok[/]"
+        if ($fails.Count) { return "[$script:PSMM_ColWarn]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (i on the row retries)[/]" }
+        return "[$script:PSMM_ColOk]background startup: all $total module task(s) ok[/]"
     }
-    if ($j.State -in 'Failed', 'Stopped') { return '[indianred1]background startup job failed - see t (tasks)[/]' }
+    if ($j.State -in 'Failed', 'Stopped') { return "[$script:PSMM_ColErr]background startup job failed - see t (tasks)[/]" }
     ''
 }
 
@@ -295,7 +295,7 @@ function script:Invoke-PSMMBulk {
         if ($Action -eq 'Load') {
             $cloud = @(Get-PSMMModuleCloudOnlyFile -Name $e.Name)
             if ($cloud.Count) {
-                $ui.Status = "[orange1]downloading $($cloud.Count) cloud-only file(s) for $(ConvertTo-PSMMSafe $e.Name) from OneDrive...[/]"
+                $ui.Status = "[$script:PSMM_ColWarn]downloading $($cloud.Count) cloud-only file(s) for $(ConvertTo-PSMMSafe $e.Name) from OneDrive...[/]"
                 if ($Context) { $Context.UpdateTarget((Build-PSMMGrid)); $Context.Refresh() }
                 $null = Invoke-PSMMFileHydration -Files $cloud
             }
@@ -310,7 +310,7 @@ function script:Invoke-PSMMBulk {
     }
     $ui.Sel.Clear()
     $verb = if ($Action -eq 'Load') { 'loaded' } else { 'unloaded' }
-    $ui.Status = if ($fail) { "[orange1]$verb $ok, $fail failed[/]" } else { "[green3]$verb $ok[/]" }
+    $ui.Status = if ($fail) { "[$script:PSMM_ColWarn]$verb $ok, $fail failed[/]" } else { "[$script:PSMM_ColOk]$verb $ok[/]" }
 }
 
 # Launch install (or update, with -Update) of the targeted rows as a
@@ -327,8 +327,8 @@ function script:Start-PSMMInstallTask {
         if ($Update) { [bool]$e.Installed } else { -not $e.Installed }
     })
     if (-not $targets.Count) {
-        $ui.Status = if ($Update) { '[orange1]nothing to update - no installed module targeted (i installs missing ones)[/]' }
-                     else { '[orange1]nothing to install - every targeted module is already installed (u updates)[/]' }
+        $ui.Status = if ($Update) { "[$script:PSMM_ColWarn]nothing to update - no installed module targeted (i installs missing ones)[/]" }
+                     else { "[$script:PSMM_ColWarn]nothing to install - every targeted module is already installed (u updates)[/]" }
         return
     }
     $mods = @(foreach ($t in $targets) {
@@ -370,7 +370,7 @@ function script:Start-PSMMInstallTask {
 function script:Start-PSMMUpdateCheckTask {
     $ui = $script:PSMM_UI
     $installed = @($ui.Entries | Where-Object { $_.Installed -and -not $_.PSObject.Properties['Unmanaged'] })
-    if (-not $installed.Count) { $ui.Status = '[orange1]no installed modules to check[/]'; return }
+    if (-not $installed.Count) { $ui.Status = "[$script:PSMM_ColWarn]no installed modules to check[/]"; return }
     $payload = @($installed | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Installed = "$($_.InstalledVersion)" } })
     $null = Start-PSMMTask -Label "update check ($($payload.Count) modules)" -Kind 'updatecheck' -ArgumentList (, $payload) -ScriptBlock {
         param($mods)

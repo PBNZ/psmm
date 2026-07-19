@@ -23,14 +23,14 @@ function script:Build-PSMMCleanupView {
         $scopes = (@($d.Obsolete.Scope | Select-Object -Unique) -join ', ')
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
                 $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
-                $nm, "[green3]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
+                $nm, "[$script:PSMM_ColOk]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'cleanup') -CountsMarkup "[$script:PSMM_ColDim]$n module(s) with multiple versions on disk[/]$pos")))
     $items.Add($T)
     if (-not $script:PSMM_UI.Elevated) {
-        $items.Add([Spectre.Console.Markup]::new('[grey66]session is not elevated: AllUsers copies are skipped automatically[/]'))
+        $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]session is not elevated: AllUsers copies are skipped automatically[/]"))
     }
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=clean this module', '^a=clean all', 'r=rescan'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
@@ -49,7 +49,7 @@ function script:Show-PSMMCleanup {
         if (-not $dupes.Count) {
             Clear-PSMMScreen
             Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old module versions[/]"
-            Write-PSMMLine '[green3]No module has more than one installed version - nothing to clean.[/]'
+            Write-PSMMLine "[$script:PSMM_ColOk]No module has more than one installed version - nothing to clean.[/]"
             $null = Wait-PSMMKey -Message 'back'
             return
         }
@@ -95,7 +95,7 @@ function script:Show-PSMMCleanup {
                 Clear-PSMMScreen
                 Write-PSMMLine "[$script:PSMM_ColAccent]rescanning...[/]"
                 $dupes = @(Get-PSMMDuplicateVersion)
-                $status = '[green3]rescanned[/]'
+                $status = "[$script:PSMM_ColOk]rescanned[/]"
             }
             'one' {
                 $d = $dupes[$st.Cursor]
@@ -123,15 +123,15 @@ function script:Invoke-PSMMDupeCleanup {
     $skipped = @(foreach ($d in $Dupes) { @($d.Obsolete | Where-Object { $_.Scope -eq 'AllUsers' -and -not $ui.Elevated }) }).Count
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old versions[/]"
-    if ($skipped) { Write-PSMMLine "[orange1]$skipped AllUsers version(s) skipped - session is not elevated[/]" }
-    if (-not $work.Count) { $null = Wait-PSMMKey; return '[orange1]nothing removable without elevation[/]' }
-    foreach ($w in $work) { Write-PSMMLine "  $(ConvertTo-PSMMSafe $w.Name) v$($w.Version) [grey66]($($w.Scope))[/]" }
-    if (-not (Read-SpectreConfirm -Message "Remove these $($work.Count) old version(s)?" -DefaultAnswer 'n')) { return '[grey66]cleanup cancelled[/]' }
+    if ($skipped) { Write-PSMMLine "[$script:PSMM_ColWarn]$skipped AllUsers version(s) skipped - session is not elevated[/]" }
+    if (-not $work.Count) { $null = Wait-PSMMKey; return "[$script:PSMM_ColWarn]nothing removable without elevation[/]" }
+    foreach ($w in $work) { Write-PSMMLine "  $(ConvertTo-PSMMSafe $w.Name) v$($w.Version) [$script:PSMM_ColMute]($($w.Scope))[/]" }
+    if (-not (Read-SpectreConfirm -Message "Remove these $($work.Count) old version(s)?" -DefaultAnswer 'n')) { return "[$script:PSMM_ColMute]cleanup cancelled[/]" }
     $ok = 0; $failed = 0
     foreach ($w in $work) {
         Write-PSMMLine "[$script:PSMM_ColAccent]removing $(ConvertTo-PSMMSafe $w.Name) v$($w.Version)...[/]"
         try { Uninstall-PSMMModuleVersion -Name $w.Name -Version "$($w.Version)"; $ok++ }
-        catch { $failed++; Write-PSMMLine "[indianred1]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+        catch { $failed++; Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
     }
-    if ($failed) { "[orange1]removed $ok, $failed failed[/]" } else { "[green3]removed $ok old version(s)[/]" }
+    if ($failed) { "[$script:PSMM_ColWarn]removed $ok, $failed failed[/]" } else { "[$script:PSMM_ColOk]removed $ok old version(s)[/]" }
 }

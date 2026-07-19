@@ -132,44 +132,44 @@ function script:Show-PSMMModuleMenu {
             ([ConsoleKey]::L) {
                 Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
                 if (-not (Confirm-PSMMCloudHydration -ModuleName $Entry.Name)) {
-                    $status = '[grey66]load cancelled (cloud-only files not downloaded)[/]'
+                    $status = "[$script:PSMM_ColMute]load cancelled (cloud-only files not downloaded)[/]"
                 } else {
                     try {
                         Import-PSMMModuleTimed -Entry $Entry
-                        $status = "[green3]loaded ($($Entry.ImportMs) ms)[/]"
-                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                        $status = "[$script:PSMM_ColOk]loaded ($($Entry.ImportMs) ms)[/]"
+                    } catch { $status = "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
                     Update-PSMMLoaded -Entries $ui.Entries
                 }
             }
             ([ConsoleKey]::U) {
                 if ($ctrl) {
                     Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
-                    try { Remove-Module -Name $Entry.Name -Force -ErrorAction Stop; $status = '[green3]unloaded[/]' }
-                    catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                    try { Remove-Module -Name $Entry.Name -Force -ErrorAction Stop; $status = "[$script:PSMM_ColOk]unloaded[/]" }
+                    catch { $status = "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
                     Update-PSMMLoaded -Entries $ui.Entries
                 } elseif (-not $Entry.Installed) {
-                    $status = '[orange1]not installed - i installs it first[/]'
+                    $status = "[$script:PSMM_ColWarn]not installed - i installs it first[/]"
                 } else {
                     Clear-PSMMScreen
                     Write-PSMMLine "[$script:PSMM_ColAccent]updating $(ConvertTo-PSMMSafe $Entry.Name)... (this can take a while)[/]"
                     try {
                         Install-PSMMModule -Name $Entry.Name -Update -Version $Entry.Version
-                        $status = '[green3]update done[/]'
-                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                        $status = "[$script:PSMM_ColOk]update done[/]"
+                    } catch { $status = "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
                     Update-PSMMAvailable -Entries $ui.Entries -Name $Entry.Name
                 }
             }
             ([ConsoleKey]::I) {
                 if ($ctrl) { continue }
                 if ($Entry.Installed) {
-                    $status = '[orange1]already installed - u updates it[/]'
+                    $status = "[$script:PSMM_ColWarn]already installed - u updates it[/]"
                 } else {
                     Clear-PSMMScreen
                     Write-PSMMLine "[$script:PSMM_ColAccent]installing $(ConvertTo-PSMMSafe $Entry.Name)... (this can take a while)[/]"
                     try {
                         Install-PSMMModule -Name $Entry.Name -Version $Entry.Version
-                        $status = '[green3]install done[/]'
-                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                        $status = "[$script:PSMM_ColOk]install done[/]"
+                    } catch { $status = "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
                     Update-PSMMAvailable -Entries $ui.Entries -Name $Entry.Name
                 }
             }
@@ -191,9 +191,9 @@ function script:Show-PSMMModuleMenu {
                     Write-PSMMLine "[$script:PSMM_ColAccent]disconnecting $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
                     try {
                         Disconnect-PSMMModule -ModuleName $Entry.Name
-                        $status = '[green3]disconnected[/]'
+                        $status = "[$script:PSMM_ColOk]disconnected[/]"
                         $auth = Get-PSMMConnectionStatus -ModuleName $Entry.Name
-                    } catch { $status = "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+                    } catch { $status = "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
                 }
             }
             ([ConsoleKey]::A) {
@@ -217,22 +217,22 @@ function script:Invoke-PSMMVersionCleanup {
     param([Parameter(Mandatory)] $Entry)
     $ui = $script:PSMM_UI
     $obsolete = @($Entry.InstalledVersions | Sort-Object { [version]"$($_.Version)" } -Descending | Select-Object -Skip 1)
-    if (-not $obsolete.Count) { return '[grey66]nothing to clean[/]' }
+    if (-not $obsolete.Count) { return "[$script:PSMM_ColMute]nothing to clean[/]" }
     $blocked = @($obsolete | Where-Object { $_.Scope -eq 'AllUsers' -and -not $ui.Elevated })
     $doable  = @($obsolete | Where-Object { $_.Scope -ne 'AllUsers' -or $ui.Elevated })
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old versions of $(ConvertTo-PSMMSafe $Entry.Name)[/]"
-    Write-PSMMLine "keeping [green3]v$($Entry.InstalledVersion)[/], removing: $(($doable | ForEach-Object { "v$($_.Version)" }) -join ', ')"
-    if ($blocked.Count) { Write-PSMMLine "[orange1]skipping $(@($blocked).Count) AllUsers version(s) - session is not elevated[/]" }
-    if (-not $doable.Count) { $null = Wait-PSMMKey; return '[orange1]nothing removable without elevation[/]' }
-    if (-not (Read-SpectreConfirm -Message "Remove $($doable.Count) old version(s)?" -DefaultAnswer 'n')) { return '[grey66]cleanup cancelled[/]' }
+    Write-PSMMLine "keeping [$script:PSMM_ColOk]v$($Entry.InstalledVersion)[/], removing: $(($doable | ForEach-Object { "v$($_.Version)" }) -join ', ')"
+    if ($blocked.Count) { Write-PSMMLine "[$script:PSMM_ColWarn]skipping $(@($blocked).Count) AllUsers version(s) - session is not elevated[/]" }
+    if (-not $doable.Count) { $null = Wait-PSMMKey; return "[$script:PSMM_ColWarn]nothing removable without elevation[/]" }
+    if (-not (Read-SpectreConfirm -Message "Remove $($doable.Count) old version(s)?" -DefaultAnswer 'n')) { return "[$script:PSMM_ColMute]cleanup cancelled[/]" }
     $ok = 0; $failed = 0
     foreach ($v in $doable) {
         Write-PSMMLine "[$script:PSMM_ColAccent]removing v$($v.Version)...[/]"
         try { Uninstall-PSMMModuleVersion -Name $Entry.Name -Version "$($v.Version)"; $ok++ }
-        catch { $failed++; Write-PSMMLine "[indianred1]  v$($v.Version): $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+        catch { $failed++; Write-PSMMLine "[$script:PSMM_ColErr]  v$($v.Version): $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
     }
-    if ($failed) { "[orange1]removed $ok, $failed failed[/]" } else { "[green3]removed $ok old version(s)[/]" }
+    if ($failed) { "[$script:PSMM_ColWarn]removed $ok, $failed failed[/]" } else { "[$script:PSMM_ColOk]removed $ok old version(s)[/]" }
 }
 
 # Pin (or unpin) an entry's version and save (#research: version pinning).
@@ -241,13 +241,13 @@ function script:Set-PSMMEntryPin {
     param([Parameter(Mandatory)] $Entry)
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Pin $(ConvertTo-PSMMSafe $Entry.Name) to a version[/]"
-    Write-PSMMLine "[grey66]exact '1.2.3' or NuGet range '[[1.0,2.0)'; empty removes the pin[/]"
+    Write-PSMMLine "[$script:PSMM_ColMute]exact '1.2.3' or NuGet range '[[1.0,2.0)'; empty removes the pin[/]"
     $v = Read-SpectreText -Message 'Version' -DefaultAnswer ($Entry.Version ?? '') -AllowEmpty
     $v = "$v".Trim()
     if ($v -eq "$($Entry.Version)") { return $false }
     $probe = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = $Entry.Name; Version = $v }) -Source $Entry.Source -Writable $true
     if ($v -and -not $probe.Version) {
-        Write-PSMMLine "[indianred1]'$(ConvertTo-PSMMSafe $v)' is not a valid version or range - nothing saved[/]"
+        Write-PSMMLine "[$script:PSMM_ColErr]'$(ConvertTo-PSMMSafe $v)' is not a valid version or range - nothing saved[/]"
         $null = Wait-PSMMKey
         return $false
     }
@@ -266,7 +266,7 @@ function script:Get-PSMMAddTargets {
     $targets = @($meta.Values | Where-Object { $_.Writable -and $_.Kind -ne 'inline' } | Select-Object -ExpandProperty Path)
     if ($targets.Count) { return $targets }
     $main = Get-PSMMMainConfigPath
-    Write-PSMMLine '[orange1]No writable config file yet.[/]'
+    Write-PSMMLine "[$script:PSMM_ColWarn]No writable config file yet.[/]"
     if (-not (Read-SpectreConfirm -Message "Create $(ConvertTo-PSMMSafe $main) now?" -DefaultAnswer 'y')) { return @() }
     $dir = Split-Path -Parent $main
     if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
@@ -291,7 +291,7 @@ function script:Add-PSMMUnmanagedEntry {
     $new | Add-Member -NotePropertyName FileEnabled -NotePropertyValue $true -Force
     Add-PSMMAllEntry -Entry $new
     Save-PSMMFile -Path $target -Entries (Get-PSMMAllEntries)
-    Write-PSMMLine "[green3]added to $(ConvertTo-PSMMSafe (Split-Path $target -Leaf)) - it is now managed[/]"
+    Write-PSMMLine "[$script:PSMM_ColOk]added to $(ConvertTo-PSMMSafe (Split-Path $target -Leaf)) - it is now managed[/]"
     $script:PSMM_UI.Dirty = $true
     $null = Wait-PSMMKey
     $true
@@ -317,7 +317,7 @@ function script:New-PSMMEntry {
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]New entry[/]"
     $targets = @(Get-PSMMAddTargets)
-    if (-not $targets.Count) { $script:PSMM_UI.Status = '[grey66]add cancelled - no config file[/]'; return }
+    if (-not $targets.Count) { $script:PSMM_UI.Status = "[$script:PSMM_ColMute]add cancelled - no config file[/]"; return }
     $target = if ($targets.Count -eq 1) { $targets[0] } else { Read-SpectreSelection -Message 'Add to which file?' -Choices $targets -Color $script:PSMM_ColAccent }
     $name = Read-SpectreText -Message 'Module name'
     if ([string]::IsNullOrWhiteSpace($name)) { return }
@@ -351,7 +351,7 @@ function script:Move-PSMMEntryUI {
     $meta = Get-PSMMFileMeta
     $targets = @($meta.Values | Where-Object { $_.Writable -and $_.Kind -ne 'inline' -and $_.Path -ne $Entry.Source } | Select-Object -ExpandProperty Path)
     if (-not $targets.Count) {
-        Write-PSMMLine '[orange1]No other writable config file to move to (create one via f -> n).[/]'
+        Write-PSMMLine "[$script:PSMM_ColWarn]No other writable config file to move to (create one via f -> n).[/]"
         $null = Wait-PSMMKey
         return $false
     }
@@ -363,7 +363,7 @@ function script:Move-PSMMEntryUI {
     $Entry.Source = $target
     Save-PSMMFile -Path $oldSource -Entries (Get-PSMMAllEntries)   # removes it there
     Save-PSMMFile -Path $target -Entries (Get-PSMMAllEntries)      # adds it here
-    Write-PSMMLine "[green3]Moved to $(ConvertTo-PSMMSafe (Split-Path $target -Leaf)).[/]"
+    Write-PSMMLine "[$script:PSMM_ColOk]Moved to $(ConvertTo-PSMMSafe (Split-Path $target -Leaf)).[/]"
     $script:PSMM_UI.Dirty = $true
     $null = Wait-PSMMKey
     return $true

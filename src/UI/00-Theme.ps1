@@ -1,30 +1,26 @@
 ﻿# 00-Theme.ps1 — palette, markup helpers, console plumbing, alternate screen.
 #
-# Palette (2026-07-06 refresh, Claude-Code-inspired warm scheme; the blue
-# accent is the original look and stays):
-#   key    = keyboard shortcuts (coral)
-#   mute   = action labels / separators / hints (bright enough to read!)
-#   accent = cursor row, titles
-# Status colours across the UI are explicit 256-colour names (green3 /
-# orange1 / indianred1 / steelblue1) so they render identically in every
-# terminal instead of following the terminal's ANSI scheme.
+# The palette (docs/design-system-v2.md §1) is read from the shared token
+# table in src/Engine/Theme.ps1, so the $PSMM_Theme knob (glacier | ember |
+# moss) swaps every token in one place and the startup report renders the
+# same colours without Spectre. Explicit 256-colour names render identically
+# in every terminal. Nothing outside the theme sources may name a colour.
 
-$script:PSMM_ColKey    = 'salmon1'
-$script:PSMM_ColMute   = 'grey66'
-$script:PSMM_ColAccent = 'deepskyblue1'
-# v2 tokens (docs/design-system-v2.md §1): the full palette lives here so
-# theme variants are token swaps in this file only.
-$script:PSMM_ColOk      = 'green3'
-$script:PSMM_ColWarn    = 'orange1'
-$script:PSMM_ColErr     = 'indianred1'
-$script:PSMM_ColInfo    = 'steelblue1'
-$script:PSMM_ColDim     = 'grey42'       # de-emphasised cells, legends
-$script:PSMM_ColCapsule = 'grey19'       # key-capsule background
-$script:PSMM_ColRowBg   = 'grey15'       # cursor-row background
-$script:PSMM_ColBorder  = 'grey27'       # ALL table/panel borders
-$script:PSMM_ColBrandFg = 'black'        # the ' psmm ' brand block
-$script:PSMM_ColBrandBg = 'salmon1'
-$script:PSMM_ColCapsuleDim = 'grey11'    # persistent-row capsule background
+$psmmThemeTable = Get-PSMMThemeTable
+$script:PSMM_ColKey        = $psmmThemeTable['key'].Markup
+$script:PSMM_ColMute       = $psmmThemeTable['mute'].Markup
+$script:PSMM_ColAccent     = $psmmThemeTable['accent'].Markup
+$script:PSMM_ColOk         = $psmmThemeTable['ok'].Markup
+$script:PSMM_ColWarn       = $psmmThemeTable['warn'].Markup
+$script:PSMM_ColErr        = $psmmThemeTable['err'].Markup
+$script:PSMM_ColInfo       = $psmmThemeTable['info'].Markup
+$script:PSMM_ColDim        = $psmmThemeTable['dim'].Markup       # de-emphasised cells, legends
+$script:PSMM_ColCapsule    = $psmmThemeTable['capsule'].Markup   # key-capsule background
+$script:PSMM_ColRowBg      = $psmmThemeTable['rowbg'].Markup     # cursor-row background
+$script:PSMM_ColBorder     = $psmmThemeTable['border'].Markup    # ALL table/panel borders
+$script:PSMM_ColBrandFg    = $psmmThemeTable['brandfg'].Markup   # the ' psmm ' brand block
+$script:PSMM_ColBrandBg    = $psmmThemeTable['brandbg'].Markup
+$script:PSMM_ColCapsuleDim = $psmmThemeTable['capsdim'].Markup   # persistent-row capsule background
 
 # Shared border style: every table/panel border goes through this so the
 # border colour is themed in one place.

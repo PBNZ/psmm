@@ -131,7 +131,7 @@ function script:Build-PSMMPagerView {
     else { $items.Add([Spectre.Console.Markup]::new("$TitleMarkup$pos")) }
     $panel = [Spectre.Console.Panel]::new([Spectre.Console.Markup]::new($body))
     $panel.Border = [Spectre.Console.BoxBorder]::Rounded
-    $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
+    $panel.BorderStyle = Get-PSMMBorderStyle
     $items.Add($panel)
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs $HintPairs)))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", 'esc=back', '^q=quit'))))
@@ -144,9 +144,9 @@ function script:Copy-PSMMText {
     param([AllowEmptyString()][string]$Text)
     try {
         Set-Clipboard -Value $Text -ErrorAction Stop
-        '[green3]copied to clipboard[/]'
+        "[$script:PSMM_ColOk]copied to clipboard[/]"
     } catch {
-        "[indianred1]clipboard copy failed: $(ConvertTo-PSMMSafe $_.Exception.Message)[/]"
+        "[$script:PSMM_ColErr]clipboard copy failed: $(ConvertTo-PSMMSafe $_.Exception.Message)[/]"
     }
 }
 

@@ -48,7 +48,7 @@ function script:Initialize-PSMMMainConfig {
                 Mode        = 'InstallOnly'
             })
         } | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $main -Encoding utf8
-        $script:PSMM_UI.Status = "[green3]created $(ConvertTo-PSMMSafe $main) - psmm's UI dependency is managed there[/]"
+        $script:PSMM_UI.Status = "[$script:PSMM_ColOk]created $(ConvertTo-PSMMSafe $main) - psmm's UI dependency is managed there[/]"
     } catch { }   # best-effort: the add flows still offer creation
 }
 
@@ -80,6 +80,10 @@ function script:Initialize-PSMMUIState {
         SelfUpdate    = Test-PSMMUpdateAvailable
     }
     $null = Start-PSMMSelfUpdateCheck   # throttled to once a day
+    # unknown $PSMM_Theme: glacier took over silently at source time - say so
+    if (Test-PSMMThemeFallback) {
+        $script:PSMM_UI.Status = "[$script:PSMM_ColWarn]unknown `$PSMM_Theme '$(ConvertTo-PSMMSafe (Get-PSMMSetting -Name 'PSMM_Theme'))' - using glacier (glacier|ember|moss)[/]"
+    }
     Initialize-PSMMMainConfig
     Sync-PSMMUIEntries -FullScan
 }

@@ -19,9 +19,9 @@ function script:Build-PSMMFilesView {
         $leaf = if ($m.Kind -eq 'inline') { 'profile inline' } else { Split-Path $m.Path -Leaf }
         $nm = ConvertTo-PSMMSafe $leaf
         if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
-        $on = if ($m.Enabled) { '[green3]on[/]' } else { '[indianred1]off[/]' }
+        $on = if ($m.Enabled) { "[$script:PSMM_ColOk]on[/]" } else { "[$script:PSMM_ColErr]off[/]" }
         $rw = if ($m.Writable) { 'rw' } else { 'ro' }
-        $fl = if ($m.IncludesIgnored) { '[orange1]![/]' } else { ' ' }
+        $fl = if ($m.IncludesIgnored) { "[$script:PSMM_ColWarn]![/]" } else { ' ' }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
                 $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }), $nm, $m.Kind, $on, $rw, "$($m.ModuleCount)", $fl))
     }
@@ -32,11 +32,11 @@ function script:Build-PSMMFilesView {
     if ($n) {
         $cur = $Metas[$State.Cursor]
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $cur.Path)[/]"))
-        if ($cur.IncludesIgnored) { $items.Add([Spectre.Console.Markup]::new('[orange1]! this file has an Includes section that is being ignored (main config only)[/]')) }
+        if ($cur.IncludesIgnored) { $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]! this file has an Includes section that is being ignored (main config only)[/]")) }
     }
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('space=enable/disable+save', 'a=apply to session', 'n=new config (templates)', 'm=move file'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
-    foreach ($w in @(Get-PSMMWarning | Select-Object -First 4)) { $items.Add([Spectre.Console.Markup]::new("[orange1]$(ConvertTo-PSMMSafe $w)[/]")) }
+    foreach ($w in @(Get-PSMMWarning | Select-Object -First 4)) { $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]$(ConvertTo-PSMMSafe $w)[/]")) }
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -71,12 +71,12 @@ function script:Show-PSMMFiles {
                 switch ($k.Key) {
                     ([ConsoleKey]::Spacebar) {
                         $m = $metas[$st.Cursor]
-                        if ($m.Kind -eq 'inline' -or -not $m.Writable) { $st.Status = '[indianred1]read-only - cannot toggle[/]' }
+                        if ($m.Kind -eq 'inline' -or -not $m.Writable) { $st.Status = "[$script:PSMM_ColErr]read-only - cannot toggle[/]" }
                         else {
                             $m.Enabled = -not $m.Enabled
                             Save-PSMMFile -Path $m.Path -Entries (Get-PSMMAllEntries)
                             $script:PSMM_UI.Dirty = $true
-                            $st.Status = "[green3]saved ($(if ($m.Enabled) { 'enabled' } else { 'disabled' })) - 'a' applies load/unload changes[/]"
+                            $st.Status = "[$script:PSMM_ColOk]saved ($(if ($m.Enabled) { 'enabled' } else { 'disabled' })) - 'a' applies load/unload changes[/]"
                         }
                         continue
                     }
@@ -117,7 +117,7 @@ function script:Invoke-PSMMApply {
     foreach ($e in $activeEntries) {
         if ($e.Mode -eq 'Load' -and -not (Get-Module -Name $e.Name)) {
             if (-not (Confirm-PSMMCloudHydration -ModuleName $e.Name)) {
-                Write-PSMMLine '[grey66]apply cancelled (cloud-only files not downloaded)[/]'
+                Write-PSMMLine "[$script:PSMM_ColMute]apply cancelled (cloud-only files not downloaded)[/]"
                 $null = Wait-PSMMKey
                 return
             }
@@ -128,18 +128,18 @@ function script:Invoke-PSMMApply {
         if ($e.Mode -eq 'Load' -and -not (Get-Module -Name $e.Name)) {
             Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $e.Name)...[/]"
             try { Import-PSMMModuleTimed -Entry $e; $did++ }
-            catch { Write-PSMMLine "[indianred1]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+            catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
         }
     }
     foreach ($m in @(Get-Module)) {
         if ($managed.ContainsKey($m.Name) -and -not $active.ContainsKey($m.Name)) {
             Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $m.Name) (no longer active)...[/]"
             try { Remove-Module -Name $m.Name -Force -ErrorAction Stop; $did++ }
-            catch { Write-PSMMLine "[indianred1]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+            catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
         }
     }
     $ui.Dirty = $true
-    Write-PSMMLine "[green3]$did change(s) applied.[/]"
+    Write-PSMMLine "[$script:PSMM_ColOk]$did change(s) applied.[/]"
     $null = Wait-PSMMKey
 }
 
@@ -171,7 +171,7 @@ function script:New-PSMMConfigFile {
         default         { Read-SpectreText -Message 'Full path for the new .json' }
     }
     if ([string]::IsNullOrWhiteSpace($path)) { return }
-    if (Test-Path -LiteralPath $path) { Write-PSMMLine '[indianred1]File already exists - not overwriting.[/]'; $null = Wait-PSMMKey; return }
+    if (Test-Path -LiteralPath $path) { Write-PSMMLine "[$script:PSMM_ColErr]File already exists - not overwriting.[/]"; $null = Wait-PSMMKey; return }
 
     # scenario templates (#29)
     $templates = Get-PSMMConfigTemplate
@@ -193,20 +193,20 @@ function script:New-PSMMConfigFile {
                 }
             } catch { }
         }
-        Write-PSMMLine "[green3]Created $(ConvertTo-PSMMSafe $path) from the '$tpl' template.[/]"
-        Write-PSMMLine "[grey66]All template modules are set to Mode=Ignore - flip the ones you want to Load/InstallOnly.[/]"
+        Write-PSMMLine "[$script:PSMM_ColOk]Created $(ConvertTo-PSMMSafe $path) from the '$tpl' template.[/]"
+        Write-PSMMLine "[$script:PSMM_ColMute]All template modules are set to Mode=Ignore - flip the ones you want to Load/InstallOnly.[/]"
     } else {
         Get-PSMMExampleConfigJson -IsMain $isMain | Set-Content -LiteralPath $path -Encoding utf8
-        Write-PSMMLine "[green3]Created $(ConvertTo-PSMMSafe $path) (example content, sample module set to Ignore).[/]"
+        Write-PSMMLine "[$script:PSMM_ColOk]Created $(ConvertTo-PSMMSafe $path) (example content, sample module set to Ignore).[/]"
     }
     if (-not $isMain -and $path -ne $prof) {
-        Write-PSMMLine "[orange1]Note: this path is not auto-discovered. Add it to the main config's Includes (or `$PSMM_JsonPath).[/]"
+        Write-PSMMLine "[$script:PSMM_ColWarn]Note: this path is not auto-discovered. Add it to the main config's Includes (or `$PSMM_JsonPath).[/]"
         $mainMeta = (Get-PSMMFileMeta)[$main]
         if ($mainMeta -and $mainMeta.Writable) {
             if (Read-SpectreConfirm -Message 'Add it to the main config Includes now?' -DefaultAnswer 'y') {
                 $mainMeta.Includes = @($mainMeta.Includes) + $path
                 Save-PSMMFile -Path $main -Entries (Get-PSMMAllEntries)
-                Write-PSMMLine '[green3]Added to Includes.[/]'
+                Write-PSMMLine "[$script:PSMM_ColOk]Added to Includes.[/]"
             }
         }
     }
@@ -218,15 +218,15 @@ function script:Move-PSMMConfigFile {
     param([Parameter(Mandatory)] $Meta)
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Move $(ConvertTo-PSMMSafe (Split-Path $Meta.Path -Leaf))[/]"
-    if ($Meta.Kind -eq 'inline') { Write-PSMMLine '[indianred1]The inline profile block cannot be moved.[/]'; $null = Wait-PSMMKey; return }
+    if ($Meta.Kind -eq 'inline') { Write-PSMMLine "[$script:PSMM_ColErr]The inline profile block cannot be moved.[/]"; $null = Wait-PSMMKey; return }
     $dir = Read-SpectreText -Message 'Target folder'
     if ([string]::IsNullOrWhiteSpace($dir)) { return }
-    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { Write-PSMMLine '[indianred1]Folder not found.[/]'; $null = Wait-PSMMKey; return }
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { Write-PSMMLine "[$script:PSMM_ColErr]Folder not found.[/]"; $null = Wait-PSMMKey; return }
     $new = Join-Path $dir (Split-Path $Meta.Path -Leaf)
-    if (Test-Path -LiteralPath $new) { Write-PSMMLine '[indianred1]A file with that name already exists there.[/]'; $null = Wait-PSMMKey; return }
+    if (Test-Path -LiteralPath $new) { Write-PSMMLine "[$script:PSMM_ColErr]A file with that name already exists there.[/]"; $null = Wait-PSMMKey; return }
     try { Move-Item -LiteralPath $Meta.Path -Destination $new -ErrorAction Stop }
-    catch { Write-PSMMLine "[indianred1]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]"; $null = Wait-PSMMKey; return }
-    Write-PSMMLine "[green3]Moved to $(ConvertTo-PSMMSafe $new).[/]"
+    catch { Write-PSMMLine "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]"; $null = Wait-PSMMKey; return }
+    Write-PSMMLine "[$script:PSMM_ColOk]Moved to $(ConvertTo-PSMMSafe $new).[/]"
     # discovery follow-up: keep the file reachable
     $main = Get-PSMMMainConfigPath
     $mainMeta = (Get-PSMMFileMeta)[$main]
@@ -234,14 +234,14 @@ function script:Move-PSMMConfigFile {
     if ($wasIncluded) {
         $mainMeta.Includes = @(@($mainMeta.Includes | Where-Object { $_ -ne $Meta.Path }) + $new)
         Save-PSMMFile -Path $main -Entries (Get-PSMMAllEntries)
-        Write-PSMMLine '[green3]Main config Includes updated to the new path.[/]'
+        Write-PSMMLine "[$script:PSMM_ColOk]Main config Includes updated to the new path.[/]"
     } elseif ($Meta.Kind -in 'legacy', 'profile') {
-        Write-PSMMLine '[orange1]The new location may not be auto-discovered.[/]'
+        Write-PSMMLine "[$script:PSMM_ColWarn]The new location may not be auto-discovered.[/]"
         if ($mainMeta -and $mainMeta.Writable) {
             if (Read-SpectreConfirm -Message 'Add the new path to the main config Includes?' -DefaultAnswer 'y') {
                 $mainMeta.Includes = @($mainMeta.Includes) + $new
                 Save-PSMMFile -Path $main -Entries (Get-PSMMAllEntries)
-                Write-PSMMLine '[green3]Added to Includes.[/]'
+                Write-PSMMLine "[$script:PSMM_ColOk]Added to Includes.[/]"
             }
         }
     }

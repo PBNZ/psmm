@@ -888,6 +888,55 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
     }
 
+    # --- step 8: theme variants --------------------------------------------
+
+    It 'every theme''s markup names parse as real Spectre colours (step 8)' {
+        InModuleScope psmm {
+            foreach ($theme in 'glacier', 'ember', 'moss') {
+                $t = Get-PSMMThemeTable -Name $theme
+                foreach ($token in $t.get_Keys()) {
+                    { [void][Spectre.Console.Style]::Parse($t[$token].Markup) } | Should -Not -Throw -Because "$theme/$token"
+                }
+            }
+        }
+    }
+
+    It 'the UI palette follows $PSMM_Theme when the UI layer is sourced (step 8)' {
+        InModuleScope psmm {
+            try {
+                $global:PSMM_Theme = 'ember'
+                . (Join-Path $script:PSMMRoot 'src/UI/00-Theme.ps1')
+                $script:PSMM_ColAccent | Should -Be 'sandybrown'
+                $script:PSMM_ColOk | Should -Be 'darkolivegreen3_1'
+                $script:PSMM_ColWarn | Should -Be 'gold1'
+                $script:PSMM_ColKey | Should -Be 'salmon1'
+                $global:PSMM_Theme = 'moss'
+                . (Join-Path $script:PSMMRoot 'src/UI/00-Theme.ps1')
+                $script:PSMM_ColAccent | Should -Be 'palegreen3_1'
+                $script:PSMM_ColKey | Should -Be 'lightgoldenrod3'
+                $script:PSMM_ColOk | Should -Be 'green3'
+            } finally {
+                Remove-Variable -Name PSMM_Theme -Scope Global -ErrorAction SilentlyContinue
+                . (Join-Path $script:PSMMRoot 'src/UI/00-Theme.ps1')   # back to glacier
+            }
+            $script:PSMM_ColAccent | Should -Be 'deepskyblue1'
+        }
+    }
+
+    It 'no colour literal survives outside the theme sources (step 8)' {
+        $rx = '(?<![\w$])(salmon1|deepskyblue1|green3|orange1|indianred1|steelblue1|sandybrown|gold1|darkolivegreen3(_\d)?|palegreen3(_\d)?|lightgoldenrod3|grey\d+)(?![\w])'
+        $bad = foreach ($f in Get-ChildItem (Join-Path $PSScriptRoot '..' 'src') -Recurse -Filter '*.ps1') {
+            if ($f.Name -in 'Theme.ps1', '00-Theme.ps1') { continue }
+            $i = 0
+            foreach ($line in Get-Content -LiteralPath $f.FullName) {
+                $i++
+                if ($line.TrimStart().StartsWith('#')) { continue }   # prose may name colours
+                if ($line -match $rx) { "$($f.Name):${i}: $($line.Trim())" }
+            }
+        }
+        $bad | Should -BeNullOrEmpty
+    }
+
     # --- step 5: header bar with breadcrumb --------------------------------
 
     It 'the header bar carries the brand block, breadcrumb, counts and right-aligned facts (step 5)' {
@@ -974,6 +1023,27 @@ Describe 'Startup report v2 (docs/design-system-v2.md §8)' -Tag Engine {
     BeforeEach { Set-UITestConfig }
     AfterEach {
         Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It '$PSMM_Theme selects the variant; unknown values fall back to glacier (step 8)' {
+        try {
+            InModuleScope psmm { Get-PSMMThemeName } | Should -Be 'glacier'
+            $global:PSMM_Theme = 'EMBER'   # case-insensitive
+            InModuleScope psmm { Get-PSMMThemeName } | Should -Be 'ember'
+            InModuleScope psmm { (Get-PSMMThemeTable)['accent'].Index } | Should -Be 215
+            InModuleScope psmm { (Get-PSMMThemeTable)['ok'].Index } | Should -Be 113
+            InModuleScope psmm { (Get-PSMMThemeTable)['warn'].Index } | Should -Be 220
+            InModuleScope psmm { Get-PSMMAnsi -Token 'ok' } | Should -Be "$([char]27)[38;5;113m"
+            $global:PSMM_Theme = 'moss'
+            InModuleScope psmm { (Get-PSMMThemeTable)['accent'].Index } | Should -Be 114
+            InModuleScope psmm { (Get-PSMMThemeTable)['key'].Index } | Should -Be 179
+            $global:PSMM_Theme = 'neon'
+            InModuleScope psmm { Get-PSMMThemeName } | Should -Be 'glacier'
+            InModuleScope psmm { Test-PSMMThemeFallback } | Should -BeTrue
+        } finally {
+            Remove-Variable -Name PSMM_Theme -Scope Global -ErrorAction SilentlyContinue
+        }
+        InModuleScope psmm { Test-PSMMThemeFallback } | Should -BeFalse
     }
 
     It 'theme tokens resolve one colour per token for markup and escapes (step 7)' {
