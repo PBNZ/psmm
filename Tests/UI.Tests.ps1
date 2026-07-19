@@ -286,25 +286,25 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $files | Should -Match 'CONFIG FILES'
     }
 
-    It 'grid hints follow the design system: lowercase keys, ^=ctrl legend, i/u/k verbs' {
+    It 'grid hints follow the design system: lowercase keys, ^ = ctrl legend, i/u/k verbs' {
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match '\^=ctrl'          # legend at the start of the chord row
-        $text | Should -Match '\^l load'
-        $text | Should -Match '\^u unload'
-        $text | Should -Match 'i install'
-        $text | Should -Match 'u update'
-        $text | Should -Match 'k check updates'
+        $text | Should -Match '\^ = ctrl'        # legend on the chord row (v2: at the end)
+        $text | Should -Match '\^l\s+load'
+        $text | Should -Match '\^u\s+unload'
+        $text | Should -Match 'i\s+install'
+        $text | Should -Match 'u\s+update'
+        $text | Should -Match 'k\s+check updates'
         $text | Should -Not -Match 'Ctrl\+'      # the old uppercase chord style is gone
     }
 
-    It 'Get-PSMMHint lowercases keys and only adds the ^=ctrl legend when a chord is present' {
+    It 'Get-PSMMHint lowercases keys and only adds the ^ = ctrl legend when a chord is present' {
         InModuleScope psmm {
             $plain = [Spectre.Console.Markup]::Remove((Get-PSMMHint -Pairs @('I=install', 'esc=back')))
-            $plain | Should -Match 'i install'
-            $plain | Should -Not -Match '\^=ctrl'
+            $plain | Should -Match 'i\s+install'
+            $plain | Should -Not -Match '\^ = ctrl'
             $chord = [Spectre.Console.Markup]::Remove((Get-PSMMHint -Pairs @('^Q=quit')))
-            $chord | Should -Match '^\^=ctrl'
-            $chord | Should -Match '\^q quit'
+            $chord | Should -Match '\^q\s+quit'
+            $chord | Should -Match '\^ = ctrl\s*$'   # legend sits at the end of the row
         }
     }
 
@@ -312,17 +312,17 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $missing = Get-RenderedText {
             Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null
         }
-        $missing | Should -Match 'i install'
-        $missing | Should -Not -Match 'u update'
-        $missing | Should -Match '\^l load'
-        $missing | Should -Match 'g h home'
+        $missing | Should -Match 'i\s+install'
+        $missing | Should -Not -Match 'u\s+update'
+        $missing | Should -Match '\^l\s+load'
+        $missing | Should -Match 'g h\s+home'
         $installed = Get-RenderedText {
             $e = $script:PSMM_UI.Entries[0]
             $e.Installed = $true; $e.InstalledVersion = [version]'1.0'
             Build-PSMMModuleMenuView -Entry $e -Auth $null
         }
-        $installed | Should -Match 'u update'
-        $installed | Should -Not -Match 'i install'
+        $installed | Should -Match 'u\s+update'
+        $installed | Should -Not -Match 'i\s+install'
     }
 
     It 'cleanup screen binds clean-all to ^a (no shift bindings in hints)' {
@@ -333,7 +333,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
                 Obsolete = @([pscustomobject]@{ Version = [version]'2.0'; Path = 'x'; Scope = 'CurrentUser' })
             })
         }
-        $text | Should -Match '\^a clean all'
+        $text | Should -Match '\^a\s+clean all'
         $text | Should -Not -MatchExactly 'clean ALL'
     }
 
@@ -391,11 +391,11 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $pager = Get-RenderedText {
             Build-PSMMPagerView -State @{ Scroll = 0 } -Lines @('line') -TitleMarkup 'T'
         }
-        $pager | Should -Match 'c copy'
+        $pager | Should -Match 'c\s+copy'
         $detail = Get-RenderedText {
             Build-PSMMCommandDetailView -State @{ Tab = 0; Scroll = 0; Status = '' } -Name 'Get-Thing' -Tabs @('Overview') -Content @{ Overview = 'x' }
         }
-        $detail | Should -Match 'c copy tab'
+        $detail | Should -Match 'c\s+copy tab'
         InModuleScope psmm {
             Mock Set-Clipboard { }
             [Spectre.Console.Markup]::Remove((Copy-PSMMText -Text 'hello')) | Should -Match 'copied to clipboard'
@@ -415,15 +415,15 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match 'user default'
         $text | Should -Match 'onedrive'
         $text | Should -Match 'primary module location is inside OneDrive'
-        $text | Should -Match 'd download cloud-only files'
-        $text | Should -Match 'k keep on device'
-        $text | Should -Match 's set primary location'
+        $text | Should -Match 'd\s+download cloud-only files'
+        $text | Should -Match 'k\s+keep on device'
+        $text | Should -Match 's\s+set primary location'
     }
 
     It 'the grid offers p=paths and shows the OneDrive notice when the primary location is cloud-backed' {
         InModuleScope psmm { $script:PSMM_UI.OneDrivePrimary = $true }
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match 'p paths'
+        $text | Should -Match 'p\s+paths'
         $text | Should -Match 'primary module location is inside OneDrive'
         InModuleScope psmm { $script:PSMM_UI.OneDrivePrimary = $false }
         $text = Get-RenderedText { Build-PSMMGrid }
@@ -658,6 +658,34 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $text = Get-RenderedText { Build-PSMMGrid }
         $text | Should -Match ([regex]::Escape([string][char]0x25AA))   # ▪
         $text | Should -Match '1 selected'
+    }
+
+    # --- step 2: capsule hint rendering ------------------------------------
+
+    It 'Get-PSMMHint renders keys as capsules: key-on-capsule-bg block plus mute label (step 2)' {
+        InModuleScope psmm {
+            $m = Get-PSMMHint -Pairs @('i=install', 'esc=back')
+            $m | Should -Match ([regex]::Escape('[salmon1 on grey19] i [/]'))
+            $m | Should -Match ([regex]::Escape('[grey66]install[/]'))
+            $m | Should -Match ([regex]::Escape('[salmon1 on grey19] esc [/]'))
+            # two-space separator between pairs, no interleaved dot
+            $m | Should -Not -Match ([regex]::Escape("[$script:PSMM_ColMute]·[/]"))
+            { [void][Spectre.Console.Markup]::new($m) } | Should -Not -Throw
+        }
+    }
+
+    It 'the persistent hint row uses accent capsules on the darker background with dim labels (step 2)' {
+        InModuleScope psmm {
+            $m = Get-PSMMPersistentHint
+            $m | Should -Match ([regex]::Escape('[deepskyblue1 on grey11] g [/]'))
+            $m | Should -Match "goto$([char]0x2026)"
+            $m | Should -Match ([regex]::Escape('[deepskyblue1 on grey11] / [/]'))
+            $m | Should -Match ([regex]::Escape('[deepskyblue1 on grey11] ? [/]'))
+            $plain = [Spectre.Console.Markup]::Remove($m)
+            $plain | Should -Match '\^q\s+quit'
+            $plain | Should -Match '\^ = ctrl\s*$'   # chord visible -> legend, at the end
+            { [void][Spectre.Console.Markup]::new($m) } | Should -Not -Throw
+        }
     }
 }
 

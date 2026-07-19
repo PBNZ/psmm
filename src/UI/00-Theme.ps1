@@ -24,6 +24,7 @@ $script:PSMM_ColRowBg   = 'grey15'       # cursor-row background
 $script:PSMM_ColBorder  = 'grey27'       # ALL table/panel borders
 $script:PSMM_ColBrandFg = 'black'        # the ' psmm ' brand block
 $script:PSMM_ColBrandBg = 'salmon1'
+$script:PSMM_ColCapsuleDim = 'grey11'    # persistent-row capsule background
 
 # Shared border style: every table/panel border goes through this so the
 # border colour is themed in one place.
@@ -141,18 +142,34 @@ function script:Get-PSMMWinSize {
 }
 
 # Render "key=action" pairs as one consistently-styled hint line.
-# Design system: keys are always lowercase; '^' before a key means ctrl, and
-# any line using a '^' chord starts with the muted legend '^=ctrl'.
+# Design system v2 (§3): every key is a capsule - reverse-video key block on
+# the capsule background, mute label, two-space separator. Keys are always
+# lowercase; '^' before a key means ctrl, and any line using a '^' chord
+# carries the dim '^ = ctrl' legend at the end of the row.
 function script:Get-PSMMHint {
     param([Parameter(Mandatory)][string[]]$Pairs)
     $parts = foreach ($p in $Pairs) {
         $k, $v = $p -split '=', 2
-        "[$script:PSMM_ColKey]$($k.ToLowerInvariant())[/] [$script:PSMM_ColMute]$v[/]"
+        "[$script:PSMM_ColKey on $script:PSMM_ColCapsule] $($k.ToLowerInvariant()) [/] [$script:PSMM_ColMute]$v[/]"
     }
     if (@($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
-        $parts = @("[$script:PSMM_ColMute]^=ctrl[/]") + @($parts)
+        $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
     }
-    $parts -join " [$script:PSMM_ColMute]·[/] "
+    $parts -join '  '
+}
+
+# Tier-two hint row (§3): the persistent strip - always the same keys,
+# always last, accent keys on the darker capsule with dim labels.
+function script:Get-PSMMPersistentHint {
+    param([string[]]$Pairs = @("g=goto$([char]0x2026)", '/=filter', '?=help', '^q=quit'))
+    $parts = foreach ($p in $Pairs) {
+        $k, $v = $p -split '=', 2
+        "[$script:PSMM_ColAccent on $script:PSMM_ColCapsuleDim] $($k.ToLowerInvariant()) [/] [$script:PSMM_ColDim]$v[/]"
+    }
+    if (@($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
+        $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
+    }
+    $parts -join '  '
 }
 
 # Minimum terminal size a table screen needs; below it Spectre collapses the
