@@ -27,7 +27,7 @@ function script:Build-PSMMFilesView {
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Config files[/]$pos [$script:PSMM_ColMute]- full path of current row below[/]"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'files') -CountsMarkup "$pos [$script:PSMM_ColDim]- full path of current row below[/]")))
     $items.Add($T)
     if ($n) {
         $cur = $Metas[$State.Cursor]

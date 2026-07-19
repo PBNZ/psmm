@@ -2,7 +2,9 @@
 # pinning, duplicate cleanup, auth status/disconnect (#32), add-unmanaged
 # (#27), edit/delete/move, command browsing.
 
-# Build the details panel for one entry. $Auth may be $null (not yet queried).
+# Build the module menu (mock 2e): breadcrumb header, condensed facts panel
+# (what/entry/disk/session/connection), actions grouped by what they touch.
+# $Auth may be $null (not yet queried).
 function script:Build-PSMMModuleMenuView {
     param(
         [Parameter(Mandatory)] $Entry,
@@ -10,57 +12,91 @@ function script:Build-PSMMModuleMenuView {
         [string]$StatusMarkup
     )
     $isUnmanaged = [bool]$Entry.PSObject.Properties['Unmanaged']
-    $issues = if ($Entry.Issues.Count) { ConvertTo-PSMMSafe ($Entry.Issues -join '; ') } else { 'none' }
-    $srcLabel = if ($isUnmanaged) { 'not in any config file (unmanaged)' }
-                else { "$(ConvertTo-PSMMSafe $Entry.Source)  ($(if ($Entry.Writable) { 'writable' } else { 'read-only' }))" }
-    $installedTxt = if ($Entry.Installed) {
-        $vers = @($Entry.InstalledVersions)
-        $extra = if ($vers.Count -gt 1) { " [orange1]($($vers.Count) versions on disk - K cleans up)[/]" } else { '' }
-        $upd = if ($Entry.UpdateAvailable) { " [orange1](update -> v$($Entry.LatestVersion))[/]" } else { '' }
-        "yes  v$($Entry.InstalledVersion)  [grey66]$($Entry.InstallScope)[/]$upd$extra"
-    } else { 'no' }
-    $pinTxt = if ($Entry.Version) { "$($Entry.Version)$(if ($Entry.PinnedExact) { ' (exact)' } else { ' (range)' })" } else { '-' }
-    $rows = @(
-        , @('Name        ', (ConvertTo-PSMMSafe $Entry.Name))
-        , @('Description ', $(if ([string]::IsNullOrWhiteSpace($Entry.Description)) { '-' } else { ConvertTo-PSMMSafe $Entry.Description }))
-        , @('Source      ', $srcLabel)
-        , @('Install/Mode', "$($Entry.Install) / $($Entry.Mode)")
-        , @('Version pin ', $pinTxt)
-        , @('Installed   ', $installedTxt)
-        , @('Loaded      ', $(if ($Entry.Loaded) { "yes  v$($Entry.LoadedVersion)$(if ($null -ne $Entry.ImportMs) { "  [grey66]import took $($Entry.ImportMs) ms[/]" })" } else { 'no' }))
-        , @('Issues      ', $issues)
-    )
-    if ($Auth) {
-        $authTxt = if (-not $Auth.Supported) { '-' }
-                   elseif ($Auth.Connected) { "[green3]connected[/]  $(ConvertTo-PSMMSafe $Auth.Account)$(if ($Auth.Detail) { "  [grey66]$(ConvertTo-PSMMSafe $Auth.Detail)[/]" })" }
-                   else { '[grey66]not connected[/]' }
-        $rows += , @('Connection  ', $authTxt)
-    }
-    $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $rule = [Spectre.Console.Rule]::new("[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Entry.FriendlyName)[/]")
-    $rule.Style = [Spectre.Console.Style]::Parse($script:PSMM_ColAccent)
-    $items.Add($rule)
-    $panel = [Spectre.Console.Panel]::new((New-PSMMDetailGrid -Rows $rows))
-    $panel.Header = [Spectre.Console.PanelHeader]::new('details')
-    $panel.Border = [Spectre.Console.BoxBorder]::Rounded
-    $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
-    $items.Add($panel)
+    $mid = [char]0x00B7
 
-    # verb keys match the grid (design system): ^l/^u load/unload, i install,
-    # u update - install and update are always separate keys.
-    $pairs = @('^l=load', '^u=unload')
-    if ($Entry.Installed) { $pairs += 'u=update' } else { $pairs += 'i=install' }
-    $pairs += 'b=browse commands'
-    if ($Entry.Installed -and @($Entry.InstalledVersions).Count -gt 1) { $pairs += 'x=clean old versions' }
-    if ($isUnmanaged) { $pairs += 'a=add to config' }
-    elseif ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { $pairs += @('e=edit', 'v=pin version', 'd=delete', 'm=move to file') }
+    # --- condensed facts -------------------------------------------------
+    $what = if (-not [string]::IsNullOrWhiteSpace($Entry.Description)) { ConvertTo-PSMMSafe $Entry.Description }
+            elseif ($Entry.FriendlyName -and $Entry.FriendlyName -ne $Entry.Name) { ConvertTo-PSMMSafe $Entry.FriendlyName }
+            else { '-' }
+    $entryTxt = if ($isUnmanaged) { 'not in any config file (unmanaged)' }
+                else {
+                    $pinTxt = if ($Entry.Version) { "pin $($Entry.Version)$(if ($Entry.PinnedExact) { ' (exact)' } else { ' (range)' })" } else { 'no pin' }
+                    $srcLeaf = if ($Entry.Source -eq '<profile inline>') { 'profile inline' } else { Split-Path $Entry.Source -Leaf }
+                    $rwTxt = if ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { 'rw' } else { 'ro' }
+                    "$(Get-PSMMStartupWord $Entry.Mode) at startup $mid gallery: $(Get-PSMMGalleryWord $Entry.Install) $mid $pinTxt [$script:PSMM_ColDim]$mid $(ConvertTo-PSMMSafe $srcLeaf) ($rwTxt)[/]"
+                }
+    $disk = if ($Entry.Installed) {
+        $vers = @($Entry.InstalledVersions)
+        $t = "v$($Entry.InstalledVersion) [$script:PSMM_ColDim]$($Entry.InstallScope)[/]"
+        if ($Entry.UpdateAvailable -and $Entry.LatestVersion) { $t += " [$script:PSMM_ColWarn]$([char]0x21E1) v$($Entry.LatestVersion) available[/]" }
+        if ($vers.Count -gt 1) { $t += " [$script:PSMM_ColWarn]$mid $($vers.Count) versions on disk[/]" }
+        $t
+    } else { 'not installed' }
+    $session = if ($Entry.Loaded) {
+        "imported $mid v$($Entry.LoadedVersion)$(if ($null -ne $Entry.ImportMs) { " [$script:PSMM_ColDim]$mid import took $($Entry.ImportMs) ms[/]" })"
+    } else { 'not imported' }
+    $facts = [System.Collections.Generic.List[string[]]]::new()
+    $facts.Add(@('what', $what))
+    $facts.Add(@('entry', $entryTxt))
+    $facts.Add(@('disk', $disk))
+    $facts.Add(@('session', $session))
     if ($Auth -and $Auth.Supported) {
-        $pairs += 's=re-check connection'
-        if ($Auth.Connected) { $pairs += 'o=disconnect' }
-    } elseif (Get-PSMMAuthProvider -ModuleName $Entry.Name) {
-        $pairs += 's=check connection'
+        $authTxt = if ($Auth.Connected) { "[$script:PSMM_ColOk]connected[/] $(ConvertTo-PSMMSafe $Auth.Account)$(if ($Auth.Detail) { " [$script:PSMM_ColDim]$mid $(ConvertTo-PSMMSafe $Auth.Detail)[/]" })" }
+                  else { "[$script:PSMM_ColDim]not connected[/]" }
+        $facts.Add(@('connection', $authTxt))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs $pairs)))
+    if ($Entry.Issues.Count) {
+        $facts.Add(@('issues', "[$script:PSMM_ColErr]$([char]0x26A0) $(ConvertTo-PSMMSafe ($Entry.Issues -join '; '))[/]"))
+    }
+    $fg = [Spectre.Console.Grid]::new()
+    $lcol = [Spectre.Console.GridColumn]::new()
+    $lcol.Padding = [Spectre.Console.Padding]::new(0, 0, 3, 0)
+    [void]$fg.AddColumn($lcol)
+    [void]$fg.AddColumn([Spectre.Console.GridColumn]::new())
+    foreach ($f in $facts) {
+        [void][Spectre.Console.GridExtensions]::AddRow($fg, [string[]]@("[$script:PSMM_ColDim]$($f[0])[/]", $f[1]))
+    }
+    $panel = [Spectre.Console.Panel]::new($fg)
+    $panel.Border = [Spectre.Console.BoxBorder]::Rounded
+    $panel.BorderStyle = Get-PSMMBorderStyle
+
+    # --- actions grouped by what they touch (§2e); same verbs, same keys --
+    $galleryPairs = @()
+    if ($Entry.Installed) {
+        $galleryPairs += if ($Entry.UpdateAvailable -and $Entry.LatestVersion) { "u=update to $($Entry.LatestVersion)" } else { 'u=update' }
+        if (@($Entry.InstalledVersions).Count -gt 1) { $galleryPairs += "x=clean $(@($Entry.InstalledVersions).Count - 1) old version(s)" }
+    } else { $galleryPairs += 'i=install' }
+    $entryPairs = if ($isUnmanaged) { @('a=add to config') }
+                  elseif ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { @('e=edit', 'v=pin version', 'd=delete', 'm=move to file') }
+                  else { @() }
+    $connPairs = @()
+    if ($Auth -and $Auth.Supported) {
+        $connPairs += 's=re-check'
+        if ($Auth.Connected) { $connPairs += 'o=disconnect' }
+    } elseif (Get-PSMMAuthProvider -ModuleName $Entry.Name) {
+        $connPairs += 's=check connection'
+    }
+    $groups = @(
+        , @('session', @('^l=load', '^u=unload', 'b=browse commands'))
+        , @('gallery', $galleryPairs)
+        , @('entry', $entryPairs)
+        , @('connection', $connPairs)
+    )
+    $ag = [Spectre.Console.Grid]::new()
+    $gcol = [Spectre.Console.GridColumn]::new()
+    $gcol.Padding = [Spectre.Console.Padding]::new(0, 0, 3, 0)
+    [void]$ag.AddColumn($gcol)
+    [void]$ag.AddColumn([Spectre.Console.GridColumn]::new())
+    foreach ($g in $groups) {
+        if (-not @($g[1]).Count) { continue }
+        [void][Spectre.Console.GridExtensions]::AddRow($ag, [string[]]@(
+                "[$script:PSMM_ColDim]$($g[0])[/]", (Get-PSMMHint -Pairs @($g[1]) -NoLegend)))
+    }
+
+    $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', "$($Entry.Name)") -RightMarkup (Get-PSMMStateMarkup -Entry $Entry))))
+    $items.Add($panel)
+    $items.Add($ag)
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)

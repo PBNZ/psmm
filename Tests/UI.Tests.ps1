@@ -115,7 +115,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
     It 'the grid header shows the running psmm version, and the self-update notice when one is cached' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $manifest = Import-PowerShellDataFile (Join-Path $PSScriptRoot '..' 'psmm.psd1')
-        $text | Should -Match ([regex]::Escape("psmm v$($manifest.ModuleVersion)-$($manifest.PrivateData.PSData.Prerelease)"))
+        $text | Should -Match ([regex]::Escape("v$($manifest.ModuleVersion)-$($manifest.PrivateData.PSData.Prerelease)"))
         InModuleScope psmm {
             $script:PSMM_UI.SelfUpdate = [pscustomobject]@{
                 Current = '0.1.0-beta3'; Latest = '0.1.0-beta4'
@@ -128,9 +128,9 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
     }
 
-    It 'renders the main grid with title, rows, position indicator and hints' {
+    It 'renders the main grid with header bar, rows, position indicator and hints' {
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match 'PS Session Module Manager'
+        $text | Should -Match ' psmm '
         $text | Should -Match 'AlphaMod'
         $text | Should -Match 'BetaMod'
         $text | Should -Match 'row 1/2'
@@ -176,7 +176,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match 'BetaMod'
         $text | Should -Match '2\.0\.0 \(exact\)'      # version pin display
         $text | Should -Match 'import took 123 ms'     # ImportMs surfaced
-        $text | Should -Match 'CheckOnly / Ignore'
+        $text | Should -Match 'gallery: check-only'    # display words (v2)
     }
 
     It 'module menu shows connection status when auth is known (#32)' {
@@ -207,7 +207,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             $st = New-PSMMListState
             Build-PSMMFilesView -State $st -Metas @((Get-PSMMFileMeta).Values)
         }
-        $text | Should -Match 'Config files'
+        $text | Should -Match "home $([char]0x203A) files"
         $text | Should -Match 'psmm-config\.json'
         $text | Should -Match 'main'
         $text | Should -Match ' on '
@@ -232,7 +232,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             )
             Build-PSMMGalleryView -State $st -Results $results -Query 'excel'
         }
-        $text | Should -Match 'PowerShell Gallery'
+        $text | Should -Match "home $([char]0x203A) gallery"
         $text | Should -Match 'ImportExcel'
         $text | Should -Match 'add to config'
     }
@@ -264,7 +264,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             })
             Build-PSMMTasksView -State $st -Tasks $tasks
         }
-        $text | Should -Match 'Background tasks'
+        $text | Should -Match "home $([char]0x203A) tasks"
         $text | Should -Match 'update check'
         $text | Should -Match 'done'
         $text | Should -Match '2 line\(s\)'
@@ -409,7 +409,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             )
             Build-PSMMPathsView -State (New-PSMMListState) -Infos $infos
         }
-        $text | Should -Match 'Module locations'
+        $text | Should -Match "home $([char]0x203A) paths"
         $text | Should -Match 'first'
         $text | Should -Match 'user default'
         $text | Should -Match 'onedrive'
@@ -830,6 +830,69 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
         $files | Should -Match "g\s+goto$([char]0x2026)"
         $files | Should -Not -Match 'c\s+conflicts'
+    }
+
+    # --- step 5: header bar with breadcrumb --------------------------------
+
+    It 'the header bar carries the brand block, breadcrumb, counts and right-aligned facts (step 5)' {
+        InModuleScope psmm {
+            $bar = Get-PSMMHeaderBar -Breadcrumb @('home')
+            $bar | Should -Match ([regex]::Escape('[black on salmon1] psmm [/]'))
+            { [void][Spectre.Console.Markup]::new($bar) } | Should -Not -Throw
+            $plain = [Spectre.Console.Markup]::Remove($bar)
+            $plain | Should -Match 'home'
+            $plain | Should -Match "v$($script:PSMM_UI.Version)"
+            $plain | Should -Match ([regex]::Escape("$($script:PSMM_UI.Engine)"))
+        }
+    }
+
+    It 'breadcrumb parents render dim, the current segment does not (step 5)' {
+        InModuleScope psmm {
+            $bar = Get-PSMMHeaderBar -Breadcrumb @('home', 'Microsoft.Graph')
+            $bar | Should -Match ([regex]::Escape("[grey42]home $([char]0x203A)[/]"))
+            $bar | Should -Not -Match ([regex]::Escape("[grey42]Microsoft.Graph[/]"))
+            [Spectre.Console.Markup]::Remove($bar) | Should -Match "home $([char]0x203A) Microsoft.Graph"
+        }
+    }
+
+    It 'the grid header bar shows module counts and the self-update flag (step 5)' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match ' psmm '
+        $text | Should -Match '2 modules'
+        $text | Should -Not -Match 'PS Session Module Manager'   # old title line retired
+        InModuleScope psmm {
+            $script:PSMM_UI.SelfUpdate = [pscustomobject]@{ Current = '1'; Latest = '2'; Command = 'x' }
+        }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match "$([char]0x21E1) update"
+        InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
+    }
+
+    It 'sub-screens breadcrumb from home: files, tasks, module menu (step 5)' {
+        $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
+        $files | Should -Match "home $([char]0x203A) files"
+        $tasks = Get-RenderedText { Build-PSMMTasksView -State (New-PSMMListState) -Tasks @() }
+        $tasks | Should -Match "home $([char]0x203A) tasks"
+        $menu = Get-RenderedText { Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null }
+        $menu | Should -Match "home $([char]0x203A) AlphaMod"
+    }
+
+    It 'the module menu shows the condensed facts panel and actions grouped by what they touch (step 5)' {
+        $menu = Get-RenderedText {
+            $e = $script:PSMM_UI.Entries | Where-Object Name -eq 'BetaMod'
+            $e.Installed = $true; $e.InstalledVersion = [version]'2.0.0'
+            $e.Loaded = $true; $e.LoadedVersion = [version]'2.0.0'; $e.ImportMs = 123
+            Build-PSMMModuleMenuView -Entry $e -Auth $null
+        }
+        foreach ($label in 'what', 'entry', 'disk', 'session') { $menu | Should -Match $label }
+        $menu | Should -Match 'gallery: check-only'
+        $menu | Should -Match 'off at startup'
+        $menu | Should -Match 'pin 2\.0\.0 \(exact\)'
+        $menu | Should -Match 'import took 123 ms'
+        # action groups
+        ($menu -replace '\s+', ' ') | Should -Match 'session .*\^l\s+load'
+        ($menu -replace '\s+', ' ') | Should -Match 'gallery .*u\s+update'
+        ($menu -replace '\s+', ' ') | Should -Match 'entry .*e\s+edit'
     }
 
     It 'moving the cursor onto a row with a pending update does not change the table width (step 3)' {

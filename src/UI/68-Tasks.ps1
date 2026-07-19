@@ -100,7 +100,7 @@ function script:Build-PSMMTasksView {
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Background tasks[/]$pos"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'tasks') -CountsMarkup $pos)))
     $items.Add($T)
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=view output', 'u=run update-help', 'c=clear finished'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
@@ -172,7 +172,7 @@ function script:Show-PSMMTasks {
                 if ($tasks.Count -and $st.Cursor -lt $tasks.Count) {
                     $t = $tasks[$st.Cursor]
                     $lines = @("task: $($t.Label)", "state: $(if (-not $t.Done) { 'running' } elseif ($t.Failed) { 'failed' } else { 'done' })", '') + @($t.Output | ForEach-Object { "$_" })
-                    Show-PSMMPager -Lines $lines -TitleMarkup "[$script:PSMM_ColAccent]Task output[/]"
+                    Show-PSMMPager -Lines $lines -TitleMarkup "[$script:PSMM_ColAccent]Task output[/]" -Breadcrumb @('home', 'tasks', 'output')
                 }
             }
         }

@@ -113,6 +113,8 @@ function script:Build-PSMMPagerView {
         # blank lines every text document contains
         [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup,
+        # when given, the v2 header bar replaces the plain title line
+        [string[]]$Breadcrumb,
         [string[]]$HintPairs = @('up/dn=scroll', 'c=copy'),
         [string]$StatusMarkup,
         [int]$ReservedRows = 7
@@ -125,7 +127,8 @@ function script:Build-PSMMPagerView {
         "  [$script:PSMM_ColMute]lines $($State.Scroll + 1)-$([Math]::Min($Lines.Count, $State.Scroll + $page))/$($Lines.Count)[/]"
     } else { '' }
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("$TitleMarkup$pos"))
+    if ($Breadcrumb) { $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb $Breadcrumb -CountsMarkup $pos))) }
+    else { $items.Add([Spectre.Console.Markup]::new("$TitleMarkup$pos")) }
     $panel = [Spectre.Console.Panel]::new([Spectre.Console.Markup]::new($body))
     $panel.Border = [Spectre.Console.BoxBorder]::Rounded
     $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
@@ -171,7 +174,8 @@ function script:Show-PSMMPager {
     param(
         # AllowEmptyString: see Build-PSMMPagerView
         [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
-        [Parameter(Mandatory)][string]$TitleMarkup
+        [Parameter(Mandatory)][string]$TitleMarkup,
+        [string[]]$Breadcrumb
     )
     $st = @{ Scroll = 0; Status = '' }
     Clear-PSMMScreen
@@ -179,13 +183,13 @@ function script:Show-PSMMPager {
         param($ctx)
         while ($true) {
             if ($script:PSMM_UI.HardQuit) { return }
-            $ctx.UpdateTarget((Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -StatusMarkup $st.Status))
+            $ctx.UpdateTarget((Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -Breadcrumb $Breadcrumb -StatusMarkup $st.Status))
             $ctx.Refresh()
             $k = Read-PSMMKeyResize
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -StatusMarkup $st.Status) -Context $ctx
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -Breadcrumb $Breadcrumb -StatusMarkup $st.Status) -Context $ctx
                 if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                 continue
             }

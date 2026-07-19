@@ -147,12 +147,17 @@ function script:Get-PSMMWinSize {
 # lowercase; '^' before a key means ctrl, and any line using a '^' chord
 # carries the dim '^ = ctrl' legend at the end of the row.
 function script:Get-PSMMHint {
-    param([Parameter(Mandatory)][string[]]$Pairs)
+    param(
+        [Parameter(Mandatory)][string[]]$Pairs,
+        # rows that sit above a persistent strip (which carries the legend
+        # itself) suppress their own to avoid repeating it
+        [switch]$NoLegend
+    )
     $parts = foreach ($p in $Pairs) {
         $k, $v = $p -split '=', 2
         "[$script:PSMM_ColKey on $script:PSMM_ColCapsule] $($k.ToLowerInvariant()) [/] [$script:PSMM_ColMute]$v[/]"
     }
-    if (@($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
+    if (-not $NoLegend -and @($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
         $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
     }
     $parts -join '  '
@@ -170,6 +175,38 @@ function script:Get-PSMMPersistentHint {
         $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
     }
     $parts -join '  '
+}
+
+# One-line header bar (§2), every screen: brand block + breadcrumb (+ dim
+# counts) with version · engine · elevated · ⇡ update right-aligned. Returns
+# a markup string padded to the window width.
+function script:Get-PSMMHeaderBar {
+    param(
+        [string[]]$Breadcrumb = @('home'),
+        [string]$CountsMarkup,
+        [string]$RightMarkup
+    )
+    $ui = $script:PSMM_UI
+    $crumbs = @(for ($i = 0; $i -lt $Breadcrumb.Count; $i++) {
+        if ($i -lt $Breadcrumb.Count - 1) { "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe $Breadcrumb[$i]) $([char]0x203A)[/]" }
+        else { "[default]$(ConvertTo-PSMMSafe $Breadcrumb[$i])[/]" }
+    })
+    $left = "[$script:PSMM_ColBrandFg on $script:PSMM_ColBrandBg] psmm [/] " + ($crumbs -join ' ')
+    if ($CountsMarkup) { $left += "  $CountsMarkup" }
+    $right = if ($PSBoundParameters.ContainsKey('RightMarkup')) { $RightMarkup }
+             else {
+                 $parts = @()
+                 if ($ui -and $ui.Version) { $parts += "v$($ui.Version)" }
+                 if ($ui -and $ui.Engine) { $parts += "$($ui.Engine)" }
+                 if ($ui -and $ui.Elevated) { $parts += 'elevated' }
+                 $r = "[$script:PSMM_ColDim]$($parts -join " $([char]0x00B7) ")[/]"
+                 if ($ui -and $ui.SelfUpdate) { $r += " [$script:PSMM_ColWarn]$([char]0x21E1) update[/]" }
+                 $r
+             }
+    $lLen = [Spectre.Console.Markup]::Remove($left).Length
+    $rLen = [Spectre.Console.Markup]::Remove($right).Length
+    $pad = [Math]::Max(1, (Get-PSMMWinSize).Width - $lLen - $rLen - 1)
+    $left + (' ' * $pad) + $right
 }
 
 # v2 display language (§5): the JSON schema keeps the Mode/Install enums;

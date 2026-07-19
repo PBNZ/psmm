@@ -27,7 +27,7 @@ function script:Build-PSMMCleanupView {
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Clean up old module versions[/] [$script:PSMM_ColMute]$n module(s) with multiple versions on disk[/]$pos"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'cleanup') -CountsMarkup "[$script:PSMM_ColDim]$n module(s) with multiple versions on disk[/]$pos")))
     $items.Add($T)
     if (-not $script:PSMM_UI.Elevated) {
         $items.Add([Spectre.Console.Markup]::new('[grey66]session is not elevated: AllUsers copies are skipped automatically[/]'))

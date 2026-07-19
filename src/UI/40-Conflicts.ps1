@@ -45,5 +45,5 @@ function script:Build-PSMMConflictLines {
 function script:Show-PSMMConflicts {
     $c = Get-PSMMConflict -Entries (Get-PSMMAllEntries)
     $lines = Build-PSMMConflictLines -Conflict $c
-    Show-PSMMPager -Lines $lines -TitleMarkup "[$script:PSMM_ColAccent]Conflicts & validation[/]"
+    Show-PSMMPager -Lines $lines -TitleMarkup "[$script:PSMM_ColAccent]Conflicts & validation[/]" -Breadcrumb @('home', 'conflicts')
 }

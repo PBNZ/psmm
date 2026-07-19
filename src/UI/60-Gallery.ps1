@@ -27,7 +27,7 @@ function script:Build-PSMMGalleryView {
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]PowerShell Gallery[/] [$script:PSMM_ColMute]search: $(ConvertTo-PSMMSafe $Query)[/]$pos"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'gallery') -CountsMarkup "[$script:PSMM_ColDim]search: $(ConvertTo-PSMMSafe $Query)[/]$pos")))
     $items.Add($T)
     if ($n) {
         $cur = $Results[$State.Cursor]

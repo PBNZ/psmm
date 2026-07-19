@@ -26,7 +26,7 @@ function script:Build-PSMMCommandListView {
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $of = if ($n -ne $Commands.Count) { " [$script:PSMM_ColMute](of $($Commands.Count))[/]" } else { '' }
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Commands in $(ConvertTo-PSMMSafe $ModuleName)[/]$pos$of$(Get-PSMMFilterMarkup -State $State)"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', $ModuleName, 'commands') -CountsMarkup "$pos$of$(Get-PSMMFilterMarkup -State $State)")))
     $items.Add($T)
     if ($State.FilterMode) {
         $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter', 'up/dn=move'))))
@@ -128,9 +128,9 @@ function script:Build-PSMMCommandDetailView {
     }) -join '  '
     $pos = if ($lines.Count -gt $page) { "  [$script:PSMM_ColMute]lines $($State.Scroll + 1)-$([Math]::Min($lines.Count, $State.Scroll + $page))/$($lines.Count)[/]" } else { '' }
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    # name and tab bar on SEPARATE short rows: one long markup row collapses
-    # to '...' on narrow terminals
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Name)[/]$pos"))
+    # header bar and tab bar on SEPARATE short rows: one long markup row
+    # collapses to '...' on narrow terminals
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', $Name) -CountsMarkup $pos)))
     $items.Add([Spectre.Console.Markup]::new($tabBar))
     $panel = [Spectre.Console.Panel]::new([Spectre.Console.Markup]::new($body))
     $panel.Border = [Spectre.Console.BoxBorder]::Rounded

@@ -166,8 +166,11 @@ function script:Build-PSMMGrid {
         )
     }
 
+    $loaded = @($entries | Where-Object { $_.Loaded }).Count
+    $updates = @($entries | Where-Object { $_.UpdateAvailable }).Count
+    $counts = "$($entries.Count) modules $([char]0x00B7) $loaded loaded$(if ($updates) { " $([char]0x00B7) $updates updates" })"
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]PS Session Module Manager[/] [$script:PSMM_ColMute](psmm v$($ui.Version) · $($ui.Engine)$(if ($ui.Elevated) { ' · elevated' }))[/]"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home') -CountsMarkup "[$script:PSMM_ColDim]$counts[/]")))
     $items.Add($T)
     $items.Add([Spectre.Console.Markup]::new($head))
     # context sentence for the cursor row (§5): the verbose explanation the

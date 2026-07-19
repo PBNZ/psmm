@@ -31,7 +31,7 @@ function script:Build-PSMMPathsView {
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Module locations[/] [$script:PSMM_ColMute](`$env:PSModulePath, search order = list order)[/]$pos"))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'paths') -CountsMarkup "[$script:PSMM_ColDim](`$env:PSModulePath, search order = list order)[/]$pos")))
     $items.Add($T)
 
     # OneDrive diagnosis: pwsh derives the FIRST (CurrentUser) entry from the
