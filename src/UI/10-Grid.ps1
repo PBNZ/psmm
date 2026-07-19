@@ -93,7 +93,7 @@ function script:Build-PSMMGrid {
             # the module column is still raw text (styled after capping);
             # issues add a trailing ' ⚠' the width must account for
             $len = if ($ci -eq $nameCol) { $rows[$ri][$nameCol].Length + $(if ($issueFlags[$ri]) { 2 } else { 0 }) }
-                   else { [Spectre.Console.Markup]::Remove($rows[$ri][$ci]).Length }
+                   else { Get-PSMMCellWidth $rows[$ri][$ci] }
             if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
         }
     }
@@ -147,7 +147,7 @@ function script:Build-PSMMGrid {
                 $bar = if ($isCur) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { ' ' }
                 $bar + $rows[$v][0]
             } else { $rows[$v][$ci] }
-            $len = [Spectre.Console.Markup]::Remove($cell).Length
+            $len = Get-PSMMCellWidth $cell
             $padded = ' ' + $cell + (' ' * ([Math]::Max(0, $widths[$ci] - $len) + 1))
             if ($isCur) { "[default on $script:PSMM_ColRowBg]$padded[/]" } else { $padded }
         })

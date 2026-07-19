@@ -28,6 +28,17 @@ function script:Get-PSMMBorderStyle { [Spectre.Console.Style]::Parse($script:PSM
 
 # Standard table chrome (§1/§5): rounded border in the border token,
 # lowercase dim headers. Screens add rows themselves.
+# Visible width of a markup cell. [Spectre.Console.Markup]::Remove collapses
+# whitespace-ONLY strings to '' (verified against the vendored 2.6.3) - a
+# blank mark slot measured as 0 gets extra padding, its column stretches,
+# and every other row gets unstyled fill: a black hole in the cursor-row
+# background right next to the bar (live-run feedback 2026-07-20 round 5).
+function script:Get-PSMMCellWidth {
+    param([string]$Cell)
+    if ([string]::IsNullOrWhiteSpace($Cell)) { return $Cell.Length }
+    [Spectre.Console.Markup]::Remove($Cell).Length
+}
+
 # ONE list-table builder for every sub-screen, with the SAME cursor
 # treatment as the grid (mockup 2a): full-row rowbg background + a ▌
 # accent bar in its own far-left slot + the caller's bold name cell.
@@ -44,7 +55,7 @@ function script:New-PSMMTable {
     $widths = @(foreach ($h in $Headers) { $h.Trim().Length })
     foreach ($r in $Rows) {
         for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
-            $len = [Spectre.Console.Markup]::Remove("$($r[$ci])").Length
+            $len = Get-PSMMCellWidth "$($r[$ci])"
             if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
         }
     }
@@ -70,7 +81,7 @@ function script:New-PSMMTable {
         $mark = if ($isCur) { " [$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { '  ' }
         $cells = [string[]](@($mark) + @(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
             $cell = "$($Rows[$ri][$ci])"
-            $len = [Spectre.Console.Markup]::Remove($cell).Length
+            $len = Get-PSMMCellWidth $cell
             ' ' + $cell + (' ' * ([Math]::Max(0, $widths[$ci] - $len) + 1))
         }))
         if ($isCur) { $cells = [string[]]@($cells | ForEach-Object { "[default on $script:PSMM_ColRowBg]$_[/]" }) }

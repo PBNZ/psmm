@@ -872,6 +872,21 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
+    It 'the cursor row background is continuous - blank mark cells must not inflate their column (live-run fix 5)' {
+        # [Spectre.Console.Markup]::Remove collapses whitespace-only cells to
+        # '' - measured as 0 they get extra padding, the column stretches and
+        # the OTHER rows get unstyled fill: a black hole in the cursor row bg
+        # right next to the bar (needs a non-cursor, non-selected row - the
+        # BetaMod fixture row - to trigger)
+        $esc = [char]27
+        $ansi = Get-RenderedAnsi { Build-PSMMGrid }
+        $cursorLine = ($ansi -split "`r?`n" | Where-Object { $_ -match '48;5;237' } | Select-Object -First 1)
+        $cursorLine | Should -Not -BeNullOrEmpty
+        # no unstyled spaces between a style reset and the next background
+        # segment anywhere inside the row
+        $cursorLine | Should -Not -Match "$([regex]::Escape("$esc[0m")) +$([regex]::Escape("$esc["))48;5;237m"
+    }
+
     It 'a blank line separates the verb rows from the persistent goto row (mockup 2a, live-run fix 4)' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $lines = @($text -split "`r?`n")
