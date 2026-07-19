@@ -50,6 +50,28 @@ BeforeAll {
         }
     }
 
+    # Like Get-RenderedText, but with ANSI + 256-colour output kept, so tests
+    # can assert actual colour escapes (borders, row backgrounds).
+    function Get-RenderedAnsi([scriptblock]$BuildInModule) {
+        InModuleScope psmm -Parameters @{ buildText = $BuildInModule.ToString() } {
+            $build = [scriptblock]::Create($buildText)
+            $sw = [System.IO.StringWriter]::new()
+            $settings = [Spectre.Console.AnsiConsoleSettings]::new()
+            $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
+            $settings.Interactive = [Spectre.Console.InteractionSupport]::No
+            $settings.Ansi = [Spectre.Console.AnsiSupport]::Yes
+            $settings.ColorSystem = [Spectre.Console.ColorSystemSupport]::EightBit
+            $console = [Spectre.Console.AnsiConsole]::Create($settings)
+            $console.Profile.Width = 120
+            Set-PSMMConsole -Console $console
+            try {
+                $r = & $build
+                $console.Write($r)
+                $sw.ToString()
+            } finally { Set-PSMMConsole -Console $null }
+        }
+    }
+
     function Set-UITestConfig {
         $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path (Join-Path $root 'main')
@@ -577,6 +599,65 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             @($script:PSMM_UI.Unmanaged).Count | Should -Be 1
             Clear-PSMMTask
         }
+    }
+}
+
+Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    BeforeEach { Set-UITestConfig }
+    AfterEach {
+        Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    # --- step 1: borders grey27, lowercase dim headers, cursor row bg -------
+
+    It 'v2 palette tokens exist and name the spec colours (step 1)' {
+        InModuleScope psmm {
+            $script:PSMM_ColDim     | Should -Be 'grey42'
+            $script:PSMM_ColCapsule | Should -Be 'grey19'
+            $script:PSMM_ColRowBg   | Should -Be 'grey15'
+            $script:PSMM_ColBorder  | Should -Be 'grey27'
+            $script:PSMM_ColOk      | Should -Be 'green3'
+            $script:PSMM_ColWarn    | Should -Be 'orange1'
+            $script:PSMM_ColErr     | Should -Be 'indianred1'
+            $script:PSMM_ColInfo    | Should -Be 'steelblue1'
+        }
+    }
+
+    It 'grid borders render grey27 and the cursor row paints a grey15 full-row background (step 1)' {
+        $out = Get-RenderedAnsi { Build-PSMMGrid }
+        # grey27 = 238, grey15 = 235 in the xterm-256 palette
+        $out | Should -Match '38;5;238'
+        $out | Should -Match '48;5;235'
+        # the row background must span up to the cell edge, not just the text:
+        # a painted cell ends with the background still open right before the reset
+        ($out -split "`r?`n" | Where-Object { $_ -match '48;5;235' }).Count | Should -BeGreaterOrEqual 1
+    }
+
+    It 'grid headers are lowercase + dim and the checkbox column is gone (step 1)' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $header = ($text -split "`r?`n" | Where-Object { $_ -cmatch 'name' } | Select-Object -First 1)
+        $header | Should -Not -BeNullOrEmpty
+        $header | Should -CMatch 'name'
+        $header | Should -Not -CMatch 'Name'
+        $text | Should -Not -CMatch 'Sel'
+        $text | Should -Not -Match '\[\[x\]\]|\[ \]'   # checkbox cells retired
+        $ansi = Get-RenderedAnsi { Build-PSMMGrid }
+        $ansi | Should -Match '38;5;242'               # grey42 dim headers
+    }
+
+    It 'the cursor row shows the accent bar and bold accent name; the bare > cursor is retired (step 1)' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match ([regex]::Escape([string][char]0x258C))   # ▌
+        # no data row starts with the old '>' cursor marker
+        @($text -split "`r?`n" | Where-Object { $_ -match '^\s*│\s*>' }).Count | Should -Be 0
+    }
+
+    It 'a selected row is marked with a filled square, and the status area counts the selection (step 1)' {
+        InModuleScope psmm { [void]$script:PSMM_UI.Sel.Add(1) }
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match ([regex]::Escape([string][char]0x25AA))   # ▪
+        $text | Should -Match '1 selected'
     }
 }
 

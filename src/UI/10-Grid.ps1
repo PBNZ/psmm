@@ -38,77 +38,93 @@ function script:Build-PSMMGrid {
         $e = $entries[$idx]
         $isCur = ($v -eq $ui.Cursor)
         $isUnmanaged = [bool]$e.PSObject.Properties['Unmanaged']
-        $box = if ($ui.Sel.Contains($idx)) { '[green3][[x]][/]' } else { "[$script:PSMM_ColMute][[ ]][/]" }
-        $state = if ($isUnmanaged) { '[steelblue1]unmanaged[/]' }
-                 elseif ($e.Loaded) { '[green3]loaded[/]' }
-                 elseif ($e.Installed) { '[orange1]installed[/]' }
-                 else { '[indianred1]missing[/]' }
+        $state = if ($isUnmanaged) { "[$script:PSMM_ColInfo]unmanaged[/]" }
+                 elseif ($e.Loaded) { "[$script:PSMM_ColOk]loaded[/]" }
+                 elseif ($e.Installed) { "[$script:PSMM_ColWarn]installed[/]" }
+                 else { "[$script:PSMM_ColErr]missing[/]" }
         $src = switch ($e.Source) {
             '<profile inline>' { 'profile' }
             '<unmanaged>'      { '-' }
             default            { Split-Path $e.Source -Leaf }
         }
-        $rw = if ($isUnmanaged) { '' } elseif ($e.Writable) { ' [grey66]rw[/]' } else { ' [grey66]ro[/]' }
+        $rw = if ($isUnmanaged) { '' } elseif ($e.Writable) { " [$script:PSMM_ColDim]rw[/]" } else { " [$script:PSMM_ColDim]ro[/]" }
         $name = "$($e.Name)"
         $scope = switch ($e.InstallScope) {
             'CurrentUser' { 'user' }
-            'AllUsers'    { if ($ui.Elevated) { 'all' } else { 'all [grey66]ro[/]' } }
-            'mixed'       { '[orange1]mixed[/]' }
+            'AllUsers'    { if ($ui.Elevated) { 'all' } else { "all [$script:PSMM_ColDim]ro[/]" } }
+            'mixed'       { "[$script:PSMM_ColWarn]mixed[/]" }
             default       { '-' }
         }
         $ver = if ($e.LoadedVersion) { "$($e.LoadedVersion)" } elseif ($e.InstalledVersion) { "$($e.InstalledVersion)" } else { '-' }
         # '↑', not '^': the design system reserves '^' for the ctrl legend
-        if ($e.UpdateAvailable) { $ver = "$ver [orange1]$([char]0x2191)[/]" }
-        if ($e.PinnedExact) { $ver = "$ver [grey66]pin[/]" }
-        $cur = if ($isCur) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }
-        $flag = if ($e.Issues.Count) { '[indianred1]![/]' } else { ' ' }
+        if ($e.UpdateAvailable) { $ver = "$ver [$script:PSMM_ColWarn]$([char]0x2191)[/]" }
+        if ($e.PinnedExact) { $ver = "$ver [$script:PSMM_ColDim]pin[/]" }
+        # column one: cursor bar wins over the selection mark (design §6)
+        $mark = if ($isCur) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" }
+                elseif ($ui.Sel.Contains($idx)) { "[$script:PSMM_ColOk]$([char]0x25AA)[/]" }
+                else { ' ' }
+        $flag = if ($e.Issues.Count) { "[$script:PSMM_ColErr]![/]" } else { ' ' }
         $rows.Add([string[]]@(
-                $cur, $box, $name, "$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))$rw",
+                $mark, $name, "$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))$rw",
                 $e.Mode, $e.Install, $scope, $state, $ver, $flag))
     }
 
-    $headers = @(' ', 'Sel', 'Name', 'Src', 'Mode', 'Inst', 'Scope', 'State', 'Ver', '!')
+    # lowercase + dim headers (design §5); plain text here for width maths,
+    # dim markup applied when the columns are created below
+    $headers = @(' ', 'name', 'src', 'mode', 'inst', 'scope', 'state', 'ver', '!')
+    $nameCol = 1
     $widths = @(foreach ($h in $headers) { $h.Length })
     for ($ci = 0; $ci -lt $headers.Count; $ci++) {
         foreach ($r in $rows) {
-            # column 2 (Name) is still raw text, everything else is markup
-            $len = if ($ci -eq 2) { $r[2].Length } else { [Spectre.Console.Markup]::Remove($r[$ci]).Length }
+            # the name column is still raw text, everything else is markup
+            $len = if ($ci -eq $nameCol) { $r[$nameCol].Length } else { [Spectre.Console.Markup]::Remove($r[$ci]).Length }
             if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
         }
     }
-    # Exact fit: content + 2 padding per column + 11 border verticals. The
-    # Name column flexes down to 14 chars; below the resulting minimum,
+    # Exact fit: content + 2 padding per column + border verticals. The
+    # name column flexes down to 14 chars; below the resulting minimum,
     # Spectre would collapse the table to a bare '...' - render a clear
     # too-small message instead (design system: too-small terminal).
     $overhead = (2 * $headers.Count) + $headers.Count + 1
-    $fixed = ($widths | Measure-Object -Sum).Sum - $widths[2]
-    $minName = [Math]::Min($widths[2], 14)
+    $fixed = ($widths | Measure-Object -Sum).Sum - $widths[$nameCol]
+    $minName = [Math]::Min($widths[$nameCol], 14)
     if ($win.Width -lt ($fixed + $overhead + $minName) -or $win.Height -lt 14) {
         return (Get-PSMMTooSmallView -MinWidth ($fixed + $overhead + $minName) -MinHeight 14)
     }
-    $nameCap = [Math]::Min($widths[2], [Math]::Max(14, $win.Width - $overhead - $fixed))
-    $widths[2] = $nameCap
+    $nameCap = [Math]::Min($widths[$nameCol], [Math]::Max(14, $win.Width - $overhead - $fixed))
+    $widths[$nameCol] = $nameCap
     for ($v = 0; $v -lt $n; $v++) {
-        $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $rows[$v][2] $nameCap)
-        if ($v -eq $ui.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
-        $rows[$v][2] = $nm
+        $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $rows[$v][$nameCol] $nameCap)
+        if ($v -eq $ui.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
+        $rows[$v][$nameCol] = $nm
     }
 
     $T = [Spectre.Console.Table]::new()
     $T.Border = [Spectre.Console.TableBorder]::Rounded
+    $T.BorderStyle = Get-PSMMBorderStyle
     for ($ci = 0; $ci -lt $headers.Count; $ci++) {
-        $col = [Spectre.Console.TableColumn]::new($headers[$ci])
-        $col.Width = $widths[$ci]
+        # padding lives INSIDE the cell content (built below) so the cursor
+        # row's background paints edge to edge, not just under the text
+        $col = [Spectre.Console.TableColumn]::new(" [$script:PSMM_ColDim]$($headers[$ci])[/] ")
+        $col.Width = $widths[$ci] + 2
+        $col.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
         $col.NoWrap = $true
         [void]$T.AddColumn($col)
     }
     for ($v = $vp.First; $v -le $vp.Last; $v++) {
-        [void][Spectre.Console.TableExtensions]::AddRow($T, $rows[$v])
+        $isCur = ($v -eq $ui.Cursor)
+        $cells = [string[]]@(for ($ci = 0; $ci -lt $headers.Count; $ci++) {
+            $cell = $rows[$v][$ci]
+            $len = [Spectre.Console.Markup]::Remove($cell).Length
+            $padded = ' ' + $cell + (' ' * [Math]::Max(0, $widths[$ci] - $len)) + ' '
+            if ($isCur) { "[default on $script:PSMM_ColRowBg]$padded[/]" } else { $padded }
+        })
+        [void][Spectre.Console.TableExtensions]::AddRow($T, $cells)
     }
     # pad very short lists with blank rows so a fresh one-entry grid doesn't
     # look collapsed (2026-07-05 feedback)
     for ($pad = $n; $pad -lt 5; $pad++) {
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]](@('') * 10))
+        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]](@('') * $headers.Count))
     }
 
     $sel = $ui.Sel.Count

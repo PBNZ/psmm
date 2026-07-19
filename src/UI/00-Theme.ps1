@@ -12,6 +12,22 @@
 $script:PSMM_ColKey    = 'salmon1'
 $script:PSMM_ColMute   = 'grey66'
 $script:PSMM_ColAccent = 'deepskyblue1'
+# v2 tokens (docs/design-system-v2.md §1): the full palette lives here so
+# theme variants are token swaps in this file only.
+$script:PSMM_ColOk      = 'green3'
+$script:PSMM_ColWarn    = 'orange1'
+$script:PSMM_ColErr     = 'indianred1'
+$script:PSMM_ColInfo    = 'steelblue1'
+$script:PSMM_ColDim     = 'grey42'       # de-emphasised cells, legends
+$script:PSMM_ColCapsule = 'grey19'       # key-capsule background
+$script:PSMM_ColRowBg   = 'grey15'       # cursor-row background
+$script:PSMM_ColBorder  = 'grey27'       # ALL table/panel borders
+$script:PSMM_ColBrandFg = 'black'        # the ' psmm ' brand block
+$script:PSMM_ColBrandBg = 'salmon1'
+
+# Shared border style: every table/panel border goes through this so the
+# border colour is themed in one place.
+function script:Get-PSMMBorderStyle { [Spectre.Console.Style]::Parse($script:PSMM_ColBorder) }
 
 # The console every UI write goes through. Production: the real AnsiConsole.
 # Tests inject a StringWriter-backed console via Set-PSMMConsole and assert on
