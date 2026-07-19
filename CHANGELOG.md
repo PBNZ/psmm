@@ -3,6 +3,55 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [0.1.0-beta6] — 2026-07-20
+
+### Changed — UI design system v2 ([docs/design-system.md](docs/design-system.md))
+- **The `g` goto layer replaces screen-switch letters**: `g` anywhere opens
+  a small overlay — `g h` home, `g g` gallery, `g f` files, `g p` paths,
+  `g t` tasks, `g c` conflicts, `g x` cleanup, `g m` unmanaged, `g ?` key
+  reference. Single letters on a screen are verbs only; esc cancels the
+  overlay and any other second key is swallowed.
+- **Header bar on every screen**: the ` psmm ` brand block plus a
+  breadcrumb (`home › Microsoft.Graph`), dim counts, and version · engine ·
+  elevated · `⇡` update flag right-aligned — replacing the per-screen title
+  lines.
+- **Plain-word grid columns**: `Mode` renders as **startup**
+  (load / install / off) and `Install` as **gallery** (if-missing /
+  check-only / latest) — display language only, the JSON schema is
+  untouched. The state column pairs a glyph with its word (`●` loaded,
+  `◐` installed, `○` missing, `◌` unmanaged), entry issues show as `⚠`
+  after the module name, the update marker is `⇡` (naming the target
+  version on the cursor row), and a muted context sentence explains the
+  cursor row in full words.
+- **Cursor & selection**: full-row background with a `▌` accent bar and
+  bold accent name (the bare `>` is retired everywhere); selection is `▪`
+  in column one (the `[ ]`/`[x]` checkbox column is retired).
+- **Capsule key hints in two tiers**: contextual verb capsules plus a
+  persistent strip (`g goto… · / filter · ? help · ^q quit`) on every
+  screen; the `^ = ctrl` legend sits at the end of the row.
+- **Tabbed help**: `?` opens `this screen | keys | config | startup |
+  about` — ←/→ switches, `/` filters within a tab, `c` copies the visible
+  tab; the keys tab is a grouped two-column capsule reference; the about
+  tab carries the exact self-update command (the grid's standing update
+  line is retired in favour of the header-bar flag).
+- **Startup report** now shares the TUI design tokens: brand block +
+  summary line, aligned per-module rows with state glyphs, right-aligned
+  timings and proportional bars (slowest Load module called out with
+  "InstallOnly would free your prompt"), `✕` failures with the exception
+  text and a retry hint, one `⋯` row for deferred background work — all in
+  raw 256-colour escapes (Spectre stays unloaded at profile time).
+- **Themes**: `$PSMM_Theme = 'glacier'` (default) `| 'ember' | 'moss'` in
+  `$PROFILE` before `Import-Module psmm`; unknown values fall back to
+  glacier with a status note. All colours come from one token table
+  (`src/Engine/Theme.ps1`); borders are grey27, headers lowercase + dim.
+
+### Fixed
+- A NuGet **range pin** like `[1.0,2.0)` crashed the module menu (invalid
+  Spectre markup — the pin is now escaped; regression test added).
+- The tasks screen never showed its cursor marker: the `$state` cell
+  variable shadowed the `$State` parameter (case-insensitive), latent
+  since v1.
+
 ## [0.1.0-beta5] — 2026-07-19
 
 ### Fixed

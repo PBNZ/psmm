@@ -86,8 +86,8 @@ Invoke-PSMMStartup
 **2. Get a config.** The first `psmm` run creates
 `~/.psmm/psmm-config.json` for you if no config exists anywhere (seeded with
 PwshSpectreConsole, psmm's own UI engine, as a managed entry). To start from
-a scenario template instead, press `f` (files) then `n` (new). Or just write
-the JSON yourself:
+a scenario template instead, press `g f` (goto files) then `n` (new). Or
+just write the JSON yourself:
 
 ```json
 {
@@ -105,21 +105,25 @@ background job; the report tells you what happened.
 
 **4. Manage interactively.** Run `psmm`:
 
-- one grid row per module: loaded/installed/missing, source file, mode,
-  install policy, scope (CurrentUser/AllUsers), version, update marker
+- one grid row per module: state (`●` loaded / `◐` installed / `○` missing /
+  `◌` unmanaged), what happens at **startup**, what the **gallery** may do,
+  version (`⇡` = update available), scope, file — plus a plain-words context
+  sentence for the row under the cursor
 - `space` select · `^l`/`^u` load/unload (`^` = ctrl) · `i` install · `u` update
   · `k` check for updates
-- `/` search (everywhere) · `?` help (everywhere) · `g h` home (anywhere) ·
-  `^q` quit (anywhere)
-- `g` search the PowerShell Gallery and add modules to your config
-- `x` clean up stacked old module versions
-- `m` reveal installed-but-unmanaged modules and adopt them into a config
-- `f` config file manager · `c` conflicts & validation · `t` background tasks
-- `p` module locations: see `$env:PSModulePath`, get warned when your
+- `g` opens the **goto layer** (anywhere): `g h` home · `g g` gallery search ·
+  `g f` config files · `g p` module locations · `g t` background tasks ·
+  `g c` conflicts · `g x` version cleanup · `g m` unmanaged modules
+- `/` filter (everywhere) · `?` tabbed help (everywhere) · `^q` quit (anywhere)
+- gallery search adds modules straight into your config; cleanup prunes
+  stacked old module versions; unmanaged modules can be adopted into a config
+- module locations: see `$env:PSModulePath`, get warned when your
   CurrentUser module folder lives inside OneDrive (PowerShell's default when
   OneDrive backs up Documents), download or pin cloud-only module files, and
   move the primary location via the documented `powershell.config.json`
   override
+- three colour themes — `glacier` (default), `ember`, `moss` — via
+  `$PSMM_Theme` in your `$PROFILE`
 
 Long operations run as background tasks with an unobtrusive progress line —
 the UI never blocks. Exiting restores your terminal exactly as it was.
@@ -134,9 +138,9 @@ the UI never blocks. Exiting restores your terminal exactly as it was.
 
 Optional `$PROFILE` knobs (set **before** `Import-Module psmm`):
 `$PSMM_StartupReport = $false`, `$PSMM_BackgroundStartup = $false`,
-`$PSMM_UpdateCheck = $false`, `$PSMM_InlineJson = '<json>'`,
-`$PSMM_JsonPath = @('C:\dir\*.json')`, `$PSMM_MainConfigPath`,
-`$PSMM_ProfileConfigPath`.
+`$PSMM_UpdateCheck = $false`, `$PSMM_Theme = 'glacier'|'ember'|'moss'`,
+`$PSMM_InlineJson = '<json>'`, `$PSMM_JsonPath = @('C:\dir\*.json')`,
+`$PSMM_MainConfigPath`, `$PSMM_ProfileConfigPath`.
 
 ## Config
 

@@ -8,7 +8,7 @@ cursor highlight, a header bar with breadcrumb, tabbed help, and a restyled
 startup report. Default theme **glacier** (today's salmon1 + deepskyblue1,
 tuned), user-selectable via a `$PSMM_Theme` knob (`glacier`|`ember`|`moss`).
 
-**The authoritative spec is `../design-system-v2.md`** — tokens, key registry,
+**The authoritative spec is `../design-system.md`** — tokens, key registry,
 symbols, rules that must keep passing tests, and a safe 8-step migration
 order. Read it first; this README is orientation.
 
@@ -85,8 +85,7 @@ Capsule markup shape: `[salmon1 on grey19] i [/] [grey66]install[/]`
 Symbols registry: `▌ ▪ ● ◐ ○ ◌ ⚠ ⇡ ↑ ↓ … ~ ^` — meanings in the spec §9.
 
 ## Files
-- `../design-system-v2.md` — the spec (becomes `docs/design-system.md`
-  once implemented).
+- `../design-system.md` — the spec (implemented 0.1.0-beta6).
 - `psmm - Next Level.dc.html` — v2 mockups (sections 2a–2g).
 - `psmm - Current UI.dc.html` — baseline recreation (1a–1n).
 - `support.js` — runtime the mockup pages need to render; not part

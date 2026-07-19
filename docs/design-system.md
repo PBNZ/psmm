@@ -1,91 +1,201 @@
-# psmm design system
+# psmm design system (v2)
 
-The rules every psmm screen follows. Any new screen or key binding must comply; deviations are
-bugs. Tests in `Tests/UI.Tests.ps1` assert the testable rules.
+Implemented 2026-07-20 (0.1.0-beta6); successor to the v1 design system.
+Mockups in `mockups/`: `psmm - Next Level.dc.html` (2a-2g); baseline
+recreation of the v1 UI: `psmm - Current UI.dc.html` (1a-1n).
 
-## Palette
+**Scope decision:** implement direction A (2a-2e, 2g). The pane-layout
+contender (2f) is REJECTED for now — not beginner friendly; do not build it.
 
-Defined once in `src/UI/00-Theme.ps1`; never hard-code colours elsewhere.
+Verdict on v1: the discipline is the asset — single palette source
+(00-Theme.ps1), key registry with tests, install ≠ update, alt-screen restore,
+too-small fallback, row x/n. v2 keeps every one of those rules and changes the
+surfaces: hint rendering, navigation, column language, help, cursor, startup
+report. All of it stays Spectre markup + explicit 256-color names; no new
+dependency.
+
+## 1. Palette (theme = "glacier", default)
+
+Defined once in `src/UI/00-Theme.ps1` as today. Additions in bold.
 
 | Token | Colour | Use |
 |---|---|---|
-| key | `salmon1` | keyboard shortcuts in hint lines |
-| mute | `grey66` | action labels, separators, secondary text |
-| accent | `deepskyblue1` | cursor row, titles, screen headings |
-| ok | `green3` | success status |
-| warn | `orange1` | warnings, degraded states |
-| err | `indianred1` | errors, missing |
-| info | `steelblue1` | neutral informational highlights |
+| key | `salmon1` | key capsules (foreground) |
+| mute | `grey66` | action labels, secondary text |
+| accent | `deepskyblue1` | cursor bar, titles, breadcrumb current, active tab |
+| ok | `green3` | loaded, success |
+| warn | `orange1` | installed-not-loaded, updates, warnings |
+| err | `indianred1` | missing, failed |
+| info | `steelblue1` | background-activity spinner, neutral highlights |
+| **dim** | **`grey42`** | de-emphasised cells (off, ro, file names), legends |
+| **capsule** | **`grey19`** | key-capsule background (`[salmon1 on grey19] i [/]`) |
+| **rowbg** | **`grey15`** | cursor-row background |
+| **border** | **`grey27`** | ALL table/panel borders (today they render default fg — too loud) |
+| **brand** | **`black on salmon1`** | the ` psmm ` block in the header bar |
 
-Status colours are explicit 256-colour names so they render identically in every terminal.
+**Decision: glacier is the default.** Themes are user-selectable via a
+`$PSMM_Theme` profile knob (`'glacier'` | `'ember'` | `'moss'`, set before
+`Import-Module psmm`, invalid values fall back to glacier with a status-line
+note). Variants (mockup 2g) are token swaps in 00-Theme.ps1 only. Nothing
+outside 00-Theme.ps1 may name a colour (unchanged rule).
 
-## Key hints
+## 2. Header bar (new, every screen)
 
-- Hints are rendered only through `Get-PSMMHint` — one style everywhere.
-- **Keys are always shown lowercase**: `i=install`, never `I=install`. This includes letters,
-  `esc`, `enter`, `space`, `home`.
-- **`^` is the ctrl modifier**: `^q=quit` means ctrl+q. Any hint line containing a `^` chord
-  starts with the muted legend `^=ctrl` so the notation is always explained on screen.
-- No shift-modified bindings. If a screen needs a second binding for a verb, use a ctrl chord.
-- Hint pairs are `key=action` with a muted `·` separator. Keep actions to one or two words.
-- Long hint sets are split across multiple short rows (a single long markup row collapses to
-  `...` on narrow terminals). Row order: navigation first, module verbs second, screen
-  switching last.
+One line, full width, `on grey11`-style background:
+`[black on salmon1] psmm [/] breadcrumb · counts……………right: version · engine · ⇡ update flag`
 
-## Key registry — same verb, same key, on every screen
+- Breadcrumb: `home`, `home › Microsoft.Graph`, `home › help`. Current segment
+  default fg, parents dim. Replaces the per-screen accent title line.
+- Right side: `v0.1.0-beta4 · PSResourceGet` + `elevated` when true + orange
+  `⇡ update` when the self-update cache says so (detail line stays available
+  in help › about).
 
-| Key | Verb | Notes |
-|---|---|---|
-| `i` | install | grid: background install of missing targets; module menu: install this module |
-| `u` | update | grid: background update of installed targets; module menu: update this module. Install and update are always separate actions with separate keys |
-| `k` | check updates | grid: background gallery check, marks rows with `↑` |
-| `^l` | load | grid: bulk load targets; module menu: load this module |
-| `^u` | unload | grid: bulk unload targets; module menu: unload this module |
-| `x` | clean up versions | grid: cleanup screen; module menu: clean this module's old versions |
-| `^a` | (cleanup screen) clean all | ctrl chord because it acts on everything at once |
-| `s` | connection status | module menu: check the Connect-* session |
-| `o` | disconnect | module menu |
-| `b` | browse commands | module menu |
-| `e` / `v` / `d` / `m` | edit / pin version / delete / move entry | module menu |
-| `a` | add | grid: new entry; module menu (unmanaged): add to config; files: apply is `a` too (screen-local) |
-| `c` | copy | help/pager screens: copy the visible content to the clipboard |
-| `r` | reload / rescan | re-read from disk |
+## 3. Keys: capsules, two tiers
 
-Screen-local keys (`g=gallery`, `f=files`, `p=paths`, `t=tasks`, `m=unmanaged`,
-`n=new config`, `d=download`/`k=keep on device` on the paths screen, ...) may reuse letters
-across screens as long as the *verb* differs per screen and no global verb is shadowed.
+- Render every key through `Get-PSMMHint` (unchanged contract) but as a
+  capsule: `[salmon1 on grey19] i [/] [grey66]install[/]`, separator two
+  spaces (drop the `·` between pairs; keep `·` only between groups).
+- Two tiers on every screen:
+  - **verb row(s)**: contextual actions, salmon capsules.
+  - **persistent row**: `g goto… · / filter · ? help · ^q quit` in accent-on-
+    grey11 capsules with dim labels, always last, always the same. `^ = ctrl`
+    legend sits right-aligned on this row (only when a chord is visible —
+    unchanged rule).
+- Keys stay lowercase; `^` stays the ctrl notation; no shift bindings
+  (unchanged).
 
-## Keys that work everywhere
+## 4. Navigation: the g goto layer (replaces screen-switch letters)
 
-| Key | Action |
+`g` anywhere opens a small overlay panel (bottom-left, accent border):
+
+| chord | goes to |
 |---|---|
-| `up`/`dn`, `pgup`/`pgdn`, `home`/`end` | move / scroll (physical home = top of list, the common TUI meaning) |
-| `/` | filter (search) mode |
-| `?` | help for the current screen |
-| `esc` | back one level (clears an active filter first); repeated esc reaches the home screen |
-| `g h` | go straight to the home screen (the module grid) from any sub-screen. This is the vim-style goto chord used by yazi, ranger and spotify_player — there is no cross-TUI "home" standard, and ctrl+h is unreliable (it is ASCII backspace on VT paths). ctrl+h works as an alias where the terminal reports it distinctly (Windows Terminal, conhost) |
-| `^q` / `^x` | quit psmm immediately |
+| g h | home (grid) |
+| g g | gallery |
+| g f | files |
+| g p | paths |
+| g t | tasks |
+| g c | conflicts |
+| g x | cleanup |
+| g m | unmanaged toggle |
+| g ? | help › keys |
 
-## Symbols
+- esc cancels; any other second key is swallowed (today's behaviour).
+- Grid letters `f p c t x m g` are freed; single letters on a screen are
+  VERBS only. `a add`, `r reload`, `i u k`, `^l ^u` keep their registry slots.
+- Implementation: re-render the current view with the panel appended — same
+  pattern as the filter-mode hint swap; no new machinery.
+- ctrl+h stays as home alias where the terminal reports it (unchanged).
 
-- `^` before a key means ctrl (see legend rule above). Because `^` is reserved for ctrl,
-  it is never used as a status marker.
-- `↑` in the Ver column = update available; `↑`/`↓` after `showing x-y` = more rows above/below.
-- `…` = truncated text.
-- `>` = cursor row.
+## 5. Grid columns: plain words + context line
 
-## Screens
+- Rename headers, lowercase + dim: `module state startup gallery version
+  scope file`.
+- `Mode` → **startup**: `load` / `install` / `off` (Load / InstallOnly /
+  Ignore). `Install` → **gallery**: `if-missing` / `check-only` / `latest`.
+  JSON schema is untouched — this is display language only.
+- **state** gets glyphs: `● loaded` (ok) · `◐ installed` (warn) · `○ missing`
+  (err) · `◌ unmanaged` (info). Glyph + word, never glyph alone.
+- `!` column dies; issues render as `⚠` (err) after the module name.
+- Update marker becomes `⇡` and shows the target on the cursor row:
+  `7.8.10 ⇡ 7.9.0`. (`↑` was fine; `⇡` reads better next to digits — either
+  is acceptable, pick one and register it.)
+- **Context line** (new, under the selection/pos line): one muted sentence
+  explaining the cursor row in full words:
+  `ImportExcel — background-installs at shell start when missing · not
+  imported this session · v7.8.10 on disk, v7.9.0 available (u updates)`.
+  This is where Mode/Install/pin/scope subtleties get to be verbose so the
+  columns don't have to.
 
-- Every screen: title line in accent, content, hint row(s), then transient status line.
-- Every scrollable list shows `row x/n` and, when clipped, `showing a-b`.
-- Every action reports its outcome in the status line; a keypress that does nothing valid says so.
-- Full-screen flows repaint a clean alternate-screen page; the user's scrollback is never touched.
-- **Too-small terminal**: when the window is too small to render a screen's table, render a
-  clear one-line message naming the current and required size instead of letting the table
-  collapse to `...`.
+## 6. Cursor & selection
 
-## Writing style in the UI
+- Cursor: full-row `on grey15` background + `▌` accent bar in column one +
+  bold accent module name. The bare `>` is retired.
+- Selection: `▪` (ok) in column one + `▪ N selected` in the status area.
+  Checkbox `[ ]/[x]` column is retired (the marks carry it).
 
-- Status/labels are lowercase sentences without trailing periods: `loaded (123 ms)`.
-- Errors show the exception message, never a bare failure.
-- Durations in ms, versions prefixed `v`.
+## 7. Help: tabs (reuse the command-detail pattern)
+
+`?` opens help for the current screen as **tabs**, not one pager:
+`this screen | keys | config | startup | about` — left/right switches,
+`/` filters within help, `c` copies the visible tab, esc back.
+The keys tab is a grouped two-column layout (navigate / act on modules /
+go places / everywhere), keys as capsules — see mockup 2c. Content source
+stays Get-PSMMHelpSection, split per tab instead of concatenated.
+
+## 8. Startup report: same design system as the TUI
+
+Format (mockup 2d):
+
+- Line 1: ` psmm ` brand block + summary: `4 loaded · 1 skipped · 1 failed ·
+  3 in background · 407 ms`.
+- One aligned row per module: state glyph · name · right-aligned ms ·
+  proportional bar (dim; warn-coloured for the slowest, annotated
+  `slowest — InstallOnly would free your prompt`).
+- Failures: `✕ name` + the exception message + `→ psmm, then i on the row
+  retries`.
+- Deferred: one `⋯` row: `ImportExcel +2 more — installing in the background`.
+- Self-update: `⇡ psmm vX is out — <command>` (command in cyan, as today).
+- Drop the `> Name <` wrappers and raw ConsoleColor semantics; use $PSStyle
+  RGB/256 escapes so report and TUI share tokens.
+
+## 9. Symbols registry (v2)
+
+| symbol | meaning |
+|---|---|
+| `▌` | cursor row (column one) |
+| `▪` | selected row |
+| `● ◐ ○ ◌` | loaded / installed / missing / unmanaged |
+| `⚠` | entry has validation issues |
+| `⇡` | update available (Ver column, header bar, startup report) |
+| `↑ ↓` after `showing x-y` | more rows above/below (unchanged) |
+| `…` | truncated (unchanged) |
+| `~` | background activity spinner line (unchanged) |
+| `^` | ctrl, and nothing else (unchanged) |
+
+## 10. Unchanged rules (restated so tests keep passing)
+
+- One palette source; no colours outside 00-Theme.ps1.
+- Same verb, same key, on every screen; install and update never share a key.
+- Keys lowercase; `^`=ctrl with visible legend; no shift bindings.
+- esc backs out one level (clears filter first); `^q`/`^x` hard-quit anywhere.
+- `/` filter everywhere with identical editing semantics.
+- Every scrollable list: `row x/n` + `showing a-b` when clipped.
+- Every action reports in the status line; no-op keypresses say so.
+- Alt-screen buffer in/out; scrollback never touched.
+- Too-small terminal → explicit one-line message with current/required size.
+- Status/labels lowercase, no trailing periods; errors show exception text;
+  durations in ms; versions `v`-prefixed.
+
+## Migration order (safe increments)
+
+1. Borders → grey27, headers lowercase+dim, cursor row bg (00-Theme + grid).
+2. Capsule hint rendering inside Get-PSMMHint (one function, every screen).
+3. startup/gallery column words + context line.
+4. g goto overlay; remove screen letters from the grid's third hint row.
+5. Header bar with breadcrumb (replaces title lines screen by screen).
+6. Tabbed help.
+7. Startup report restyle.
+8. Theme variants ($PSMM_Theme).
+
+Each step is independently shippable and testable (extend UI.Tests.ps1:
+capsule markup shape, goto table completeness, startup/gallery word mapping,
+context-line presence).
+
+## Implementation notes (2026-07-20)
+
+All 8 steps shipped in 0.1.0-beta6. Deliberate deviations from the letter of
+this spec:
+
+- The persistent row's pairs adapt to the screen type: the grid shows
+  `g goto… · / filter · ? help · ^q quit`; sub-screens swap `/ filter` for
+  `esc back` when they have no filter (the row is otherwise identical).
+- Sub-screen list tables use the `▌` bar + bold accent name as the cursor;
+  the full-row background is implemented on the grid (the padded-cell
+  technique it needs is grid-specific).
+- The token table lives in `src/Engine/Theme.ps1` (markup name + xterm-256
+  index per token) so the startup report can render the same tokens without
+  Spectre; `src/UI/00-Theme.ps1` reads its palette from there. The guard
+  test allows colour names only in those two files.
+- `err` maps to Spectre `indianred1` (#ff5f5f, 203) - the spec allowed
+  203/204.

@@ -20,10 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            Prerelease   = 'beta5'
+            Prerelease   = 'beta6'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0-beta5 - fix: fresh-install op_Addition crash (single managed entry made the first full scan throw before the alt screen opened; the error surfaced on exit and the initial availability refresh never ran). See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta6 - UI design system v2: g goto layer replaces screen-switch letters, header bar with breadcrumb on every screen, plain-word startup/gallery columns with state glyphs and a context sentence, capsule key hints, tabbed help, restyled startup report, and three themes via $PSMM_Theme (glacier|ember|moss). See CHANGELOG.md.'
         }
     }
 }
