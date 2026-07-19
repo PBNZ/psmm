@@ -16,7 +16,7 @@ jobs:
     name: Gate + publish
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Tag must match the manifest version
         shell: pwsh
