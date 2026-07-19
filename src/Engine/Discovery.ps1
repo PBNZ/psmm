@@ -123,7 +123,8 @@ function Get-PSMMEntry {
 # ---- engine-state accessors (UI + tests use these, never the vars) ----
 # Get-PSMMAllEntries returns a plain array (safe to pipe); mutation goes
 # through Add-PSMMAllEntry / Set-PSMMAllEntries so the backing list stays
-# consistent.
+# consistent. NB: pipeline unrolling strips the @() on return - callers that
+# need a real array (indexing, +) must wrap the call in @() themselves (gh#1).
 
 function Get-PSMMAllEntries  { if ($script:PSMM_AllEntries) { @($script:PSMM_AllEntries) } else { @() } }
 function Get-PSMMFileMeta    { $script:PSMM_FileMeta }

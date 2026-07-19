@@ -109,7 +109,10 @@ function script:Sync-PSMMUIEntries {
         }
     }
     $script:PSMM_UI.Entries = $list
-    $all = Get-PSMMAllEntries
+    # @() is mandatory: a single-entry result (fresh install: the one seeded
+    # PwshSpectreConsole module) unrolls to a scalar PSObject on return, and
+    # scalar + array below throws op_Addition (gh#1)
+    $all = @(Get-PSMMAllEntries)
     if ($FullScan) { Update-PSMMAvailable -Entries ($all + @($list | Where-Object { $_.PSObject.Properties['Unmanaged'] })) }
     Update-PSMMLoaded -Entries $list
     Update-PSMMLoaded -Entries $all

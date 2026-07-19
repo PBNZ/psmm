@@ -436,6 +436,31 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match 'RogueMod'
     }
 
+    It 'a machine with exactly ONE managed entry full-scans without errors (fresh-install regression, gh#1)' {
+        # Fresh install: Initialize-PSMMMainConfig seeds ONE module, so
+        # Get-PSMMAllEntries unrolled to a scalar PSObject on return and
+        # ($all + @(...)) in Sync-PSMMUIEntries threw op_Addition. The @()
+        # inside the accessor cannot survive pipeline unrolling - the caller
+        # must wrap.
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path (Join-Path $root 'main')
+        $global:PSMM_MainConfigPath    = Join-Path $root 'main\psmm-config.json'
+        $global:PSMM_ProfileConfigPath = Join-Path $root 'nope\psmm-config.json'
+        $global:PSMM_JsonPath          = @(Join-Path $root 'nope2\*.json')
+        @{
+            Modules = @(
+                @{ Name = 'PwshSpectreConsole'; Install = 'IfMissing'; Mode = 'InstallOnly' }
+            )
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+        InModuleScope psmm {
+            # the disk sweep is not under test - the crash was in the argument
+            # expression, which still evaluates against a mock
+            Mock Update-PSMMAvailable { }
+            { Sync-PSMMUIEntries -FullScan } | Should -Not -Throw
+            $script:PSMM_UI.Entries.Count | Should -Be 1
+        }
+    }
+
     It 'the pager accepts text with blank lines (help/? crashed on this, regression)' {
         # Mandatory [string[]] rejects empty-string ELEMENTS unless
         # AllowEmptyString is declared - every help/conflict document has
