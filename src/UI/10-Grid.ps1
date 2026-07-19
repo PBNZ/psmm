@@ -75,9 +75,9 @@ function script:Build-PSMMGrid {
             }
         }
         $ver += $pin
-        # column one is selection-only; the cursor is carried by the row
-        # background + bold accent name (the ▌ bar read as a broken checkbox
-        # next to the marks - live-run feedback 2026-07-20)
+        # the selection dot; the cursor bar is prepended into the same mark
+        # slot at render time, one char to its LEFT (mockup 2a) - the bar
+        # must never cover the dot (live-run feedback 2026-07-20)
         $mark = if ($ui.Sel.Contains($idx)) { "[$script:PSMM_ColOk]$([char]0x25AA)[/]" } else { ' ' }
         $issueFlags.Add([bool]$e.Issues.Count)
         $rows.Add([string[]]@($mark, $name, $state, $startup, $gallery, $ver, $scope, $file))
@@ -102,7 +102,11 @@ function script:Build-PSMMGrid {
     # module column flexes down to 14 chars; below the resulting minimum,
     # Spectre would collapse the table to a bare '...' - render a clear
     # too-small message instead (design system: too-small terminal).
-    $overhead = (2 * $headers.Count) + $headers.Count + 1
+    # column 0 is the mark slot: cursor bar ▌ + selection dot ▪ side by side
+    $widths[0] = 2
+    # per-column padding (2) + the panel's outer border (2); no inner
+    # verticals any more (mockup 2a)
+    $overhead = (2 * $headers.Count) + 2
     $fixed = ($widths | Measure-Object -Sum).Sum - $widths[$nameCol]
     $minName = [Math]::Min($widths[$nameCol], 14)
     if ($win.Width -lt ($fixed + $overhead + $minName) -or $win.Height -lt 14) {
@@ -118,33 +122,46 @@ function script:Build-PSMMGrid {
         $rows[$v][$nameCol] = $nm
     }
 
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    $T.BorderStyle = Get-PSMMBorderStyle
+    # borderless grid in a rounded panel (mockup 2a): outer frame only, no
+    # column separators, no header rule. Padding lives INSIDE the cells so
+    # the cursor row's background paints edge to edge. In the mark slot the
+    # cursor bar sits immediately LEFT of the selection dot - it must never
+    # cover it (live-run fix 4).
+    $G = [Spectre.Console.Grid]::new()
     for ($ci = 0; $ci -lt $headers.Count; $ci++) {
-        # padding lives INSIDE the cell content (built below) so the cursor
-        # row's background paints edge to edge, not just under the text
-        $col = [Spectre.Console.TableColumn]::new(" [$script:PSMM_ColDim]$($headers[$ci])[/] ")
-        $col.Width = $widths[$ci] + 2
+        $col = [Spectre.Console.GridColumn]::new()
         $col.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
         $col.NoWrap = $true
-        [void]$T.AddColumn($col)
+        [void]$G.AddColumn($col)
     }
+    $headerCells = [string[]]@(for ($ci = 0; $ci -lt $headers.Count; $ci++) {
+        $h = $headers[$ci].Trim()
+        if ($h) { " [$script:PSMM_ColDim]$h[/]" + (' ' * ([Math]::Max(0, $widths[$ci] - $h.Length) + 1)) }
+        else { ' ' * ($widths[$ci] + 2) }
+    })
+    [void][Spectre.Console.GridExtensions]::AddRow($G, $headerCells)
     for ($v = $vp.First; $v -le $vp.Last; $v++) {
         $isCur = ($v -eq $ui.Cursor)
         $cells = [string[]]@(for ($ci = 0; $ci -lt $headers.Count; $ci++) {
-            $cell = $rows[$v][$ci]
+            $cell = if ($ci -eq 0) {
+                $bar = if ($isCur) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { ' ' }
+                $bar + $rows[$v][0]
+            } else { $rows[$v][$ci] }
             $len = [Spectre.Console.Markup]::Remove($cell).Length
-            $padded = ' ' + $cell + (' ' * [Math]::Max(0, $widths[$ci] - $len)) + ' '
+            $padded = ' ' + $cell + (' ' * ([Math]::Max(0, $widths[$ci] - $len) + 1))
             if ($isCur) { "[default on $script:PSMM_ColRowBg]$padded[/]" } else { $padded }
         })
-        [void][Spectre.Console.TableExtensions]::AddRow($T, $cells)
+        [void][Spectre.Console.GridExtensions]::AddRow($G, $cells)
     }
     # pad very short lists with blank rows so a fresh one-entry grid doesn't
     # look collapsed (2026-07-05 feedback)
     for ($pad = $n; $pad -lt 5; $pad++) {
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]](@('') * $headers.Count))
+        [void][Spectre.Console.GridExtensions]::AddRow($G, [string[]]@(foreach ($w in $widths) { ' ' * ($w + 2) }))
     }
+    $T = [Spectre.Console.Panel]::new($G)
+    $T.Border = [Spectre.Console.BoxBorder]::Rounded
+    $T.BorderStyle = Get-PSMMBorderStyle
+    $T.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
 
     $sel = $ui.Sel.Count
     $pos = Get-PSMMPositionMarkup -State $ui -Count $n -Viewport $vp

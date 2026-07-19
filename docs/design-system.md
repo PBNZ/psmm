@@ -146,7 +146,7 @@ Format (mockup 2d):
 
 | symbol | meaning |
 |---|---|
-| `▌` | RETIRED (was cursor; now full-row `rowbg` background + bold name) |
+| `▌` | cursor row (far-left mark slot, left of the selection dot) |
 | `▪` | selected row |
 | `● ◐ ○ ◌` | loaded / installed / missing / unmanaged |
 | `⚠` | entry has validation issues |
@@ -201,13 +201,19 @@ All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
   bottom-left, middle-left and window-centre all read as detached. On
   dismissal only the panel rectangle is blanked and the caller's repaint
   restores what was underneath.
-- **The `▌` cursor bar is RETIRED on every screen** (live-run feedback
-  2026-07-20, two rounds): next to the grid's selection marks it read as a
-  broken checkbox, and on sub-screen tables it read as an artifact. The
-  cursor is the full-row `rowbg` background + bold accent name on the grid
-  AND every sub-screen list — one design on all pages; a design-consistency
-  test renders every list screen and holds them to it. Grid column one is
-  selection-only (`▪`).
+- **Tables are borderless inside** (mockup 2a, live-run feedback 2026-07-20
+  round 4): outer rounded frame only — no column separators, no header
+  rule. One shared builder renders every list table; the grid builds inline
+  (hot path) with the identical technique.
+- **The `▌` cursor bar lives in its own far-left mark slot**, immediately
+  LEFT of the selection dot — the earlier complaints were the bar *sharing*
+  the selection slot and covering the `▪` dot (and, with column borders,
+  reading as a broken checkbox). Cursor = bar + full-row `rowbg` background
+  + bold accent name, identical on the grid and every sub-screen list; the
+  design-consistency test renders every list screen and holds them to it.
+- **A blank line separates the verb rows from the persistent goto row**
+  (mockup 2a); it ships inside `Get-PSMMPersistentHint`, so every screen
+  gets it for free.
 - **`m` (show/hide unmanaged) is a grid verb**, not a goto chord.
 - **The console cursor is hidden** while the TUI runs (it blinked over the
   frames); text prompts show it for the duration.

@@ -29,12 +29,11 @@ function script:Get-PSMMBorderStyle { [Spectre.Console.Style]::Parse($script:PSM
 # Standard table chrome (§1/§5): rounded border in the border token,
 # lowercase dim headers. Screens add rows themselves.
 # ONE list-table builder for every sub-screen, with the SAME cursor
-# treatment as the grid: the cursor row paints an edge-to-edge rowbg
-# background (padding lives inside the cells; widths computed from ALL
-# rows), the caller bolds the name cell. The ▌ bar mark is retired -
-# it read as an artifact next to the grid's bg-only cursor (live-run
-# feedback 2026-07-20: one design on all pages). The grid builds its
-# table inline for speed but uses this exact technique; the design
+# treatment as the grid (mockup 2a): full-row rowbg background + a ▌
+# accent bar in its own far-left slot + the caller's bold name cell.
+# Widths are computed from ALL rows and padding lives inside the cells,
+# so the background paints edge to edge. The grid builds its table
+# inline for speed but uses this exact technique; the design
 # consistency test holds both to it.
 function script:New-PSMMTable {
     param(
@@ -49,29 +48,39 @@ function script:New-PSMMTable {
             if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
         }
     }
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    $T.BorderStyle = Get-PSMMBorderStyle
-    for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
-        $h = $Headers[$ci]
-        $cell = if ($h.Trim()) { " [$script:PSMM_ColDim]$($h.ToLowerInvariant())[/] " } else { ' ' }
-        $col = [Spectre.Console.TableColumn]::new($cell)
-        $col.Width = $widths[$ci] + 2
+    # borderless grid inside a rounded panel (mockup 2a: outer frame only,
+    # no column separators, no header rule). Column 0 is the cursor-bar
+    # slot; the bar never shares a slot with content, so it can't cover
+    # anything (live-run feedback 2026-07-20 round 4).
+    $G = [Spectre.Console.Grid]::new()
+    for ($ci = 0; $ci -le $Headers.Count; $ci++) {
+        $col = [Spectre.Console.GridColumn]::new()
         $col.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
         $col.NoWrap = $true
-        [void]$T.AddColumn($col)
+        [void]$G.AddColumn($col)
     }
+    $headerCells = [string[]](@('  ') + @(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+        $h = $Headers[$ci].Trim()
+        if ($h) { " [$script:PSMM_ColDim]$($h.ToLowerInvariant())[/]" + (' ' * ([Math]::Max(0, $widths[$ci] - $h.Length) + 1)) }
+        else { ' ' * ($widths[$ci] + 2) }
+    }))
+    [void][Spectre.Console.GridExtensions]::AddRow($G, $headerCells)
     for ($ri = 0; $ri -lt $Rows.Count; $ri++) {
         $isCur = ($ri -eq $CursorRow)
-        $cells = [string[]]@(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+        $mark = if ($isCur) { " [$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { '  ' }
+        $cells = [string[]](@($mark) + @(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
             $cell = "$($Rows[$ri][$ci])"
             $len = [Spectre.Console.Markup]::Remove($cell).Length
-            $padded = ' ' + $cell + (' ' * [Math]::Max(0, $widths[$ci] - $len)) + ' '
-            if ($isCur) { "[default on $script:PSMM_ColRowBg]$padded[/]" } else { $padded }
-        })
-        [void][Spectre.Console.TableExtensions]::AddRow($T, $cells)
+            ' ' + $cell + (' ' * ([Math]::Max(0, $widths[$ci] - $len) + 1))
+        }))
+        if ($isCur) { $cells = [string[]]@($cells | ForEach-Object { "[default on $script:PSMM_ColRowBg]$_[/]" }) }
+        [void][Spectre.Console.GridExtensions]::AddRow($G, $cells)
     }
-    $T
+    $P = [Spectre.Console.Panel]::new($G)
+    $P.Border = [Spectre.Console.BoxBorder]::Rounded
+    $P.BorderStyle = Get-PSMMBorderStyle
+    $P.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
+    $P
 }
 
 # 1-based origin (@{ Top; Left }) for an overlay panel: dead centre of the
@@ -317,7 +326,9 @@ function script:Get-PSMMHint {
 }
 
 # Tier-two hint row (§3): the persistent strip - always the same keys,
-# always last, accent keys on the darker capsule with dim labels.
+# always last, accent keys on the darker capsule with dim labels. A blank
+# line above separates it from the verb rows (mockup 2a) - it is part of
+# the returned markup so every screen gets it for free.
 function script:Get-PSMMPersistentHint {
     param([string[]]$Pairs = @("g=goto$([char]0x2026)", '/=filter', '?=help', '^q=quit'))
     $parts = foreach ($p in $Pairs) {
@@ -327,7 +338,7 @@ function script:Get-PSMMPersistentHint {
     if (@($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
         $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
     }
-    $parts -join '  '
+    "`n" + ($parts -join '  ')
 }
 
 # One-line header bar (§2), every screen: brand block + breadcrumb (+ dim
