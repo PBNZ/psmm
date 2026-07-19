@@ -140,7 +140,7 @@ function script:Show-PSMMModuleMenu {
         $k = [Console]::ReadKey($true)
         if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
         if ($k.KeyChar -eq 'g') {
-            $dest = Read-PSMMGotoKey
+            $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth -Author $author)
             if ($dest) { $ui.Goto = $dest; return }
             continue
         }

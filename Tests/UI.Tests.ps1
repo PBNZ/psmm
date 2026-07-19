@@ -806,6 +806,29 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
+    It 'the overlay floats dead centre of the CONTENT area, clamped when bigger (live-run fix 2)' {
+        InModuleScope psmm {
+            # content box 30x90 in a much larger window: centre over the box
+            $o = Get-PSMMOverlayOrigin -PanelHeight 7 -PanelWidth 50 -AreaHeight 30 -AreaWidth 90
+            $o.Top | Should -Be 11    # (30-7)/2 rounded down
+            $o.Left | Should -Be 20   # (90-50)/2
+            $tiny = Get-PSMMOverlayOrigin -PanelHeight 7 -PanelWidth 50 -AreaHeight 5 -AreaWidth 40
+            $tiny.Top | Should -Be 1  # clamp to top-left
+            $tiny.Left | Should -Be 1
+        }
+    }
+
+    It 'the content box of a frame excludes the padded header bar from the width (live-run fix 2)' {
+        InModuleScope psmm {
+            $size = Get-PSMMContentSize -Renderable (Build-PSMMGrid)
+            $size.Height | Should -BeGreaterThan 5
+            $size.Width | Should -BeGreaterThan 40
+            # the 2-module grid is far narrower than the 120-col console; the
+            # full-width header bar must not inflate the measured width
+            $size.Width | Should -BeLessThan 115
+        }
+    }
+
     It 'grid hints: single letters are verbs only, navigation lives in the persistent goto row (step 4)' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $text | Should -Match 'i\s+install'

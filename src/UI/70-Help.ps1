@@ -374,7 +374,7 @@ function script:Show-PSMMHelpScreen {
                 continue
             }
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMHelpView -State $st -Tabs $tabs)
                 if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                 continue
             }

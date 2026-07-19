@@ -1,7 +1,7 @@
 ﻿# 03-Goto.ps1 — the g goto layer (design-system-v2 §4): pressing g anywhere
-# draws a small accent-bordered panel OVER the current frame (bottom-left,
-# raw VT positioning via Write-PSMMOverlay); the next key jumps to a named
-# screen. Identical on every screen, so the per-screen switch letters are
+# draws a small accent-bordered panel floating dead centre over the current
+# frame (raw VT positioning via Write-PSMMOverlay); the next key jumps to
+# a named screen. Identical on every screen, so the per-screen switch letters are
 # freed for verbs. Show/hide unmanaged is NOT here - that is a grid verb
 # ('m'), not a place to go (live-run feedback 2026-07-20).
 
@@ -51,12 +51,14 @@ function script:Build-PSMMGotoPanel {
 }
 
 # Draw the overlay on top of whatever is on screen and read the second key.
-# Returns the destination string, or $null (esc / unknown key swallowed /
-# hard quit). Every caller repaints its frame right after, which restores
-# anything the erased overlay rows covered.
+# $BaseRenderable is the frame currently showing - the panel centres over
+# its content box (window centre when omitted). Returns the destination
+# string, or $null (esc / unknown key swallowed / hard quit). Every caller
+# repaints its frame right after, which restores anything the erased
+# overlay rows covered.
 function script:Read-PSMMGotoKey {
-    [CmdletBinding()] param()
-    $region = Write-PSMMOverlay -Renderable (Build-PSMMGotoPanel)
+    [CmdletBinding()] param($BaseRenderable)
+    $region = Write-PSMMOverlay -Renderable (Build-PSMMGotoPanel) -Content $BaseRenderable
     $k2 = [Console]::ReadKey($true)
     Clear-PSMMOverlay -Region $region
     if (Test-PSMMHardQuitKey $k2) { $script:PSMM_UI.HardQuit = $true; return $null }

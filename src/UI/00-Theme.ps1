@@ -46,16 +46,53 @@ function script:Get-PSMMCursorMark {
     if ($IsCursor) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { ' ' }
 }
 
-# Draw a renderable ON TOP of the current frame, bottom-left, via raw VT
-# cursor positioning - Spectre's live display has no z-layers, and appending
-# the panel below a full-height frame pushed the screen (live-run feedback).
-# DECSC/DECRC keep the live display's cursor bookkeeping intact; the caller
-# erases the region (Clear-PSMMOverlay) before the next repaint. Returns the
-# drawn region (@{ Top; Count }) or $null when output is redirected.
+# 1-based origin (@{ Top; Left }) for an overlay panel: dead centre of the
+# CONTENT area on both axes (live-run feedback rounds 2-4: bottom,
+# middle-left and window-centre all read as detached from the frame),
+# clamped to the top-left when the panel is bigger than the area.
+function script:Get-PSMMOverlayOrigin {
+    param([int]$PanelHeight, [int]$PanelWidth, [int]$AreaHeight, [int]$AreaWidth)
+    @{
+        Top  = [Math]::Max(1, [Math]::Floor(($AreaHeight - $PanelHeight) / 2))
+        Left = [Math]::Max(1, [Math]::Floor(($AreaWidth - $PanelWidth) / 2))
+    }
+}
+
+# Visible size of a rendered frame: trailing blank lines dropped; the first
+# line is EXCLUDED from the width because it is the header bar, padded to
+# the full window width - including it would turn "centred over content"
+# back into "centred over the window".
+function script:Get-PSMMContentSize {
+    param([Parameter(Mandatory)] $Renderable)
+    $win = Get-PSMMWinSize
+    $lines = @(ConvertTo-PSMMTextLines -Renderable $Renderable -Width $win.Width | ForEach-Object { "$_".TrimEnd() })
+    while ($lines.Count -gt 0 -and [string]::IsNullOrEmpty($lines[$lines.Count - 1])) {
+        $lines = @($lines | Select-Object -First ($lines.Count - 1))
+    }
+    $w = 0
+    for ($i = 1; $i -lt $lines.Count; $i++) {
+        if ($lines[$i].Length -gt $w) { $w = $lines[$i].Length }
+    }
+    if ($w -le 0) { $w = $win.Width }
+    @{ Height = [Math]::Max(1, $lines.Count); Width = $w }
+}
+
+# Draw a renderable ON TOP of the current frame via raw VT cursor
+# positioning - Spectre's live display has no z-layers, and appending the
+# panel below a full-height frame pushed the screen (live-run feedback).
+# The panel floats dead centre over the CONTENT ($Content = the frame's
+# renderable, measured via Get-PSMMContentSize; window when omitted).
+# DECSC/DECRC keep the live display's cursor bookkeeping intact; the
+# caller erases the region (Clear-PSMMOverlay) before the next repaint.
+# Returns the drawn region (@{ Top; Left; Count; Width }) or $null when
+# output is redirected.
 function script:Write-PSMMOverlay {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
         Justification = 'Raw VT cursor positioning must bypass any host/stream formatting.')]
-    param([Parameter(Mandatory)] $Renderable)
+    param(
+        [Parameter(Mandatory)] $Renderable,
+        $Content
+    )
     try {
         if ([Console]::IsOutputRedirected) { return $null }
         $sw = [System.IO.StringWriter]::new()
@@ -70,21 +107,29 @@ function script:Write-PSMMOverlay {
         $lines = @($sw.ToString() -split "`r?`n" | Where-Object { $_ -ne '' })
         if (-not $lines.Count) { return $null }
         $win = Get-PSMMWinSize
-        $top = [Math]::Max(1, $win.Height - $lines.Count)   # 1-based VT row
+        $panelWidth = 0
+        foreach ($l in $lines) {
+            $w = ($l -replace '\x1b\[[0-9;?]*[A-Za-z]', '').Length
+            if ($w -gt $panelWidth) { $panelWidth = $w }
+        }
+        $area = if ($Content) { Get-PSMMContentSize -Renderable $Content }
+                else { @{ Height = $win.Height; Width = $win.Width } }
+        $origin = Get-PSMMOverlayOrigin -PanelHeight $lines.Count -PanelWidth $panelWidth -AreaHeight $area.Height -AreaWidth $area.Width
         $esc = [char]27
         $out = [System.Text.StringBuilder]::new()
         [void]$out.Append("$esc" + '7')                     # DECSC save cursor
         for ($i = 0; $i -lt $lines.Count; $i++) {
-            [void]$out.Append("$esc[$($top + $i);2H").Append($lines[$i]).Append("$esc[0m")
+            [void]$out.Append("$esc[$($origin.Top + $i);$($origin.Left)H").Append($lines[$i]).Append("$esc[0m")
         }
         [void]$out.Append("$esc" + '8')                     # DECRC restore
         [Console]::Write($out.ToString())
-        @{ Top = $top; Count = $lines.Count }
+        @{ Top = $origin.Top; Left = $origin.Left; Count = $lines.Count; Width = $panelWidth }
     } catch { $null }
 }
 
-# Erase an overlay region drawn by Write-PSMMOverlay (whole lines; the
-# caller's next repaint restores any frame content underneath).
+# Erase the rectangle an overlay was drawn in (blank spaces, not whole
+# lines - a centred panel must not wipe the frame text beside it); the
+# caller's next repaint restores the content underneath.
 function script:Clear-PSMMOverlay {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
         Justification = 'Raw VT cursor positioning must bypass any host/stream formatting.')]
@@ -93,10 +138,12 @@ function script:Clear-PSMMOverlay {
     try {
         if ([Console]::IsOutputRedirected) { return }
         $esc = [char]27
+        $blank = ' ' * [Math]::Max(1, [int]$Region.Width)
+        $left = [Math]::Max(1, [int]$Region.Left)
         $out = [System.Text.StringBuilder]::new()
         [void]$out.Append("$esc" + '7')
         for ($i = 0; $i -lt $Region.Count; $i++) {
-            [void]$out.Append("$esc[$($Region.Top + $i);1H").Append("$esc[2K")
+            [void]$out.Append("$esc[$($Region.Top + $i);${left}H").Append("$esc[0m").Append($blank)
         }
         [void]$out.Append("$esc" + '8')
         [Console]::Write($out.ToString())
@@ -178,14 +225,17 @@ function script:Exit-PSMMAltScreen {
 # Used to feed tables into the shared pager: inside the alternate screen
 # buffer there is no scrollback, so anything potentially tall must scroll.
 function script:ConvertTo-PSMMTextLines {
-    param([Parameter(Mandatory)] $Renderable)
+    param(
+        [Parameter(Mandatory)] $Renderable,
+        [int]$Width = 0
+    )
     $sw = [System.IO.StringWriter]::new()
     $settings = [Spectre.Console.AnsiConsoleSettings]::new()
     $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
     $settings.Interactive = [Spectre.Console.InteractionSupport]::No
     $settings.Ansi = [Spectre.Console.AnsiSupport]::No
     $console = [Spectre.Console.AnsiConsole]::Create($settings)
-    $console.Profile.Width = (Get-PSMMWinSize).Width - 4
+    $console.Profile.Width = if ($Width -gt 0) { $Width } else { (Get-PSMMWinSize).Width - 4 }
     $console.Write($Renderable)
     # Ansi=No is NOT always honoured: Spectre's environment detection (e.g.
     # GITHUB_ACTIONS=true) force-enables ANSI over the explicit setting, and

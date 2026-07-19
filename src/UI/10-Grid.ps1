@@ -421,7 +421,7 @@ function script:Invoke-PSMMGrid {
             # the g goto layer (v2 §4): overlay + second key; single letters
             # below are verbs only
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMGrid)
                 if ($script:PSMM_UI.HardQuit) { $result.Cmd = 'quit'; return }
                 if ($dest -and $dest -ne 'home') {
                     # route through Goto (not Cmd) so the manager knows the

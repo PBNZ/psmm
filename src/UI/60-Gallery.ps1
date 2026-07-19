@@ -72,7 +72,7 @@ function script:Show-PSMMGallery {
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
                 if ($k.KeyChar -eq 'g') {
-                    $dest = Read-PSMMGotoKey
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMGalleryView -State $st -Results $results -Query $query -StatusMarkup $st.Status)
                     if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                     continue
                 }

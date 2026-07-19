@@ -71,7 +71,7 @@ function script:Show-PSMMCommands {
                     continue
                 }
                 if ($k.KeyChar -eq 'g') {
-                    $dest = Read-PSMMGotoKey
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMCommandListView -State $st -Commands $cmds -View $view -ModuleName $Entry.Name)
                     if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                     continue
                 }
@@ -165,7 +165,7 @@ function script:Show-PSMMCommandDetail {
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
             if ($k.KeyChar -eq 'g') {
-                $dest = Read-PSMMGotoKey
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMCommandDetailView -State $st -Name $Name -Content $content -Tabs $tabs)
                 if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                 continue
             }

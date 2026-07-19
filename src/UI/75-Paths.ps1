@@ -67,7 +67,7 @@ function script:Show-PSMMPaths {
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
                 if ($k.KeyChar -eq 'g') {
-                    $dest = Read-PSMMGotoKey
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPathsView -State $st -Infos $infos -StatusMarkup $st.Status)
                     if ($dest) { $script:PSMM_UI.Goto = $dest; return }
                     continue
                 }

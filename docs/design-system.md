@@ -193,10 +193,14 @@ All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
 - **Border = `grey35` (240), not grey27**: #444 had too little contrast on a
   black terminal background.
 - **The goto overlay really overlays**: the panel is drawn on top of the
-  current frame, bottom-left, with raw VT cursor positioning (DECSC/DECRC
-  around absolute moves) - appending it to the renderable pushed a
-  full-height frame off screen. The region is erased on dismissal and the
-  caller's repaint restores what was underneath.
+  current frame with raw VT cursor positioning (DECSC/DECRC around
+  absolute moves) - appending it to the renderable pushed a full-height
+  frame off screen. It floats dead centre of the frame's CONTENT box
+  (measured from the renderable, excluding the padded full-width header
+  bar), like a modal over the content - picked in live-run feedback after
+  bottom-left, middle-left and window-centre all read as detached. On
+  dismissal only the panel rectangle is blanked and the caller's repaint
+  restores what was underneath.
 - **Grid column one is selection-only** (`▪`); the cursor is carried by the
   full-row background + bold accent name. The `▌` bar next to the selection
   marks read as a broken checkbox. `▌` remains the cursor mark on
