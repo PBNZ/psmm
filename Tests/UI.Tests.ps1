@@ -888,6 +888,41 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         InModuleScope psmm { $script:PSMM_UI.SelfUpdate = $null }
     }
 
+    # --- review fixes ------------------------------------------------------
+
+    It 'a NuGet range pin renders in the module menu without killing the markup (review fix)' {
+        # '[1.0,2.0)' is a documented pin format AND an invalid Spectre tag -
+        # it must be escaped on its way into the facts panel
+        $text = Get-RenderedText {
+            $e = $script:PSMM_UI.Entries[0]
+            $e.Version = '[1.0,2.0)'; $e.PinnedExact = $false
+            Build-PSMMModuleMenuView -Entry $e -Auth $null
+        }
+        $text | Should -Match ([regex]::Escape('pin [1.0,2.0) (range)'))
+    }
+
+    It 'sub-screen tables carry the v2 chrome: grey27 border, lowercase headers, block cursor (review fix)' {
+        $ansi = Get-RenderedAnsi { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
+        $ansi | Should -Match '38;5;238'                      # grey27 border
+        foreach ($build in @(
+            { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) },
+            { Build-PSMMTasksView -State (New-PSMMListState) -Tasks @([pscustomobject]@{
+                Id = 1; Label = 'x'; Kind = 'generic'; Data = $null; Job = $null
+                StartedAt = [datetime]'2026-07-04 10:00:00'; Output = @(); Done = $true; Failed = $false; Seen = $true }) },
+            { Build-PSMMGalleryView -State (New-PSMMListState) -Results @([pscustomobject]@{
+                Name = 'M'; Version = '1.0'; Description = 'd'; Author = 'a' }) -Query 'q' },
+            { Build-PSMMPathsView -State (New-PSMMListState) -Infos @([pscustomobject]@{
+                Order = 0; Path = 'C:\x'; First = $true; Exists = $true; OneDrive = $false; UserDefault = $false }) }
+        )) {
+            $text = Get-RenderedText $build
+            $text | Should -Match ([regex]::Escape([string][char]0x258C))          # ▌ cursor
+            @($text -split "`r?`n" | Where-Object { $_ -match '^\s*│\s*>' }).Count | Should -Be 0
+        }
+        $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
+        $files | Should -Not -CMatch '│\s*File\s*│'           # headers lowercase
+        $files | Should -Match '│\s*file\s*│'
+    }
+
     # --- step 8: theme variants --------------------------------------------
 
     It 'every theme''s markup names parse as real Spectre colours (step 8)' {

@@ -13,20 +13,18 @@ function script:Build-PSMMPathsView {
     $n = $Infos.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 14)
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', '#', 'Path', 'Notes') { [void][Spectre.Console.TableExtensions]::AddColumn($T, $h) }
+    $T = New-PSMMTable -Headers @(' ', '#', 'path', 'notes')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $p = $Infos[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $p.Path ([Math]::Max(20, $win.Width - 45)))
-        if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
+        if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         $notes = @()
         if ($p.First) { $notes += "[$script:PSMM_ColAccent]first[/]" }
         if ($p.UserDefault) { $notes += 'user default' }
         if ($p.OneDrive) { $notes += "[$script:PSMM_ColWarn]onedrive[/]" }
         if (-not $p.Exists) { $notes += "[$script:PSMM_ColErr]missing[/]" }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
+                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
                 "$($p.Order + 1)", $nm, ($notes -join ' ')))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp

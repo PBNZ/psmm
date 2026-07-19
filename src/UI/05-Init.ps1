@@ -80,12 +80,13 @@ function script:Initialize-PSMMUIState {
         SelfUpdate    = Test-PSMMUpdateAvailable
     }
     $null = Start-PSMMSelfUpdateCheck   # throttled to once a day
+    Initialize-PSMMMainConfig
+    Sync-PSMMUIEntries -FullScan
     # unknown $PSMM_Theme: glacier took over silently at source time - say so
+    # (last, so a first-run "created config" status cannot overwrite it)
     if (Test-PSMMThemeFallback) {
         $script:PSMM_UI.Status = "[$script:PSMM_ColWarn]unknown `$PSMM_Theme '$(ConvertTo-PSMMSafe (Get-PSMMSetting -Name 'PSMM_Theme'))' - using glacier (glacier|ember|moss)[/]"
     }
-    Initialize-PSMMMainConfig
-    Sync-PSMMUIEntries -FullScan
 }
 
 # (Re)build the entry list from config + disk. -FullScan does the one

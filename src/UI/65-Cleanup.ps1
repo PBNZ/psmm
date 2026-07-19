@@ -12,17 +12,15 @@ function script:Build-PSMMCleanupView {
     $n = $Dupes.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', 'Module', 'Keep', 'Remove', 'Scopes') { [void][Spectre.Console.TableExtensions]::AddColumn($T, $h) }
+    $T = New-PSMMTable -Headers @(' ', 'module', 'keep', 'remove', 'scopes')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $d = $Dupes[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $d.Name 40)
-        if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
+        if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         $obsVers = (@($d.Obsolete | ForEach-Object { "v$($_.Version)" }) -join ', ')
         $scopes = (@($d.Obsolete.Scope | Select-Object -Unique) -join ', ')
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
+                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
                 $nm, "[$script:PSMM_ColOk]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp

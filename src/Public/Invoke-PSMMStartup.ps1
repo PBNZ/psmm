@@ -55,7 +55,6 @@
     # v2 report (design-system-v2 §8): collect one row per module, render at
     # the end via Get-PSMMStartupReportLines - same tokens as the TUI.
     $rows = [System.Collections.Generic.List[object]]::new()
-    $failed = [System.Collections.Generic.List[string]]::new()
     $mid = [char]0x00B7
 
     # Partition: Mode=Load must run in THIS session (imports do not cross job
@@ -97,7 +96,6 @@
                 }
             ))
         } catch {
-            $failed.Add($e.FriendlyName)
             $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
             if (-not $report) { Write-Warning "Could not set up $($e.FriendlyName): $($_.Exception.Message)" }
         }
@@ -119,14 +117,16 @@
                 try {
                     $result = Invoke-PSMMEntryAction -Entry $e
                     $rows.Add($(
-                        if ($result -match 'not installed') {
+                        if ($result -match 'check-only') {
+                            # same condition as the Mode=Load path: a skip
+                            [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = "not installed $mid check-only, nothing done" }
+                        } elseif ($result -match 'not installed') {
                             [pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$result" }
                         } else {
                             [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = 'installed, not imported' }
                         }
                     ))
                 } catch {
-                    $failed.Add($e.FriendlyName)
                     $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
                     if (-not $report) { Write-Warning "Could not set up $($e.FriendlyName): $($_.Exception.Message)" }
                 }

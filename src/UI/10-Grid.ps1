@@ -425,7 +425,13 @@ function script:Invoke-PSMMGrid {
                 $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMGrid) -Context $ctx
                 if ($script:PSMM_UI.HardQuit) { $result.Cmd = 'quit'; return }
                 if ($dest -eq 'unmanaged') { Invoke-PSMMUnmanagedToggle }
-                elseif ($dest -and $dest -ne 'home') { $result.Cmd = $dest; return }
+                elseif ($dest -and $dest -ne 'home') {
+                    # route through Goto (not Cmd) so the manager knows the
+                    # overlay was the source - g ? lands on help - keys
+                    $script:PSMM_UI.Goto = $dest
+                    $result.Cmd = 'goto'
+                    return
+                }
                 continue
             }
 

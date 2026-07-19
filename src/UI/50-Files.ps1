@@ -11,19 +11,17 @@ function script:Build-PSMMFilesView {
     $n = $Metas.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 12)
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', 'File', 'Kind', 'On', 'RW', 'Mods', '!') { [void][Spectre.Console.TableExtensions]::AddColumn($T, $h) }
+    $T = New-PSMMTable -Headers @(' ', 'file', 'kind', 'on', 'rw', 'mods', '!')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $m = $Metas[$i]
         $leaf = if ($m.Kind -eq 'inline') { 'profile inline' } else { Split-Path $m.Path -Leaf }
         $nm = ConvertTo-PSMMSafe $leaf
-        if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
+        if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         $on = if ($m.Enabled) { "[$script:PSMM_ColOk]on[/]" } else { "[$script:PSMM_ColErr]off[/]" }
         $rw = if ($m.Writable) { 'rw' } else { 'ro' }
         $fl = if ($m.IncludesIgnored) { "[$script:PSMM_ColWarn]![/]" } else { ' ' }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }), $nm, $m.Kind, $on, $rw, "$($m.ModuleCount)", $fl))
+                (Get-PSMMCursorMark ($i -eq $State.Cursor)), $nm, $m.Kind, $on, $rw, "$($m.ModuleCount)", $fl))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()

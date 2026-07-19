@@ -82,21 +82,20 @@ function script:Build-PSMMTasksView {
     $n = $Tasks.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 10)
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', 'Task', 'State', 'Started', 'Output') { [void][Spectre.Console.TableExtensions]::AddColumn($T, $h) }
+    $T = New-PSMMTable -Headers @(' ', 'task', 'state', 'started', 'output')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         # NB: $task, not $t - PowerShell variables are case-insensitive and $T
-        # is the table right above.
+        # is the table right above. Same reason for $stateCell, not $state:
+        # it would overwrite the $State parameter and break the cursor mark.
         $task = $Tasks[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $task.Label 44)
-        if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
-        $state = if (-not $task.Done) { "[$script:PSMM_ColAccent]running[/]" }
-                 elseif ($task.Failed) { "[$script:PSMM_ColErr]failed[/]" }
-                 else { "[$script:PSMM_ColOk]done[/]" }
+        if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
+        $stateCell = if (-not $task.Done) { "[$script:PSMM_ColInfo]running[/]" }
+                     elseif ($task.Failed) { "[$script:PSMM_ColErr]failed[/]" }
+                     else { "[$script:PSMM_ColOk]done[/]" }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
-                $nm, $state, $task.StartedAt.ToString('HH:mm:ss'), "$($task.Output.Count) line(s)"))
+                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
+                $nm, $stateCell, $task.StartedAt.ToString('HH:mm:ss'), "$($task.Output.Count) line(s)"))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()

@@ -13,15 +13,13 @@ function script:Build-PSMMCommandListView {
     $n = $View.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 9)
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', 'Command', 'Type') { [void][Spectre.Console.TableExtensions]::AddColumn($T, $h) }
+    $T = New-PSMMTable -Headers @(' ', 'command', 'type')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $c = $View[$i]
         $nm = ConvertTo-PSMMSafe $c.Name
-        if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
+        if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }), $nm, "$($c.CommandType)"))
+                (Get-PSMMCursorMark ($i -eq $State.Cursor)), $nm, "$($c.CommandType)"))
     }
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $of = if ($n -ne $Commands.Count) { " [$script:PSMM_ColMute](of $($Commands.Count))[/]" } else { '' }

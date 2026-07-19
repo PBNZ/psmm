@@ -26,6 +26,26 @@ $script:PSMM_ColCapsuleDim = $psmmThemeTable['capsdim'].Markup   # persistent-ro
 # border colour is themed in one place.
 function script:Get-PSMMBorderStyle { [Spectre.Console.Style]::Parse($script:PSMM_ColBorder) }
 
+# Standard table chrome (§1/§5): rounded border in the border token,
+# lowercase dim headers. Screens add rows themselves.
+function script:New-PSMMTable {
+    param([Parameter(Mandatory)][string[]]$Headers)
+    $T = [Spectre.Console.Table]::new()
+    $T.Border = [Spectre.Console.TableBorder]::Rounded
+    $T.BorderStyle = Get-PSMMBorderStyle
+    foreach ($h in $Headers) {
+        $cell = if ($h.Trim()) { "[$script:PSMM_ColDim]$($h.ToLowerInvariant())[/]" } else { $h }
+        [void][Spectre.Console.TableExtensions]::AddColumn($T, $cell)
+    }
+    $T
+}
+
+# Cursor marker for simple (non-grid) list tables: the v2 block bar.
+function script:Get-PSMMCursorMark {
+    param([bool]$IsCursor)
+    if ($IsCursor) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { ' ' }
+}
+
 # The console every UI write goes through. Production: the real AnsiConsole.
 # Tests inject a StringWriter-backed console via Set-PSMMConsole and assert on
 # the rendered frames (see D-UI-ARCH).
@@ -202,7 +222,8 @@ function script:Get-PSMMHeaderBar {
     $lLen = [Spectre.Console.Markup]::Remove($left).Length
     $rLen = [Spectre.Console.Markup]::Remove($right).Length
     $pad = [Math]::Max(1, (Get-PSMMWinSize).Width - $lLen - $rLen - 1)
-    $left + (' ' * $pad) + $right
+    # full-width bar background (§2); inner tags override only the foreground
+    "[default on $script:PSMM_ColCapsuleDim]" + $left + (' ' * $pad) + $right + "[/]"
 }
 
 # v2 display language (§5): the JSON schema keeps the Mode/Install enums;
@@ -248,7 +269,7 @@ function script:Get-PSMMTooSmallView {
     param([int]$MinWidth = 60, [int]$MinHeight = 14)
     $win = Get-PSMMWinSize
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
-    $items.Add([Spectre.Console.Markup]::new("[orange1]window too small to draw this screen[/]"))
+    $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]window too small to draw this screen[/]"))
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]current $($win.Width)x$($win.Height), need at least ${MinWidth}x${MinHeight} - enlarge the terminal[/]"))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('esc=back', '^q=quit'))))
     [Spectre.Console.Rows]::new($items)

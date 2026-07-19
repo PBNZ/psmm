@@ -20,7 +20,8 @@ function script:Build-PSMMModuleMenuView {
             else { '-' }
     $entryTxt = if ($isUnmanaged) { 'not in any config file (unmanaged)' }
                 else {
-                    $pinTxt = if ($Entry.Version) { "pin $($Entry.Version)$(if ($Entry.PinnedExact) { ' (exact)' } else { ' (range)' })" } else { 'no pin' }
+                    # escape: range pins like '[1.0,2.0)' are invalid Spectre tags
+                    $pinTxt = if ($Entry.Version) { "pin $(ConvertTo-PSMMSafe $Entry.Version)$(if ($Entry.PinnedExact) { ' (exact)' } else { ' (range)' })" } else { 'no pin' }
                     $srcLeaf = if ($Entry.Source -eq '<profile inline>') { 'profile inline' } else { Split-Path $Entry.Source -Leaf }
                     $rwTxt = if ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { 'rw' } else { 'ro' }
                     "$(Get-PSMMStartupWord $Entry.Mode) at startup $mid gallery: $(Get-PSMMGalleryWord $Entry.Install) $mid $pinTxt [$script:PSMM_ColDim]$mid $(ConvertTo-PSMMSafe $srcLeaf) ($rwTxt)[/]"

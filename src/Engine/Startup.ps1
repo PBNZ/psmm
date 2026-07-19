@@ -37,7 +37,7 @@ function Get-PSMMStartupReportLines {
 
     if (-not $Rows.Count) { return $lines }
     $nameW = 4
-    foreach ($r in $Rows) { $l = "$($r.Name)".Length; if ($l -gt $nameW -and $l -le 34) { $nameW = $l } }
+    foreach ($r in $Rows) { $l = [Math]::Min(34, "$($r.Name)".Length); if ($l -gt $nameW) { $nameW = $l } }
     $maxMs = 1
     foreach ($r in $Rows) { if ([int]$r.Ms -gt $maxMs) { $maxMs = [int]$r.Ms } }
     $okRows = @($Rows | Where-Object { $_.Kind -eq 'ok' -and [int]$_.Ms -gt 0 })
@@ -45,7 +45,9 @@ function Get-PSMMStartupReportLines {
     $anyFail = $false
 
     foreach ($r in $Rows) {
-        $name = "$($r.Name)".PadRight($nameW)
+        $nameTxt = "$($r.Name)"
+        if ($nameTxt.Length -gt 34) { $nameTxt = $nameTxt.Substring(0, 33) + [char]0x2026 }
+        $name = $nameTxt.PadRight($nameW)
         switch ($r.Kind) {
             'ok' {
                 $ms = ("{0} ms" -f [int]$r.Ms).PadLeft(8)

@@ -13,15 +13,13 @@ function script:Build-PSMMGalleryView {
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
     $descCap = [Math]::Max(20, $win.Width - 60)
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    foreach ($h in ' ', 'Name', 'Version', 'Description') { [void][Spectre.Console.TableExtensions]::AddColumn($T, $h) }
+    $T = New-PSMMTable -Headers @(' ', 'name', 'version', 'description')
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $r = $Results[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $r.Name 40)
-        if ($i -eq $State.Cursor) { $nm = "[$script:PSMM_ColAccent]$nm[/]" }
+        if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                $(if ($i -eq $State.Cursor) { "[$script:PSMM_ColAccent]>[/]" } else { ' ' }),
+                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
                 $nm, (ConvertTo-PSMMSafe $r.Version),
                 (ConvertTo-PSMMSafe (Get-PSMMTrunc ($r.Description -replace '\s+', ' ') $descCap))))
     }
