@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#17181c}
+a{color:#00afff;text-decoration:none}a:hover{color:#5fd7ff}
+</style>
+</helmet>
+<section style="padding:40px 48px 80px;display:flex;flex-direction:column;gap:26px;font-family:'JetBrains Mono',Consolas,ui-monospace,monospace">
+<div style="max-width:900px;display:flex;flex-direction:column;gap:6px">
+<div style="color:#e8e9ec;font-size:22px;font-weight:700">psmm — current UI, recreated from source</div>
+<div style="color:#8a8f9a;font-size:13px;line-height:1.6">Baseline for the design-system review. Every screen below is rebuilt from <span style="color:#c8ccd4">src/UI/*.ps1</span> — palette from 00-Theme.ps1 (salmon1 · grey66 · deepskyblue1 + green3 / orange1 / indianred1 / steelblue1), hint lines exactly as Get-PSMMHint renders them (key␣action, "^=ctrl" legend when a chord is present), rounded Spectre tables, per-screen layouts from each Build-* function.</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start">
+
+<div id="1a" data-screen-label="startup report" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1a</span><span style="color:#9aa0ab;font-size:12px">startup report — Invoke-PSMMStartup in $PROFILE</span></div>
+<div style="width:880px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>pwsh</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#16c60c">PS </span><span>C:\Users\peter&gt; </span></div>
+<div style="white-space:pre-wrap"> </div>
+<div style="white-space:pre-wrap">psmm <span style="color:#767676">v0.1.0-beta3</span> - PS Session Module Manager priority managed</div>
+<div style="white-space:pre-wrap">&gt; Terminal Icons &lt; <span style="color:#16c60c">installed, loaded (41 ms)</span></div>
+<div style="white-space:pre-wrap">&gt; PSReadLine &lt; <span style="color:#16c60c">installed, loaded (18 ms)</span></div>
+<div style="white-space:pre-wrap">&gt; posh-git &lt; <span style="color:#16c60c">installed, loaded (36 ms)</span></div>
+<div style="white-space:pre-wrap">&gt; Microsoft Graph &lt; <span style="color:#16c60c">installed, loaded (312 ms)</span></div>
+<div style="white-space:pre-wrap">&gt; Az Accounts &lt; <span style="color:#e74856">not installed (check-only)</span></div>
+<div style="white-space:pre-wrap">&gt; 3 background module task(s) started &lt; <span style="color:#767676">deferred (psmm shows results)</span></div>
+<div style="white-space:pre-wrap"><span style="color:#f9f1a5">WARNING: Could not set up &gt; PnP PowerShell &lt; : Version '3.x' is not a valid version or range.</span></div>
+<div style="white-space:pre-wrap"><span style="color:#f9f1a5">[1 failed: PnP PowerShell]  Run 'psmm' and press i on the row to retry.</span></div>
+<div style="white-space:pre-wrap"><span style="color:#f9f1a5">psmm config: duplicate module 'Pester' in scenario-developer.json - main config wins</span></div>
+<div style="white-space:pre-wrap"><span style="color:#f9f1a5">psmm: v0.1.0-beta4 is available (you have v0.1.0-beta3) - update: </span><span style="color:#61d6d6">Install-PSResource psmm -Prerelease -Reinstall</span><span style="color:#f9f1a5">, then restart pwsh</span></div>
+<div style="white-space:pre-wrap"><span style="color:#16c60c">PS </span><span>C:\Users\peter&gt; </span><span style="background:#cccccc;color:#0c0c0c">&nbsp;</span></div>
+</div>
+</div>
+</div>
+
+<div id="1b" data-screen-label="module grid (home)" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1b</span><span style="color:#9aa0ab;font-size:12px">module grid — home screen (10-Grid.ps1)</span></div>
+<div style="width:1120px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">PS Session Module Manager</span> <span style="color:#a8a8a8">(psmm v0.1.0-beta3 · PSResourceGet)</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55">
+<thead><tr>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Sel</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Name</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Src</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Mode</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Inst</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Scope</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">State</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Ver</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">!</th>
+</tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Terminal-Icons</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">psmm-config.json <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Load</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">loaded</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">0.11.0</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PSReadLine</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">psmm-config.json <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Load</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">CheckOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ffaf00">mixed</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">loaded</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">2.3.6</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">posh-git</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-develo… <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Load</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">loaded</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">1.1.0</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">ImportExcel</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">psmm-config.json <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">InstallOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ffaf00">installed</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">7.8.10 <span style="color:#ffaf00">↑</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Pester</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-develo… <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">InstallOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Latest</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ffaf00">installed</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">5.7.1</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">[x]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PwshSpectreConsole</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">psmm-config.json <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">InstallOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ffaf00">installed</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">2.4.0</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Microsoft.Graph</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-micros… <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Load</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">loaded</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">2.28.0 <span style="color:#ffaf00">↑</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">ExchangeOnlineManagement</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-micros… <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">InstallOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">-</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ff5f87">missing</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">-</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Az.Accounts</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">psmm-config.json <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Ignore</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">CheckOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">all <span style="color:#a8a8a8">ro</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ffaf00">installed</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">5.3.1 <span style="color:#a8a8a8">pin</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PnP.PowerShell</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-micros… <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">InstallOnly</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ff5f87">missing</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">-</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ff5f87">!</span></td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#00af00">1 selected</span><span style="color:#a8a8a8">  row 4/10</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">space</span> <span style="color:#a8a8a8">select</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">enter</span> <span style="color:#a8a8a8">actions</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">/</span> <span style="color:#a8a8a8">search</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">quit</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">^l</span> <span style="color:#a8a8a8">load</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^u</span> <span style="color:#a8a8a8">unload</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">i</span> <span style="color:#a8a8a8">install</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">u</span> <span style="color:#a8a8a8">update</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">k</span> <span style="color:#a8a8a8">check updates</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">r</span> <span style="color:#a8a8a8">reload</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ff875f">a</span> <span style="color:#a8a8a8">add</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g</span> <span style="color:#a8a8a8">gallery</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">x</span> <span style="color:#a8a8a8">cleanup</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">f</span> <span style="color:#a8a8a8">files</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">p</span> <span style="color:#a8a8a8">paths</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">c</span> <span style="color:#a8a8a8">conflicts</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">t</span> <span style="color:#a8a8a8">tasks</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">m</span> <span style="color:#a8a8a8">unmanaged</span></div>
+<div style="white-space:pre-wrap"><span style="color:#5f87ff">~</span> <span style="color:#a8a8a8">tasks: 1 running · 2 done  (t=details)</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">81 installed module(s) not in your config - m shows them</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ffaf00">psmm v0.1.0-beta4 is available (you have v0.1.0-beta3) - update: Install-PSResource psmm -Prerelease -Reinstall, then restart pwsh</span></div>
+</div>
+</div>
+</div>
+
+<div id="1c" data-screen-label="grid filter mode" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1c</span><span style="color:#9aa0ab;font-size:12px">grid — filter (search) mode, note the ≥5-row padding</span></div>
+<div style="width:1120px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">PS Session Module Manager</span> <span style="color:#a8a8a8">(psmm v0.1.0-beta3 · PSResourceGet)</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55;min-width:840px">
+<thead><tr>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Sel</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Name</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Src</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Mode</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Inst</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Scope</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">State</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Ver</th>
+<th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">!</th>
+</tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#a8a8a8">[ ]</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">Microsoft.Graph</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-micros… <span style="color:#a8a8a8">rw</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Load</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">IfMissing</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">user</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">loaded</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">2.28.0 <span style="color:#ffaf00">↑</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">none selected</span><span style="color:#a8a8a8">  row 1/1</span><span style="color:#00afff">  filter: graph<span style="background:#00afff;color:#0c0c0c">&nbsp;</span></span></div>
+<div style="white-space:pre-wrap"><span style="color:#ff875f">type</span> <span style="color:#a8a8a8">filter</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">enter</span> <span style="color:#a8a8a8">apply</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">clear &amp; exit filter</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span></div>
+</div>
+</div>
+</div>
+
+<div id="1d" data-screen-label="module menu" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1d</span><span style="color:#9aa0ab;font-size:12px">module menu — enter / right-arrow on a row (20-Submenu.ps1)</span></div>
+<div style="width:940px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="display:flex;align-items:center;gap:10px;color:#00afff"><span style="flex:1;border-top:1px solid #00afff;height:0"></span><span>Microsoft Graph</span><span style="flex:1;border-top:1px solid #00afff;height:0"></span></div>
+<div style="border:1px solid #a8a8a8;border-radius:8px;padding:6px 12px;margin:10px 0 4px;position:relative">
+<span style="position:absolute;top:-10px;left:12px;background:#0c0c0c;padding:0 6px;color:#a8a8a8">details</span>
+<div style="display:grid;grid-template-columns:max-content 1fr;column-gap:24px">
+<span style="color:#00afff">Name</span><span>Microsoft.Graph</span>
+<span style="color:#00afff">Description</span><span>Microsoft Graph PowerShell meta-module</span>
+<span style="color:#00afff">Source</span><span>C:\Users\peter\.psmm\scenario-microsoft-365-admin.json  (writable)</span>
+<span style="color:#00afff">Install/Mode</span><span>IfMissing / Load</span>
+<span style="color:#00afff">Version pin</span><span>-</span>
+<span style="color:#00afff">Installed</span><span>yes  v2.28.0  <span style="color:#a8a8a8">CurrentUser</span> <span style="color:#ffaf00">(update -&gt; v2.29.1)</span> <span style="color:#ffaf00">(2 versions on disk - K cleans up)</span></span>
+<span style="color:#00afff">Loaded</span><span>yes  v2.28.0  <span style="color:#a8a8a8">import took 312 ms</span></span>
+<span style="color:#00afff">Issues</span><span>none</span>
+<span style="color:#00afff">Connection</span><span><span style="color:#00af00">connected</span>  admin@contoso.com  <span style="color:#a8a8a8">14 scopes</span></span>
+</div>
+</div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">^l</span> <span style="color:#a8a8a8">load</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^u</span> <span style="color:#a8a8a8">unload</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">u</span> <span style="color:#a8a8a8">update</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">b</span> <span style="color:#a8a8a8">browse commands</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">x</span> <span style="color:#a8a8a8">clean old versions</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">e</span> <span style="color:#a8a8a8">edit</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">v</span> <span style="color:#a8a8a8">pin version</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">d</span> <span style="color:#a8a8a8">delete</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">m</span> <span style="color:#a8a8a8">move to file</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">s</span> <span style="color:#a8a8a8">re-check connection</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">o</span> <span style="color:#a8a8a8">disconnect</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+<div style="white-space:pre-wrap"><span style="color:#00af00">loaded (312 ms)</span></div>
+</div>
+</div>
+</div>
+
+<div id="1e" data-screen-label="command browser" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1e</span><span style="color:#9aa0ab;font-size:12px">command browser — b in the module menu (30-Commands.ps1)</span></div>
+<div style="width:620px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Commands in ImportExcel</span><span style="color:#a8a8a8">  row 2/98  showing 1-9 ↓</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55;min-width:440px">
+<thead><tr><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Command</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Type</th></tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Add-ConditionalFormatting</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">Add-ExcelChart</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Add-ExcelDataValidationRule</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Add-ExcelName</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Add-ExcelTable</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Add-PivotTable</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Add-Worksheet</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Close-ExcelPackage</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Compare-Worksheet</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Function</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">enter</span> <span style="color:#a8a8a8">details</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">/</span> <span style="color:#a8a8a8">search</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+<div id="1f" data-screen-label="command help tabs" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1f</span><span style="color:#9aa0ab;font-size:12px">tabbed command help — enter on a command</span></div>
+<div style="width:720px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Export-Excel</span><span style="color:#a8a8a8">  lines 1-15/214</span></div>
+<div style="white-space:pre-wrap"><span style="color:#00afff;text-decoration:underline">Overview</span>  <span style="color:#a8a8a8">Parameters</span>  <span style="color:#a8a8a8">Examples</span></div>
+<div style="border:1px solid #a8a8a8;border-radius:8px;padding:4px 12px;margin:4px 0">
+<div style="white-space:pre-wrap">NAME</div>
+<div style="white-space:pre-wrap">    Export-Excel</div>
+<div style="white-space:pre-wrap"> </div>
+<div style="white-space:pre-wrap">SYNOPSIS</div>
+<div style="white-space:pre-wrap">    Exports data to an Excel worksheet.</div>
+<div style="white-space:pre-wrap"> </div>
+<div style="white-space:pre-wrap">SYNTAX</div>
+<div style="white-space:pre-wrap">    Export-Excel [[-Path] &lt;String&gt;] [-InputObject &lt;Object&gt;] [-Show]</div>
+<div style="white-space:pre-wrap">    [-WorksheetName &lt;String&gt;] [-TableName &lt;String&gt;] [-AutoSize]</div>
+<div style="white-space:pre-wrap">    [-FreezeTopRow] [-BoldTopRow] [-PassThru] [&lt;CommonParameters&gt;]</div>
+<div style="white-space:pre-wrap"> </div>
+<div style="white-space:pre-wrap">DESCRIPTION</div>
+<div style="white-space:pre-wrap">    Exports data to an Excel file, and where possible tries to convert</div>
+<div style="white-space:pre-wrap">    numbers so Excel recognizes them as numbers instead of text; after</div>
+<div style="white-space:pre-wrap">    all: 2+2 should be 4, not 22.</div>
+</div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">left/right</span> <span style="color:#a8a8a8">switch tab</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">scroll</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">c</span> <span style="color:#a8a8a8">copy tab</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+<div id="1g" data-screen-label="config files" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1g</span><span style="color:#9aa0ab;font-size:12px">config file manager — f (50-Files.ps1)</span></div>
+<div style="width:900px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Config files</span><span style="color:#a8a8a8">  row 1/4</span> <span style="color:#a8a8a8">- full path of current row below</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55">
+<thead><tr><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">File</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Kind</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">On</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">RW</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Mods</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">!</th></tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">psmm-config.json</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">main</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">on</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">rw</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">5</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-developer.json</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">include</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">on</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">rw</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">4</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scenario-microsoft-365-admin.json</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">include</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ff5f87">off</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">rw</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">7</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#ffaf00">!</span></td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">profile inline</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">inline</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">on</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">ro</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">1</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">C:\Users\peter\.psmm\psmm-config.json</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">space</span> <span style="color:#a8a8a8">enable/disable+save</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">a</span> <span style="color:#a8a8a8">apply to session</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ff875f">n</span> <span style="color:#a8a8a8">new config (templates)</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">m</span> <span style="color:#a8a8a8">move file</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">c</span> <span style="color:#a8a8a8">conflicts</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ffaf00">duplicate module 'Pester' in scenario-developer.json - main config wins</span></div>
+</div>
+</div>
+</div>
+
+<div id="1h" data-screen-label="gallery search" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1h</span><span style="color:#9aa0ab;font-size:12px">gallery search — g (60-Gallery.ps1)</span></div>
+<div style="width:900px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">PowerShell Gallery</span> <span style="color:#a8a8a8">search: excel</span><span style="color:#a8a8a8">  row 1/12  showing 1-6 ↓</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55">
+<thead><tr><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Name</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Version</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Description</th></tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">ImportExcel</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">7.8.10</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PowerShell module to import/export Excel spreadsheets, without…</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PSExcel</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">1.0.2</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Work with Excel without installing Excel</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">ExcelPSLib</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">0.6.5</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Allow simple creation and manipulation of XLSX file</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PSWriteExcel</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">0.1.15</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Little project to create Excel files without Microsoft Excel b…</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">ExcelCmdlets</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">1.0.1</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">CData Cmdlets for Excel</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Excelimo</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">0.0.11</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Simple project generating Excel Workbooks/Worksheets</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">by dfinke - PowerShell module to import/export Excel spreadsheets, without Excel. Reads and writes …</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">enter</span> <span style="color:#a8a8a8">add to config</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">/</span> <span style="color:#a8a8a8">new search</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+<div style="white-space:pre-wrap"><span style="color:#00af00">12 result(s)</span></div>
+</div>
+</div>
+</div>
+
+<div id="1i" data-screen-label="version cleanup" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1i</span><span style="color:#9aa0ab;font-size:12px">version cleanup — x (65-Cleanup.ps1)</span></div>
+<div style="width:900px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Clean up old module versions</span> <span style="color:#a8a8a8">4 module(s) with multiple versions on disk</span><span style="color:#a8a8a8">  row 1/4</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55">
+<thead><tr><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Module</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Keep</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Remove</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Scopes</th></tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">Az.Accounts</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">v5.3.1</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">v5.2.0, v5.1.0</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">CurrentUser</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Microsoft.Graph.Authentication</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">v2.29.1</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">v2.25.0</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">CurrentUser</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">Pester</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">v5.7.1</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">v5.5.0, v3.4.0</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">CurrentUser, AllUsers</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">PSReadLine</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">v2.3.6</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">v2.2.6</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">AllUsers</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">session is not elevated: AllUsers copies are skipped automatically</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">enter</span> <span style="color:#a8a8a8">clean this module</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^a</span> <span style="color:#a8a8a8">clean all</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">r</span> <span style="color:#a8a8a8">rescan</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+<div id="1j" data-screen-label="background tasks" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1j</span><span style="color:#9aa0ab;font-size:12px">background tasks — t (68-Tasks.ps1)</span></div>
+<div style="width:760px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Background tasks</span><span style="color:#a8a8a8">  row 1/3</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55">
+<thead><tr><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Task</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">State</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Started</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Output</th></tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">install: ExchangeOnlineManagement</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">running</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">14:02:11</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">0 line(s)</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">update check (8 modules)</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">done</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">13:58:47</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">6 line(s)</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">scan: unmanaged modules</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00af00">done</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">13:58:02</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">81 line(s)</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">enter</span> <span style="color:#a8a8a8">view output</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">u</span> <span style="color:#a8a8a8">run update-help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">c</span> <span style="color:#a8a8a8">clear finished</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+<div id="1k" data-screen-label="module locations" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1k</span><span style="color:#9aa0ab;font-size:12px">module locations — p, with the OneDrive diagnosis (75-Paths.ps1)</span></div>
+<div style="width:920px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Module locations</span> <span style="color:#a8a8a8">($env:PSModulePath, search order = list order)</span><span style="color:#a8a8a8">  row 1/5</span></div>
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #c8c8c8;border-radius:8px;margin:3px 0;color:#cccccc;font-size:12.5px;line-height:1.55">
+<thead><tr><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8">&nbsp;</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">#</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Path</th><th style="white-space:nowrap;padding:0 8px;font-weight:400;text-align:left;border-bottom:1px solid #c8c8c8;border-left:1px solid #c8c8c8">Notes</th></tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 8px"><span style="color:#00afff">&gt;</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">1</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#00afff">C:\Users\peter\OneDrive\Documents\PowerShell\Modules</span></td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8"><span style="color:#5f87ff">first</span> user default <span style="color:#ffaf00">onedrive</span></td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">2</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">C:\Program Files\PowerShell\Modules</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">3</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">c:\program files\powershell\7\Modules</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">4</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">C:\Program Files\WindowsPowerShell\Modules</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+<tr><td style="white-space:nowrap;padding:0 8px">&nbsp;</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">5</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules</td><td style="white-space:nowrap;padding:0 8px;border-left:1px solid #c8c8c8">&nbsp;</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap"><span style="color:#ffaf00">your primary module location is inside OneDrive</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">this is PowerShell's default when OneDrive backs up the Documents folder (a common org policy, not something you did). cloud-only files there can stall or fail module loading - d downloads them, k keeps the folder on this device, s moves the primary location.</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">move</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">d</span> <span style="color:#a8a8a8">download cloud-only files</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">k</span> <span style="color:#a8a8a8">keep on device (pin)</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">?</span> <span style="color:#a8a8a8">help</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+<div style="white-space:pre-wrap"><span style="color:#ff875f">s</span> <span style="color:#a8a8a8">set primary location</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">r</span> <span style="color:#a8a8a8">remove primary override</span></div>
+</div>
+</div>
+</div>
+
+<div id="1l" data-screen-label="conflicts pager" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1l</span><span style="color:#9aa0ab;font-size:12px">conflicts &amp; validation — c, tables rendered to plain text in the pager (40-Conflicts.ps1)</span></div>
+<div style="width:860px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.5;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Conflicts &amp; validation</span><span style="color:#a8a8a8">  lines 1-19/27</span></div>
+<div style="border:1px solid #a8a8a8;border-radius:8px;padding:4px 12px;margin:4px 0;font-size:12px;line-height:1.45">
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">== Validation issues ==</div>
+<div style="white-space:pre">╭────────────────┬───────────────────────────┬───────────────────────────────────┬─────╮</div>
+<div style="white-space:pre">│ Name           │ Source                    │ Issues                            │ RW  │</div>
+<div style="white-space:pre">├────────────────┼───────────────────────────┼───────────────────────────────────┼─────┤</div>
+<div style="white-space:pre">│ PnP.PowerShell │ scenario-microsoft-365-a… │ Version '3.x' is not a valid ran… │ yes │</div>
+<div style="white-space:pre">╰────────────────┴───────────────────────────┴───────────────────────────────────┴─────╯</div>
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">== Duplicate module names ==</div>
+<div style="white-space:pre">╭────────┬───────┬───────────────────────────────────────────╮</div>
+<div style="white-space:pre">│ Name   │ Count │ Sources                                   │</div>
+<div style="white-space:pre">├────────┼───────┼───────────────────────────────────────────┤</div>
+<div style="white-space:pre">│ Pester │ 2     │ psmm-config.json, scenario-developer.json │</div>
+<div style="white-space:pre">╰────────┴───────┴───────────────────────────────────────────╯</div>
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">== Command shadowing (loaded modules) ==</div>
+<div style="white-space:pre">   none</div>
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">== Config warnings (this session) ==</div>
+</div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">scroll</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">c</span> <span style="color:#a8a8a8">copy</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+<div id="1m" data-screen-label="help pager" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1m</span><span style="color:#9aa0ab;font-size:12px">help — ? anywhere, one long scrolled pager (70-Help.ps1)</span></div>
+<div style="width:760px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.5;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#00afff">Help</span><span style="color:#a8a8a8">  lines 1-20/96</span></div>
+<div style="border:1px solid #a8a8a8;border-radius:8px;padding:4px 12px;margin:4px 0;font-size:12px;line-height:1.45">
+<div style="white-space:pre">psmm - PowerShell Session Module Manager</div>
+<div style="white-space:pre">========================================</div>
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">MAIN SCREEN (module grid)</div>
+<div style="white-space:pre">-------------------------</div>
+<div style="white-space:pre">Every module your config files declare, one row each.</div>
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">  State    loaded (in this session) / installed (on disk) / missing /</div>
+<div style="white-space:pre">           unmanaged (installed but in no config file - toggle with m)</div>
+<div style="white-space:pre">  Scope    user (CurrentUser) / all (AllUsers) / mixed. "all ro" means</div>
+<div style="white-space:pre">           the session is not elevated, so AllUsers copies are read-only.</div>
+<div style="white-space:pre">  Ver      version loaded (or newest installed). ↑ = update available</div>
+<div style="white-space:pre">           (after a k check). pin = version pinned in the config.</div>
+<div style="white-space:pre">  !        the entry has validation issues (c shows details).</div>
+<div style="white-space:pre"> </div>
+<div style="white-space:pre">  space    select/deselect row (bulk actions target the selection,</div>
+<div style="white-space:pre">           or just the cursor row when nothing is selected)</div>
+<div style="white-space:pre">  enter    open the module action menu (right-arrow does the same;</div>
+<div style="white-space:pre">           left-arrow backs out of any menu)</div>
+<div style="white-space:pre">  ^l load    ^u unload    (^ means ctrl)</div>
+</div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">up/dn</span> <span style="color:#a8a8a8">scroll</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">c</span> <span style="color:#a8a8a8">copy</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">g h</span> <span style="color:#a8a8a8">home</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+<div id="1n" data-screen-label="too-small terminal" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">1n</span><span style="color:#9aa0ab;font-size:12px">too-small terminal fallback (00-Theme.ps1)</span></div>
+<div style="width:420px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.1.0-beta3 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 40px;font-size:12.5px;line-height:1.55;color:#cccccc">
+<div style="white-space:pre-wrap"><span style="color:#ffaf00">window too small to draw this screen</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">current 52x11, need at least 96x14 - enlarge the terminal</span></div>
+<div style="white-space:pre-wrap"><span style="color:#a8a8a8">^=ctrl ·</span> <span style="color:#ff875f">esc</span> <span style="color:#a8a8a8">back</span> <span style="color:#a8a8a8">·</span> <span style="color:#ff875f">^q</span> <span style="color:#a8a8a8">quit</span></div>
+</div>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+</body>
+</html>

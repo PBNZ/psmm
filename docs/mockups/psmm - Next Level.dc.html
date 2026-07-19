@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#17181c}
+a{color:#00afff;text-decoration:none}a:hover{color:#5fd7ff}
+</style>
+</helmet>
+<section style="padding:40px 48px 80px;display:flex;flex-direction:column;gap:28px;font-family:'JetBrains Mono',Consolas,ui-monospace,monospace">
+<div style="max-width:960px;display:flex;flex-direction:column;gap:6px">
+<div style="color:#e8e9ec;font-size:22px;font-weight:700">psmm — next level</div>
+<div style="color:#8a8f9a;font-size:13px;line-height:1.6">Proposed evolution of the design system. Everything below stays inside the current stack: Spectre markup, explicit 256-color names, keyboard only. Key capsules = <span style="color:#c8ccd4">[grey19 on salmon1]</span>-style background markup; row highlight = per-row background style; the goto overlay is just a re-render with a small panel — no new dependency.</div>
+</div>
+
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-wrap:wrap;gap:14px;max-width:1180px">
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #00af00;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">Keep: the discipline</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">Single palette source, key registry with tests, install ≠ update, alt-screen restore, too-small fallback, row x/n everywhere. This rigor is the system's best asset — v2 changes surfaces, not rules.</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #ff875f;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">1 · Hints have no hierarchy</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">Today every key is the same salmon-on-grey pair; 20+ bindings always visible. v2: keys become capsules (reverse-video blocks your eye can target), split into two tiers — contextual verbs vs a dim persistent strip (<a href="#2a">2a</a>).</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #ff875f;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">2 · g becomes the goto layer</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">Eight screen-switch letters burn the alphabet and crowd the grid's third hint row. v2 moves ALL navigation under the existing <span style="color:#ff875f">g</span> chord with a vimium/which-key overlay (<a href="#2b">2b</a>) — same key everywhere, single letters stay reserved for verbs.</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #ff875f;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">3 · Mode/Inst are config jargon</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">"InstallOnly / IfMissing" answers neither "what happens at startup?" nor "what may the gallery do?". v2 renames the columns <span style="color:#c8ccd4">startup</span> and <span style="color:#c8ccd4">gallery</span>, lowercases the values, and adds a one-line context sentence for the cursor row (<a href="#2a">2a</a>).</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #ff875f;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">4 · Help is a wall of text</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">One 96-line pager. v2 reuses the command-detail tab pattern that already exists (30-Commands.ps1): topic tabs, and the key reference becomes a grouped two-column layout (<a href="#2c">2c</a>).</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #ff875f;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">5 · Weak cursor, loud borders</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">A lone "&gt;" plus a recolored name is easy to lose; bright #ccc borders shout louder than content. v2: full-row background highlight with a ▌ bar, borders dimmed to grey27, headers lowercase + dim (<a href="#2a">2a</a>).</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #ff875f;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">6 · Startup report ≠ the TUI</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">"&gt; Name &lt;" wrappers and raw ConsoleColor look like a different product. v2 gives the report the same tokens: state glyphs, aligned timings with bars, the slowest module called out (<a href="#2d">2d</a>).</div></div>
+<div style="flex:0 0 350px;background:#1e2026;border:1px solid #2c2f37;border-left:3px solid #5f87ff;border-radius:10px;padding:14px 16px"><div style="color:#e8e9ec;font-size:13px;font-weight:700;margin-bottom:6px">Identity</div><div style="color:#9aa0ab;font-size:12px;line-height:1.6">The <span style="background:#ff875f;color:#141414;padding:0 5px;font-weight:700">&nbsp;psmm&nbsp;</span> brand block in a one-line header bar gives every screen the same anchor + breadcrumb — the "where am I" affordance the current title line only hints at. Palette variants in <a href="#2g">2g</a>.</div></div>
+</div>
+</sc-if>
+
+<div style="display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start">
+
+<div id="2a" data-screen-label="v2 grid" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2a</span><span style="color:#9aa0ab;font-size:12px">v2 module grid — header bar · plain-word columns · row highlight · two-tier capsule hints · context line</span></div>
+<div style="width:1120px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.2.0 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:0 0 20px;font-size:12.5px;line-height:1.55;color:#c6c6c6">
+<div style="display:flex;align-items:center;gap:12px;background:#1c1c1c;padding:4px 16px;margin-bottom:10px"><span style="background:#ff875f;color:#141414;font-weight:700;padding:0 7px">&nbsp;psmm&nbsp;</span><span style="color:#c6c6c6">home</span><span style="color:#585858">·</span><span style="color:#6c6c6c">10 modules · 4 loaded · 2 updates</span><span style="margin-left:auto;color:#6c6c6c;white-space:nowrap">v0.1.0-beta4 · PSResourceGet · <span style="color:#ffaf00">⇡ update</span></span></div>
+<div style="padding:0 16px">
+<table style="border-collapse:separate;border-spacing:0;border:1px solid #444444;border-radius:8px;margin:3px 0;color:#c6c6c6;font-size:12.5px;line-height:1.55">
+<thead><tr>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">&nbsp;</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">module</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">state</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">startup</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">gallery</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">version</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">scope</th>
+<th style="white-space:nowrap;padding:0 10px;font-weight:400;text-align:left;border-bottom:1px solid #444444;color:#6c6c6c">file</th>
+</tr></thead>
+<tbody>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">Terminal-Icons</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#00af00">● loaded</span></td><td style="white-space:nowrap;padding:0 10px">load</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px">0.11.0</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">user</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">psmm-config</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">PSReadLine</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#00af00">● loaded</span></td><td style="white-space:nowrap;padding:0 10px">load</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">check-only</td><td style="white-space:nowrap;padding:0 10px">2.3.6</td><td style="white-space:nowrap;padding:0 10px;color:#ffaf00">mixed</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">psmm-config</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">posh-git</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#00af00">● loaded</span></td><td style="white-space:nowrap;padding:0 10px">load</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px">1.1.0</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">user</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">developer</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px;background:#262626"><span style="color:#00afff">▌</span></td><td style="white-space:nowrap;padding:0 10px;background:#262626"><span style="color:#00afff;font-weight:700">ImportExcel</span></td><td style="white-space:nowrap;padding:0 10px;background:#262626"><span style="color:#ffaf00">◐ installed</span></td><td style="white-space:nowrap;padding:0 10px;background:#262626">install</td><td style="white-space:nowrap;padding:0 10px;background:#262626;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px;background:#262626">7.8.10 <span style="color:#ffaf00">⇡ 7.9.0</span></td><td style="white-space:nowrap;padding:0 10px;background:#262626;color:#8a8a8a">user</td><td style="white-space:nowrap;padding:0 10px;background:#262626;color:#8a8a8a">psmm-config</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">Pester</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#ffaf00">◐ installed</span></td><td style="white-space:nowrap;padding:0 10px">install</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">latest</td><td style="white-space:nowrap;padding:0 10px">5.7.1</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">user</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">developer</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px"><span style="color:#00af00">▪</span></td><td style="white-space:nowrap;padding:0 10px">PwshSpectreConsole</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#ffaf00">◐ installed</span></td><td style="white-space:nowrap;padding:0 10px">install</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px">2.4.0</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">user</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">psmm-config</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">Microsoft.Graph</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#00af00">● loaded</span></td><td style="white-space:nowrap;padding:0 10px">load</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px">2.28.0 <span style="color:#ffaf00">⇡</span></td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">user</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">m365-admin</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">ExchangeOnlineManagement</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#ff5f87">○ missing</span></td><td style="white-space:nowrap;padding:0 10px">install</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">—</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">—</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">m365-admin</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">Az.Accounts</td><td style="white-space:nowrap;padding:0 10px"><span style="color:#ffaf00">◐ installed</span></td><td style="white-space:nowrap;padding:0 10px;color:#6c6c6c">off</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">check-only</td><td style="white-space:nowrap;padding:0 10px">5.3.1 <span style="color:#8a8a8a">pin</span></td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">all <span style="color:#6c6c6c">ro</span></td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">psmm-config</td></tr>
+<tr><td style="white-space:nowrap;padding:0 10px">&nbsp;</td><td style="white-space:nowrap;padding:0 10px">PnP.PowerShell <span style="color:#ff5f87">⚠</span></td><td style="white-space:nowrap;padding:0 10px"><span style="color:#ff5f87">○ missing</span></td><td style="white-space:nowrap;padding:0 10px">install</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">if-missing</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">—</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">—</td><td style="white-space:nowrap;padding:0 10px;color:#8a8a8a">m365-admin</td></tr>
+</tbody></table>
+<div style="white-space:pre-wrap;margin-top:2px"><span style="color:#00af00">▪ 1 selected</span><span style="color:#6c6c6c">  ·  row 4/10</span></div>
+<div style="white-space:pre-wrap"><span style="color:#00afff">ImportExcel</span><span style="color:#8a8a8a"> — background-installs at shell start when missing · not imported this session · v7.8.10 on disk, v7.9.0 available (</span><span style="color:#ff875f">u</span><span style="color:#8a8a8a"> updates)</span></div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:8px">
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">i</span> <span style="color:#a8a8a8">install</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">u</span> <span style="color:#a8a8a8">update</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">k</span> <span style="color:#a8a8a8">check ⇡</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">^l</span> <span style="color:#a8a8a8">load</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">^u</span> <span style="color:#a8a8a8">unload</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">space</span> <span style="color:#a8a8a8">select</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">enter</span> <span style="color:#a8a8a8">actions</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">a</span> <span style="color:#a8a8a8">add</span></span>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:6px">
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">g</span> <span style="color:#6c6c6c">goto…</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">/</span> <span style="color:#6c6c6c">filter</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">?</span> <span style="color:#6c6c6c">help</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">^q</span> <span style="color:#6c6c6c">quit</span></span>
+<span style="margin-left:auto;color:#585858">^ = ctrl</span>
+</div>
+<div style="white-space:pre-wrap;margin-top:8px"><span style="color:#5f87ff">~</span> <span style="color:#6c6c6c">installing ExchangeOnlineManagement in the background · </span><span style="color:#ff875f">g t</span><span style="color:#6c6c6c"> tasks</span></div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="2b" data-screen-label="v2 goto overlay" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2b</span><span style="color:#9aa0ab;font-size:12px">g pressed — the goto layer (vimium/which-key style), identical on every screen</span></div>
+<div style="width:860px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45);position:relative">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.2.0 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:0 0 20px;font-size:12.5px;line-height:1.55;color:#c6c6c6">
+<div style="opacity:.3">
+<div style="display:flex;align-items:center;gap:12px;background:#1c1c1c;padding:4px 16px;margin-bottom:10px"><span style="background:#ff875f;color:#141414;font-weight:700;padding:0 7px">&nbsp;psmm&nbsp;</span><span>home</span><span style="margin-left:auto;color:#6c6c6c;white-space:nowrap">v0.1.0-beta4 · PSResourceGet</span></div>
+<div style="padding:0 16px">
+<div style="white-space:pre-wrap">Terminal-Icons        <span style="color:#00af00">● loaded</span>     load      0.11.0</div>
+<div style="white-space:pre-wrap">PSReadLine            <span style="color:#00af00">● loaded</span>     load      2.3.6</div>
+<div style="white-space:pre-wrap"><span style="color:#00afff">ImportExcel</span>           <span style="color:#ffaf00">◐ installed</span>  install   7.8.10 ⇡</div>
+<div style="white-space:pre-wrap">Pester                <span style="color:#ffaf00">◐ installed</span>  install   5.7.1</div>
+<div style="white-space:pre-wrap">Microsoft.Graph       <span style="color:#00af00">● loaded</span>     load      2.28.0 ⇡</div>
+<div style="white-space:pre-wrap">Az.Accounts           <span style="color:#ffaf00">◐ installed</span>  off       5.3.1 pin</div>
+<div style="white-space:pre-wrap"> </div>
+<div style="white-space:pre-wrap"> </div>
+</div>
+</div>
+<div style="position:absolute;left:16px;bottom:16px;background:#0c0c0c;border:1px solid #00afff;border-radius:8px;padding:10px 16px 12px;box-shadow:0 12px 40px rgba(0,0,0,.7)">
+<div style="margin-bottom:8px"><span style="background:#303030;color:#00afff;padding:0 7px;border-radius:4px">g</span> <span style="color:#c6c6c6">goto</span><span style="color:#585858">  —  next key jumps, from anywhere</span></div>
+<div style="display:grid;grid-template-columns:repeat(3,max-content);gap:5px 34px">
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">h</span> <span style="color:#a8a8a8">home</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">f</span> <span style="color:#a8a8a8">files</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">t</span> <span style="color:#a8a8a8">tasks</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">g</span> <span style="color:#a8a8a8">gallery</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">p</span> <span style="color:#a8a8a8">paths</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">c</span> <span style="color:#a8a8a8">conflicts</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">x</span> <span style="color:#a8a8a8">cleanup</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">m</span> <span style="color:#a8a8a8">unmanaged</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">?</span> <span style="color:#a8a8a8">keys</span></span>
+</div>
+<div style="margin-top:8px;color:#585858">esc cancels · anything else is swallowed</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="2c" data-screen-label="v2 tabbed help" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2c</span><span style="color:#9aa0ab;font-size:12px">v2 help — topic tabs (reuses the existing command-detail tab pattern) + grouped key reference</span></div>
+<div style="width:860px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.2.0 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:0 0 20px;font-size:12.5px;line-height:1.55;color:#c6c6c6">
+<div style="display:flex;align-items:center;gap:12px;background:#1c1c1c;padding:4px 16px;margin-bottom:10px"><span style="background:#ff875f;color:#141414;font-weight:700;padding:0 7px">&nbsp;psmm&nbsp;</span><span style="color:#6c6c6c">home ›</span><span style="color:#c6c6c6">help</span></div>
+<div style="padding:0 16px">
+<div style="white-space:pre-wrap;margin-bottom:6px"><span style="color:#6c6c6c">this screen</span>  <span style="color:#00afff;text-decoration:underline;font-weight:700">keys</span>  <span style="color:#6c6c6c">config</span>  <span style="color:#6c6c6c">startup</span>  <span style="color:#6c6c6c">about</span></div>
+<div style="display:flex;gap:44px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="color:#00afff;margin-bottom:2px">navigate</div>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">↑/↓</span> <span style="color:#a8a8a8">move</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">pgup/pgdn</span> <span style="color:#a8a8a8">page</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">home/end</span> <span style="color:#a8a8a8">top / bottom</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">/</span> <span style="color:#a8a8a8">filter (enter keeps, esc clears)</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">→</span> <span style="color:#a8a8a8">drill in</span>  <span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">←</span> <span style="color:#a8a8a8">back out</span></span>
+<div style="color:#00afff;margin:10px 0 2px">go places</div>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">g</span> <span style="color:#a8a8a8">then</span> <span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">h g f p t c x m</span> <span style="color:#a8a8a8">goto anywhere</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">esc</span> <span style="color:#a8a8a8">back one level</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">^q</span> <span style="color:#a8a8a8">quit from anywhere</span></span>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="color:#00afff;margin-bottom:2px">act on modules</div>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">space</span> <span style="color:#a8a8a8">select</span>  <span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">enter</span> <span style="color:#a8a8a8">actions</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">i</span> <span style="color:#a8a8a8">install missing (background)</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">u</span> <span style="color:#a8a8a8">update installed (background)</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">k</span> <span style="color:#a8a8a8">check the gallery for updates</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">^l</span> <span style="color:#a8a8a8">load</span>  <span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">^u</span> <span style="color:#a8a8a8">unload</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">a</span> <span style="color:#a8a8a8">add entry</span>  <span style="background:#1c1c1c;color:#ff875f;padding:0 7px;border-radius:4px">r</span> <span style="color:#a8a8a8">reload from disk</span></span>
+<div style="color:#585858;margin-top:10px;max-width:340px">bulk verbs target the selection, or the cursor row when nothing is selected. install and update are always separate keys.</div>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:12px">
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">←/→</span> <span style="color:#6c6c6c">switch tab</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">/</span> <span style="color:#6c6c6c">search help</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">c</span> <span style="color:#6c6c6c">copy tab</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">esc</span> <span style="color:#6c6c6c">back</span></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="2d" data-screen-label="v2 startup report" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2d</span><span style="color:#9aa0ab;font-size:12px">v2 startup report — same tokens as the TUI, aligned timings, slowest called out</span></div>
+<div style="width:860px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>pwsh</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:12px 16px 20px;font-size:12.5px;line-height:1.6;color:#c6c6c6">
+<div style="white-space:pre-wrap"><span style="background:#ff875f;color:#141414;font-weight:700">&nbsp;psmm&nbsp;</span> <span style="color:#8a8a8a">4 loaded · 1 skipped · 1 failed · 3 in background · 407 ms</span></div>
+<div style="display:grid;grid-template-columns:18px 190px 62px 90px 1fr;column-gap:8px;margin-top:6px">
+<span style="color:#00af00">●</span><span>Terminal-Icons</span><span style="text-align:right;color:#8a8a8a">41 ms</span><span style="color:#3a3f46">▍</span><span></span>
+<span style="color:#00af00">●</span><span>PSReadLine</span><span style="text-align:right;color:#8a8a8a">18 ms</span><span style="color:#3a3f46">▎</span><span></span>
+<span style="color:#00af00">●</span><span>posh-git</span><span style="text-align:right;color:#8a8a8a">36 ms</span><span style="color:#3a3f46">▍</span><span></span>
+<span style="color:#00af00">●</span><span>Microsoft.Graph</span><span style="text-align:right;color:#8a8a8a">312 ms</span><span style="color:#ffaf00">██▋</span><span style="color:#6c6c6c">slowest — InstallOnly would free your prompt</span>
+<span style="color:#8a8a8a">○</span><span style="color:#8a8a8a">Az.Accounts</span><span style="text-align:right;color:#6c6c6c">—</span><span></span><span style="color:#6c6c6c">not installed · check-only, nothing done</span>
+<span style="color:#ff5f87">✕</span><span>PnP.PowerShell</span><span style="text-align:right;color:#6c6c6c">—</span><span></span><span style="color:#ff5f87">Version '3.x' is not a valid range</span><span></span><span></span><span></span><span></span><span style="color:#6c6c6c">→ psmm, then <span style="color:#ff875f">i</span> on the row retries</span>
+<span style="color:#5f87ff">⋯</span><span style="color:#8a8a8a">ImportExcel +2 more</span><span style="text-align:right;color:#6c6c6c">bg</span><span></span><span style="color:#6c6c6c">installing in the background — results in psmm</span>
+</div>
+<div style="white-space:pre-wrap;margin-top:8px"><span style="color:#ffaf00">⇡ psmm v0.1.0-beta5 is out (you have beta4)</span><span style="color:#8a8a8a"> — </span><span style="color:#61d6d6">Install-PSResource psmm -Prerelease -Reinstall</span></div>
+<div style="white-space:pre-wrap;margin-top:6px"><span style="color:#16c60c">PS </span><span>C:\Users\peter&gt; </span><span style="background:#cccccc;color:#0c0c0c">&nbsp;</span></div>
+</div>
+</div>
+</div>
+
+<div id="2e" data-screen-label="v2 module menu" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2e</span><span style="color:#9aa0ab;font-size:12px">v2 module menu — breadcrumb + actions grouped by what they touch</span></div>
+<div style="width:1060px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.2.0 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:0 0 20px;font-size:12.5px;line-height:1.55;color:#c6c6c6">
+<div style="display:flex;align-items:center;gap:12px;background:#1c1c1c;padding:4px 16px;margin-bottom:10px"><span style="background:#ff875f;color:#141414;font-weight:700;padding:0 7px">&nbsp;psmm&nbsp;</span><span style="color:#6c6c6c">home ›</span><span style="color:#c6c6c6">Microsoft.Graph</span><span style="margin-left:auto;color:#00af00;white-space:nowrap">● loaded</span></div>
+<div style="padding:0 16px">
+<div style="border:1px solid #444444;border-radius:8px;padding:6px 12px;margin:2px 0 10px;display:grid;grid-template-columns:max-content 1fr;column-gap:24px">
+<span style="color:#6c6c6c">what</span><span>Microsoft Graph PowerShell meta-module</span>
+<span style="color:#6c6c6c">entry</span><span>load at startup · gallery: if-missing · no pin <span style="color:#6c6c6c">· m365-admin.json (rw)</span></span>
+<span style="color:#6c6c6c">disk</span><span>v2.28.0 <span style="color:#8a8a8a">CurrentUser</span> <span style="color:#ffaf00">⇡ v2.29.1 available · 2 versions on disk</span></span>
+<span style="color:#6c6c6c">session</span><span>imported · v2.28.0 · <span style="color:#8a8a8a">312 ms at startup</span></span>
+<span style="color:#6c6c6c">connection</span><span><span style="color:#00af00">connected</span> admin@contoso.com <span style="color:#8a8a8a">· 14 scopes</span></span>
+</div>
+<div style="display:grid;grid-template-columns:110px 1fr;row-gap:7px;align-items:start">
+<span style="color:#6c6c6c">session</span><span style="display:flex;flex-wrap:wrap;gap:6px 16px"><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">^l</span> <span style="color:#a8a8a8">load</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">^u</span> <span style="color:#a8a8a8">unload</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">b</span> <span style="color:#a8a8a8">browse 74 commands</span></span></span>
+<span style="color:#6c6c6c">gallery</span><span style="display:flex;flex-wrap:wrap;gap:6px 16px"><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">u</span> <span style="color:#a8a8a8">update to 2.29.1</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">x</span> <span style="color:#a8a8a8">clean 1 old version</span></span></span>
+<span style="color:#6c6c6c">entry</span><span style="display:flex;flex-wrap:wrap;gap:6px 16px"><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">e</span> <span style="color:#a8a8a8">edit</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">v</span> <span style="color:#a8a8a8">pin version</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">d</span> <span style="color:#a8a8a8">delete</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">m</span> <span style="color:#a8a8a8">move to file</span></span></span>
+<span style="color:#6c6c6c">connection</span><span style="display:flex;flex-wrap:wrap;gap:6px 16px"><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">s</span> <span style="color:#a8a8a8">re-check</span></span><span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">o</span> <span style="color:#a8a8a8">disconnect</span></span></span>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:12px">
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">g</span> <span style="color:#6c6c6c">goto…</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">?</span> <span style="color:#6c6c6c">help</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">esc</span> <span style="color:#6c6c6c">back</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">^q</span> <span style="color:#6c6c6c">quit</span></span>
+<span style="margin-left:auto;color:#585858">^ = ctrl</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="2f" data-screen-label="contender: pane layout" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2f</span><span style="color:#9aa0ab;font-size:12px">contender — lazygit-style panes: list + always-on detail, no submenu round-trip. Bigger rewrite; pick only if 2a's flow still feels modal.</span></div>
+<div style="width:1120px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.45)">
+<div style="display:flex;align-items:center;background:#1a1a1a;padding:6px 12px;font-size:11px;color:#8a8f98"><span>psmm v0.2.0 - PS Session Module Manager</span><span style="margin-left:auto;letter-spacing:6px;white-space:nowrap">─ ▢ ✕</span></div>
+<div style="padding:0 0 20px;font-size:12.5px;line-height:1.55;color:#c6c6c6">
+<div style="display:flex;align-items:center;gap:12px;background:#1c1c1c;padding:4px 16px;margin-bottom:10px"><span style="background:#ff875f;color:#141414;font-weight:700;padding:0 7px">&nbsp;psmm&nbsp;</span><span style="color:#c6c6c6">home</span><span style="margin-left:auto;color:#6c6c6c;white-space:nowrap">v0.1.0-beta4 · PSResourceGet</span></div>
+<div style="display:flex;gap:12px;padding:0 16px">
+<div style="flex:0 0 400px;border:1px solid #00afff;border-radius:8px;padding:12px 10px 6px;position:relative">
+<span style="position:absolute;top:-10px;left:12px;background:#0c0c0c;padding:0 6px;color:#00afff">1 · modules — 10 <span style="color:#6c6c6c">/ filter</span></span>
+<div style="white-space:pre-wrap">  Terminal-Icons            <span style="color:#00af00">●</span></div>
+<div style="white-space:pre-wrap">  PSReadLine                <span style="color:#00af00">●</span></div>
+<div style="white-space:pre-wrap">  posh-git                  <span style="color:#00af00">●</span></div>
+<div style="white-space:pre-wrap;background:#262626"><span style="color:#00afff">▌ ImportExcel               </span><span style="color:#ffaf00">◐ ⇡</span></div>
+<div style="white-space:pre-wrap">  Pester                    <span style="color:#ffaf00">◐</span></div>
+<div style="white-space:pre-wrap"><span style="color:#00af00">▪</span> PwshSpectreConsole        <span style="color:#ffaf00">◐</span></div>
+<div style="white-space:pre-wrap">  Microsoft.Graph           <span style="color:#00af00">● ⇡</span></div>
+<div style="white-space:pre-wrap">  ExchangeOnlineManagement  <span style="color:#ff5f87">○</span></div>
+<div style="white-space:pre-wrap">  Az.Accounts               <span style="color:#ffaf00">◐</span></div>
+<div style="white-space:pre-wrap">  PnP.PowerShell            <span style="color:#ff5f87">○ ⚠</span></div>
+</div>
+<div style="flex:1;border:1px solid #444444;border-radius:8px;padding:12px 12px 6px;position:relative">
+<span style="position:absolute;top:-10px;left:12px;background:#0c0c0c;padding:0 6px;color:#6c6c6c">2 · ImportExcel</span>
+<div style="display:grid;grid-template-columns:max-content 1fr;column-gap:20px;row-gap:2px;margin-top:4px">
+<span style="color:#6c6c6c">state</span><span><span style="color:#ffaf00">◐ installed</span>, not imported this session</span>
+<span style="color:#6c6c6c">entry</span><span>background-install when missing <span style="color:#6c6c6c">· psmm-config.json (rw)</span></span>
+<span style="color:#6c6c6c">disk</span><span>v7.8.10 <span style="color:#8a8a8a">CurrentUser</span> <span style="color:#ffaf00">⇡ v7.9.0 available</span></span>
+<span style="color:#6c6c6c">about</span><span style="color:#8a8a8a">Import/export Excel spreadsheets, without Excel — dfinke</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px">
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">u</span> <span style="color:#a8a8a8">update</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">^l</span> <span style="color:#a8a8a8">load</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">b</span> <span style="color:#a8a8a8">commands</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">e</span> <span style="color:#a8a8a8">edit</span></span>
+<span style="white-space:nowrap"><span style="background:#303030;color:#ff875f;padding:0 7px;border-radius:4px">v</span> <span style="color:#a8a8a8">pin</span></span>
+</div>
+</div>
+</div>
+<div style="padding:0 16px;margin-top:10px;color:#585858;white-space:pre-wrap"><span style="color:#5f87ff">~</span> 14:02 installing ExchangeOnlineManagement · 13:58 update check: 2 updates found</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:6px;padding:0 16px">
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">1/2</span> <span style="color:#6c6c6c">focus pane</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">tab</span> <span style="color:#6c6c6c">cycle</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">g</span> <span style="color:#6c6c6c">goto…</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">?</span> <span style="color:#6c6c6c">help</span></span>
+<span style="white-space:nowrap"><span style="background:#1c1c1c;color:#00afff;padding:0 7px;border-radius:4px">^q</span> <span style="color:#6c6c6c">quit</span></span>
+</div>
+</div>
+</div>
+</div>
+
+<div id="2g" data-screen-label="palette variants" style="flex:none;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="background:#2b2d34;color:#e8e9ec;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">2g</span><span style="color:#9aa0ab;font-size:12px">theme variants — all explicit 256-color names, swap in 00-Theme.ps1 only</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:20px">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="width:360px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;background:#1c1c1c;padding:4px 12px;font-size:12px"><span style="background:#ff875f;color:#141414;font-weight:700;padding:0 6px">&nbsp;psmm&nbsp;</span><span style="color:#c6c6c6">glacier</span><span style="margin-left:auto;color:#6c6c6c;white-space:nowrap">default</span></div>
+<div style="padding:8px 12px 12px;font-size:12px;line-height:1.6;color:#c6c6c6">
+<div style="white-space:pre-wrap">  Terminal-Icons   <span style="color:#00af00">● loaded</span></div>
+<div style="white-space:pre-wrap;background:#262626"><span style="color:#00afff">▌ ImportExcel      </span><span style="color:#ffaf00">◐ installed ⇡</span></div>
+<div style="white-space:pre-wrap">  PnP.PowerShell   <span style="color:#ff5f87">○ missing</span></div>
+<div style="margin-top:6px"><span style="background:#303030;color:#ff875f;padding:0 6px;border-radius:4px">i</span> <span style="color:#a8a8a8">install</span>  <span style="background:#1c1c1c;color:#00afff;padding:0 6px;border-radius:4px">g</span> <span style="color:#6c6c6c">goto…</span></div>
+</div>
+</div>
+<div style="color:#6c7080;font-size:11px;line-height:1.6;max-width:360px">today's pair, tuned: key salmon1 · accent deepskyblue1 · row bg grey15 (235) · borders grey27 (238). Least churn, keeps the identity.</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="width:360px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;background:#1c1c1c;padding:4px 12px;font-size:12px"><span style="background:#ffaf5f;color:#141414;font-weight:700;padding:0 6px">&nbsp;psmm&nbsp;</span><span style="color:#d0cbc2">ember</span></div>
+<div style="padding:8px 12px 12px;font-size:12px;line-height:1.6;color:#d0cbc2">
+<div style="white-space:pre-wrap">  Terminal-Icons   <span style="color:#87d75f">● loaded</span></div>
+<div style="white-space:pre-wrap;background:#262626"><span style="color:#ffaf5f">▌ ImportExcel      </span><span style="color:#ffd700">◐ installed ⇡</span></div>
+<div style="white-space:pre-wrap">  PnP.PowerShell   <span style="color:#ff5f5f">○ missing</span></div>
+<div style="margin-top:6px"><span style="background:#303030;color:#ff875f;padding:0 6px;border-radius:4px">i</span> <span style="color:#a8a8a8">install</span>  <span style="background:#1c1c1c;color:#ffaf5f;padding:0 6px;border-radius:4px">g</span> <span style="color:#6c6c6c">goto…</span></div>
+</div>
+</div>
+<div style="color:#6c7080;font-size:11px;line-height:1.6;max-width:360px">all-warm, Claude-Code adjacent: accent sandybrown (215) · ok darkolivegreen3 (113) · warn gold1 (220) · err indianred1 (203). Distinctive, but warn/accent sit close.</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="width:360px;background:#0c0c0c;border:1px solid #35373d;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;background:#1c1c1c;padding:4px 12px;font-size:12px"><span style="background:#87d787;color:#141414;font-weight:700;padding:0 6px">&nbsp;psmm&nbsp;</span><span style="color:#c6cdc6">moss</span></div>
+<div style="padding:8px 12px 12px;font-size:12px;line-height:1.6;color:#c6cdc6">
+<div style="white-space:pre-wrap">  Terminal-Icons   <span style="color:#00af00">● loaded</span></div>
+<div style="white-space:pre-wrap;background:#262626"><span style="color:#87d787">▌ ImportExcel      </span><span style="color:#ffaf00">◐ installed ⇡</span></div>
+<div style="white-space:pre-wrap">  PnP.PowerShell   <span style="color:#ff5f87">○ missing</span></div>
+<div style="margin-top:6px"><span style="background:#303030;color:#d7af5f;padding:0 6px;border-radius:4px">i</span> <span style="color:#a8a8a8">install</span>  <span style="background:#1c1c1c;color:#87d787;padding:0 6px;border-radius:4px">g</span> <span style="color:#6c6c6c">goto…</span></div>
+</div>
+</div>
+<div style="color:#6c7080;font-size:11px;line-height:1.6;max-width:360px">terminal-classic: accent palegreen3 (114) · key lightgoldenrod3 (179). Calm, but green accent collides with green = loaded; needs care.</div>
+</div>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showNotes&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Review&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showNotes: this.props.showNotes ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>
