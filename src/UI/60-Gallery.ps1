@@ -13,17 +13,17 @@ function script:Build-PSMMGalleryView {
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
     $descCap = [Math]::Max(20, $win.Width - 78)
-    $T = New-PSMMTable -Headers @(' ', 'name', 'version', 'by', 'description')
+    $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $r = $Results[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $r.Name 40)
         if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
+        $rows.Add([string[]]@(
                 $nm, (ConvertTo-PSMMSafe $r.Version),
                 (ConvertTo-PSMMSafe (Get-PSMMTrunc "$($r.Author)" 18)),
                 (ConvertTo-PSMMSafe (Get-PSMMTrunc ($r.Description -replace '\s+', ' ') $descCap))))
     }
+    $T = New-PSMMTable -Headers @('name', 'version', 'by', 'description') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'gallery') -CountsMarkup "[$script:PSMM_ColDim]search: $(ConvertTo-PSMMSafe $Query)[/]$pos")))

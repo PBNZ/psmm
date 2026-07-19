@@ -82,21 +82,20 @@ function script:Build-PSMMTasksView {
     $n = $Tasks.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 10)
-    $T = New-PSMMTable -Headers @(' ', 'task', 'state', 'started', 'output')
+    $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         # NB: $task, not $t - PowerShell variables are case-insensitive and $T
-        # is the table right above. Same reason for $stateCell, not $state:
-        # it would overwrite the $State parameter and break the cursor mark.
+        # is the table below. Same reason for $stateCell, not $state: it would
+        # overwrite the $State parameter and break the cursor row.
         $task = $Tasks[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $task.Label 44)
         if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         $stateCell = if (-not $task.Done) { "[$script:PSMM_ColInfo]running[/]" }
                      elseif ($task.Failed) { "[$script:PSMM_ColErr]failed[/]" }
                      else { "[$script:PSMM_ColOk]done[/]" }
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
-                $nm, $stateCell, $task.StartedAt.ToString('HH:mm:ss'), "$($task.Output.Count) line(s)"))
+        $rows.Add([string[]]@($nm, $stateCell, $task.StartedAt.ToString('HH:mm:ss'), "$($task.Output.Count) line(s)"))
     }
+    $T = New-PSMMTable -Headers @('task', 'state', 'started', 'output') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'tasks') -CountsMarkup $pos)))

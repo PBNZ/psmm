@@ -13,14 +13,14 @@ function script:Build-PSMMCommandListView {
     $n = $View.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 9)
-    $T = New-PSMMTable -Headers @(' ', 'command', 'type')
+    $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $c = $View[$i]
         $nm = ConvertTo-PSMMSafe $c.Name
         if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                (Get-PSMMCursorMark ($i -eq $State.Cursor)), $nm, "$($c.CommandType)"))
+        $rows.Add([string[]]@($nm, "$($c.CommandType)"))
     }
+    $T = New-PSMMTable -Headers @('command', 'type') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $of = if ($n -ne $Commands.Count) { " [$script:PSMM_ColMute](of $($Commands.Count))[/]" } else { '' }
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()

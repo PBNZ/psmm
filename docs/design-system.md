@@ -146,7 +146,7 @@ Format (mockup 2d):
 
 | symbol | meaning |
 |---|---|
-| `▌` | cursor row (column one) |
+| `▌` | RETIRED (was cursor; now full-row `rowbg` background + bold name) |
 | `▪` | selected row |
 | `● ◐ ○ ◌` | loaded / installed / missing / unmanaged |
 | `⚠` | entry has validation issues |
@@ -201,10 +201,13 @@ All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
   bottom-left, middle-left and window-centre all read as detached. On
   dismissal only the panel rectangle is blanked and the caller's repaint
   restores what was underneath.
-- **Grid column one is selection-only** (`▪`); the cursor is carried by the
-  full-row background + bold accent name. The `▌` bar next to the selection
-  marks read as a broken checkbox. `▌` remains the cursor mark on
-  sub-screen list tables (which have no selection column).
+- **The `▌` cursor bar is RETIRED on every screen** (live-run feedback
+  2026-07-20, two rounds): next to the grid's selection marks it read as a
+  broken checkbox, and on sub-screen tables it read as an artifact. The
+  cursor is the full-row `rowbg` background + bold accent name on the grid
+  AND every sub-screen list — one design on all pages; a design-consistency
+  test renders every list screen and holds them to it. Grid column one is
+  selection-only (`▪`).
 - **`m` (show/hide unmanaged) is a grid verb**, not a goto chord.
 - **The console cursor is hidden** while the TUI runs (it blinked over the
   frames); text prompts show it for the duration.
@@ -224,9 +227,11 @@ All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
 - The persistent row's pairs adapt to the screen type: the grid shows
   `g goto… · / filter · ? help · ^q quit`; sub-screens swap `/ filter` for
   `esc back` when they have no filter (the row is otherwise identical).
-- Sub-screen list tables use the `▌` bar + bold accent name as the cursor;
-  the full-row background is implemented on the grid (the padded-cell
-  technique it needs is grid-specific).
+- **rowbg = `grey23` (237), not grey15**: once the cursor bar left the grid,
+  the #262626 background all but vanished on a black terminal; #3a3a3a reads
+  as a highlight and stays below the grey35 border. Sub-screen tables get
+  the same edge-to-edge background via `New-PSMMTable` (widths computed from
+  all rows, padding inside the cells — the grid technique, shared).
 - The token table lives in `src/Engine/Theme.ps1` (markup name + xterm-256
   index per token) so the startup report can render the same tokens without
   Spectre; `src/UI/00-Theme.ps1` reads its palette from there. The guard

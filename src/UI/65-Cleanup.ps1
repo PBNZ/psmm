@@ -12,17 +12,16 @@ function script:Build-PSMMCleanupView {
     $n = $Dupes.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 11)
-    $T = New-PSMMTable -Headers @(' ', 'module', 'keep', 'remove', 'scopes')
+    $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $d = $Dupes[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $d.Name 40)
         if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         $obsVers = (@($d.Obsolete | ForEach-Object { "v$($_.Version)" }) -join ', ')
         $scopes = (@($d.Obsolete.Scope | Select-Object -Unique) -join ', ')
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
-                $nm, "[$script:PSMM_ColOk]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
+        $rows.Add([string[]]@($nm, "[$script:PSMM_ColOk]v$($d.Latest)[/]", (ConvertTo-PSMMSafe (Get-PSMMTrunc $obsVers 40)), $scopes))
     }
+    $T = New-PSMMTable -Headers @('module', 'keep', 'remove', 'scopes') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'cleanup') -CountsMarkup "[$script:PSMM_ColDim]$n module(s) with multiple versions on disk[/]$pos")))

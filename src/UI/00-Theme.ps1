@@ -28,22 +28,50 @@ function script:Get-PSMMBorderStyle { [Spectre.Console.Style]::Parse($script:PSM
 
 # Standard table chrome (§1/§5): rounded border in the border token,
 # lowercase dim headers. Screens add rows themselves.
+# ONE list-table builder for every sub-screen, with the SAME cursor
+# treatment as the grid: the cursor row paints an edge-to-edge rowbg
+# background (padding lives inside the cells; widths computed from ALL
+# rows), the caller bolds the name cell. The ▌ bar mark is retired -
+# it read as an artifact next to the grid's bg-only cursor (live-run
+# feedback 2026-07-20: one design on all pages). The grid builds its
+# table inline for speed but uses this exact technique; the design
+# consistency test holds both to it.
 function script:New-PSMMTable {
-    param([Parameter(Mandatory)][string[]]$Headers)
+    param(
+        [Parameter(Mandatory)][string[]]$Headers,
+        [AllowEmptyCollection()]$Rows = @(),   # one string[] of markup cells per row
+        [int]$CursorRow = -1                   # index into $Rows; -1 = no cursor
+    )
+    $widths = @(foreach ($h in $Headers) { $h.Trim().Length })
+    foreach ($r in $Rows) {
+        for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+            $len = [Spectre.Console.Markup]::Remove("$($r[$ci])").Length
+            if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
+        }
+    }
     $T = [Spectre.Console.Table]::new()
     $T.Border = [Spectre.Console.TableBorder]::Rounded
     $T.BorderStyle = Get-PSMMBorderStyle
-    foreach ($h in $Headers) {
-        $cell = if ($h.Trim()) { "[$script:PSMM_ColDim]$($h.ToLowerInvariant())[/]" } else { $h }
-        [void][Spectre.Console.TableExtensions]::AddColumn($T, $cell)
+    for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+        $h = $Headers[$ci]
+        $cell = if ($h.Trim()) { " [$script:PSMM_ColDim]$($h.ToLowerInvariant())[/] " } else { ' ' }
+        $col = [Spectre.Console.TableColumn]::new($cell)
+        $col.Width = $widths[$ci] + 2
+        $col.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
+        $col.NoWrap = $true
+        [void]$T.AddColumn($col)
+    }
+    for ($ri = 0; $ri -lt $Rows.Count; $ri++) {
+        $isCur = ($ri -eq $CursorRow)
+        $cells = [string[]]@(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+            $cell = "$($Rows[$ri][$ci])"
+            $len = [Spectre.Console.Markup]::Remove($cell).Length
+            $padded = ' ' + $cell + (' ' * [Math]::Max(0, $widths[$ci] - $len)) + ' '
+            if ($isCur) { "[default on $script:PSMM_ColRowBg]$padded[/]" } else { $padded }
+        })
+        [void][Spectre.Console.TableExtensions]::AddRow($T, $cells)
     }
     $T
-}
-
-# Cursor marker for simple (non-grid) list tables: the v2 block bar.
-function script:Get-PSMMCursorMark {
-    param([bool]$IsCursor)
-    if ($IsCursor) { "[$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { ' ' }
 }
 
 # 1-based origin (@{ Top; Left }) for an overlay panel: dead centre of the

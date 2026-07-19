@@ -612,7 +612,7 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         InModuleScope psmm {
             $script:PSMM_ColDim     | Should -Be 'grey42'
             $script:PSMM_ColCapsule | Should -Be 'grey19'
-            $script:PSMM_ColRowBg   | Should -Be 'grey15'
+            $script:PSMM_ColRowBg   | Should -Be 'grey23'   # lifted from grey15: the highlight vanished on black once the cursor bar left the grid (live-run feedback)
             $script:PSMM_ColBorder  | Should -Be 'grey35'   # lifted from grey27: more contrast on black (live-run feedback)
             $script:PSMM_ColOk      | Should -Be 'green3'
             $script:PSMM_ColWarn    | Should -Be 'orange1'
@@ -621,14 +621,14 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
-    It 'grid borders render the border token and the cursor row paints a grey15 full-row background (step 1)' {
+    It 'grid borders render the border token and the cursor row paints a grey23 full-row background (step 1)' {
         $out = Get-RenderedAnsi { Build-PSMMGrid }
-        # grey35 = 240, grey15 = 235 in the xterm-256 palette
+        # grey35 = 240, grey23 = 237 in the xterm-256 palette
         $out | Should -Match '38;5;240'
-        $out | Should -Match '48;5;235'
+        $out | Should -Match '48;5;237'
         # the row background must span up to the cell edge, not just the text:
         # a painted cell ends with the background still open right before the reset
-        ($out -split "`r?`n" | Where-Object { $_ -match '48;5;235' }).Count | Should -BeGreaterOrEqual 1
+        ($out -split "`r?`n" | Where-Object { $_ -match '48;5;237' }).Count | Should -BeGreaterOrEqual 1
     }
 
     It 'grid headers are lowercase + dim and the checkbox column is gone (step 1)' {
@@ -979,22 +979,33 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $text | Should -Match ([regex]::Escape('pin [1.0,2.0) (range)'))
     }
 
-    It 'sub-screen tables carry the v2 chrome: grey27 border, lowercase headers, block cursor (review fix)' {
-        $ansi = Get-RenderedAnsi { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
-        $ansi | Should -Match '38;5;240'                      # border token (grey35)
-        foreach ($build in @(
-            { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) },
-            { Build-PSMMTasksView -State (New-PSMMListState) -Tasks @([pscustomobject]@{
+    It 'design consistency: EVERY list screen paints the cursor identically - full-row rowbg, no bar mark (live-run fix 3)' {
+        # one design on all pages (live-run feedback 2026-07-20): the ▌ bar is
+        # retired everywhere; the cursor is the grey23 row background + bold
+        # accent name on the grid AND every sub-screen list
+        $builders = [ordered]@{
+            grid     = { Build-PSMMGrid }
+            files    = { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
+            tasks    = { Build-PSMMTasksView -State (New-PSMMListState) -Tasks @([pscustomobject]@{
                 Id = 1; Label = 'x'; Kind = 'generic'; Data = $null; Job = $null
-                StartedAt = [datetime]'2026-07-04 10:00:00'; Output = @(); Done = $true; Failed = $false; Seen = $true }) },
-            { Build-PSMMGalleryView -State (New-PSMMListState) -Results @([pscustomobject]@{
-                Name = 'M'; Version = '1.0'; Description = 'd'; Author = 'a' }) -Query 'q' },
-            { Build-PSMMPathsView -State (New-PSMMListState) -Infos @([pscustomobject]@{
+                StartedAt = [datetime]'2026-07-04 10:00:00'; Output = @(); Done = $true; Failed = $false; Seen = $true }) }
+            gallery  = { Build-PSMMGalleryView -State (New-PSMMListState) -Results @([pscustomobject]@{
+                Name = 'M'; Version = '1.0'; Description = 'd'; Author = 'a' }) -Query 'q' }
+            paths    = { Build-PSMMPathsView -State (New-PSMMListState) -Infos @([pscustomobject]@{
                 Order = 0; Path = 'C:\x'; First = $true; Exists = $true; OneDrive = $false; UserDefault = $false }) }
-        )) {
-            $text = Get-RenderedText $build
-            $text | Should -Match ([regex]::Escape([string][char]0x258C))          # ▌ cursor
+            commands = { Build-PSMMCommandListView -State (New-PSMMListState) -ModuleName 'M' `
+                -Commands @([pscustomobject]@{ Name = 'Get-Thing'; CommandType = 'Function' }) `
+                -View @([pscustomobject]@{ Name = 'Get-Thing'; CommandType = 'Function' }) }
+            cleanup  = { Build-PSMMCleanupView -State (New-PSMMListState) -Dupes @([pscustomobject]@{
+                Name = 'M'; Latest = '2.0'; Obsolete = @([pscustomobject]@{ Version = '1.0'; Scope = 'CurrentUser' }) }) }
+        }
+        foreach ($name in $builders.Keys) {
+            $text = Get-RenderedText $builders[$name]
+            $text | Should -Not -Match ([regex]::Escape([string][char]0x258C)) -Because "$name must not use the retired cursor bar"
             @($text -split "`r?`n" | Where-Object { $_ -match '^\s*│\s*>' }).Count | Should -Be 0
+            $ansi = Get-RenderedAnsi $builders[$name]
+            $ansi | Should -Match '48;5;237' -Because "$name must paint the grey23 cursor-row background"
+            $ansi | Should -Match '38;5;240' -Because "$name must use the border token"
         }
         $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
         $files | Should -Not -CMatch '│\s*File\s*│'           # headers lowercase
@@ -1210,7 +1221,7 @@ Describe 'Startup report v2 (docs/design-system-v2.md §8)' -Tag Engine {
             $t['key'].Index | Should -Be 209
             $t['accent'].Markup | Should -Be 'deepskyblue1'
             $t['accent'].Index | Should -Be 39
-            $t['rowbg'].Index | Should -Be 235
+            $t['rowbg'].Index | Should -Be 237
             $t['border'].Index | Should -Be 240
             Get-PSMMAnsi -Token 'ok' | Should -Be "$([char]27)[38;5;34m"
             Get-PSMMAnsi -Token 'brandbg' -Background | Should -Be "$([char]27)[48;5;209m"

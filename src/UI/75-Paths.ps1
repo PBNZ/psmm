@@ -13,7 +13,7 @@ function script:Build-PSMMPathsView {
     $n = $Infos.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 14)
-    $T = New-PSMMTable -Headers @(' ', '#', 'path', 'notes')
+    $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $p = $Infos[$i]
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $p.Path ([Math]::Max(20, $win.Width - 45)))
@@ -23,10 +23,9 @@ function script:Build-PSMMPathsView {
         if ($p.UserDefault) { $notes += 'user default' }
         if ($p.OneDrive) { $notes += "[$script:PSMM_ColWarn]onedrive[/]" }
         if (-not $p.Exists) { $notes += "[$script:PSMM_ColErr]missing[/]" }
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                (Get-PSMMCursorMark ($i -eq $State.Cursor)),
-                "$($p.Order + 1)", $nm, ($notes -join ' ')))
+        $rows.Add([string[]]@("$($p.Order + 1)", $nm, ($notes -join ' ')))
     }
+    $T = New-PSMMTable -Headers @('#', 'path', 'notes') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'paths') -CountsMarkup "[$script:PSMM_ColDim](`$env:PSModulePath, search order = list order)[/]$pos")))

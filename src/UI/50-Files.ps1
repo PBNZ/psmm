@@ -11,7 +11,7 @@ function script:Build-PSMMFilesView {
     $n = $Metas.Count
     $win = Get-PSMMWinSize
     $vp = Get-PSMMViewport -State $State -Count $n -Rows ($win.Height - 12)
-    $T = New-PSMMTable -Headers @(' ', 'file', 'kind', 'on', 'rw', 'mods', '!')
+    $rows = [System.Collections.Generic.List[string[]]]::new()
     for ($i = $vp.First; $i -le $vp.Last; $i++) {
         $m = $Metas[$i]
         $leaf = if ($m.Kind -eq 'inline') { 'profile inline' } else { Split-Path $m.Path -Leaf }
@@ -20,9 +20,9 @@ function script:Build-PSMMFilesView {
         $on = if ($m.Enabled) { "[$script:PSMM_ColOk]on[/]" } else { "[$script:PSMM_ColErr]off[/]" }
         $rw = if ($m.Writable) { 'rw' } else { 'ro' }
         $fl = if ($m.IncludesIgnored) { "[$script:PSMM_ColWarn]![/]" } else { ' ' }
-        [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@(
-                (Get-PSMMCursorMark ($i -eq $State.Cursor)), $nm, $m.Kind, $on, $rw, "$($m.ModuleCount)", $fl))
+        $rows.Add([string[]]@($nm, $m.Kind, $on, $rw, "$($m.ModuleCount)", $fl))
     }
+    $T = New-PSMMTable -Headers @('file', 'kind', 'on', 'rw', 'mods', '!') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'files') -CountsMarkup "$pos [$script:PSMM_ColDim]- full path of current row below[/]")))

@@ -33,7 +33,10 @@ function Get-PSMMThemeTable {
         info    = @{ Markup = 'steelblue1';   Index = 75 }
         dim     = @{ Markup = 'grey42';       Index = 242 }
         capsule = @{ Markup = 'grey19';       Index = 236 }
-        rowbg   = @{ Markup = 'grey15';       Index = 235 }
+        # grey23, not the spec's grey15: once the cursor bar left the grid the
+        # #262626 background all but vanished on black (live-run feedback
+        # 2026-07-20); #3a3a3a reads as a highlight and stays below the border
+        rowbg   = @{ Markup = 'grey23';       Index = 237 }
         # grey35, not the spec's grey27: #444 had too little contrast on a
         # black terminal background (live-run feedback 2026-07-20)
         border  = @{ Markup = 'grey35';       Index = 240 }
