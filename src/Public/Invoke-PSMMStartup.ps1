@@ -51,12 +51,12 @@
 
     $entries = Get-PSMMEntry
     $report  = (-not $Quiet -and (Get-PSMMSetting -Name 'PSMM_StartupReport' -Default $true))
-    if ($report) {
-        Write-Host "`npsmm " -NoNewline
-        Write-Host "v$(Get-PSMMVersionString)" -NoNewline -ForegroundColor DarkGray
-        Write-Host ' - PS Session Module Manager priority managed'
-    }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    # v2 report (design-system-v2 §8): collect one row per module, render at
+    # the end via Get-PSMMStartupReportLines - same tokens as the TUI.
+    $rows = [System.Collections.Generic.List[object]]::new()
     $failed = [System.Collections.Generic.List[string]]::new()
+    $mid = [char]0x00B7
 
     # Partition: Mode=Load must run in THIS session (imports do not cross job
     # boundaries). InstallOnly only touches disk/gallery -> deferrable.
@@ -84,18 +84,22 @@
             } else {
                 $result = Invoke-PSMMEntryAction -Entry $e   # Latest: must hit the gallery anyway
             }
-            if ($report) {
-                if     ($result -match 'not installed|check-only') { $disp = $result;               $color = 'Red' }
-                elseif ($result -match 'not loaded')               { $disp = 'installed, unloaded'; $color = 'Blue' }
-                elseif ($result -match 'loaded')                   { $disp = 'installed, loaded';   $color = 'Green' }
-                else                                               { $disp = $result;               $color = 'Gray' }
-                if ($e.ImportMs -ge 0 -and $disp -match 'loaded') { $disp += " ($($e.ImportMs) ms)" }
-                Write-Host "> $($e.FriendlyName) < " -NoNewline
-                Write-Host $disp -ForegroundColor $color
-            }
+            $rows.Add($(
+                if ($result -match 'not installed|check-only') {
+                    [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = "not installed $mid check-only, nothing done" }
+                } elseif ($result -match 'not loaded') {
+                    [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = 'installed, not imported' }
+                } elseif ($result -match 'loaded') {
+                    $note = if ($result -match 'installed \+') { 'installed first' } else { '' }
+                    [pscustomobject]@{ Kind = 'ok'; Name = $e.FriendlyName; Ms = [int]$e.ImportMs; Note = $note }
+                } else {
+                    [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = "$result" }
+                }
+            ))
         } catch {
             $failed.Add($e.FriendlyName)
-            Write-Warning "Could not set up > $($e.FriendlyName) < : $($_.Exception.Message)"
+            $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
+            if (-not $report) { Write-Warning "Could not set up $($e.FriendlyName): $($_.Exception.Message)" }
         }
     }
 
@@ -104,31 +108,36 @@
                          (Get-Command Start-ThreadJob -ErrorAction SilentlyContinue)
         if ($useBackground) {
             $null = Start-PSMMDeferredJob -Entries $deferred
-            if ($report) {
-                Write-Host ("> {0} background module task(s) started < " -f $deferred.Count) -NoNewline
-                Write-Host 'deferred (psmm shows results)' -ForegroundColor DarkGray
-            }
+            $label = "$($deferred[0].FriendlyName)$(if ($deferred.Count -gt 1) { " +$($deferred.Count - 1) more" })"
+            $rows.Add([pscustomobject]@{
+                Kind = 'defer'; Name = $label; Ms = $null; Count = $deferred.Count
+                Note = "installing in the background $([char]0x2014) results in psmm"
+            })
         } else {
             # No ThreadJob or backgrounding disabled: run them inline.
             foreach ($e in $deferred) {
                 try {
                     $result = Invoke-PSMMEntryAction -Entry $e
-                    if ($report) {
-                        $disp  = if ($result -match 'not installed') { $result } else { 'installed, unloaded' }
-                        $color = if ($result -match 'not installed') { 'Red' } else { 'Blue' }
-                        Write-Host "> $($e.FriendlyName) < " -NoNewline
-                        Write-Host $disp -ForegroundColor $color
-                    }
+                    $rows.Add($(
+                        if ($result -match 'not installed') {
+                            [pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$result" }
+                        } else {
+                            [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = 'installed, not imported' }
+                        }
+                    ))
                 } catch {
                     $failed.Add($e.FriendlyName)
-                    Write-Warning "Could not set up > $($e.FriendlyName) < : $($_.Exception.Message)"
+                    $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
+                    if (-not $report) { Write-Warning "Could not set up $($e.FriendlyName): $($_.Exception.Message)" }
                 }
             }
         }
     }
 
-    if ($failed.Count -and $report) {
-        Write-Host ("[{0} failed: {1}]  Run 'psmm' and press i on the row to retry." -f $failed.Count, ($failed -join ', ')) -ForegroundColor Yellow
+    $sw.Stop()
+    if ($report) {
+        Write-Host ''
+        foreach ($l in (Get-PSMMStartupReportLines -Rows $rows -TotalMs $sw.ElapsedMilliseconds)) { Write-Host $l }
     }
     $warnings = Get-PSMMWarning
     if ($warnings.Count -and -not $Quiet) {
@@ -141,9 +150,10 @@
     if (-not $Quiet) {
         $u = Test-PSMMUpdateAvailable
         if ($u) {
-            Write-Host "psmm: v$($u.Latest) is available (you have v$($u.Current)) - update: " -NoNewline -ForegroundColor Yellow
-            Write-Host $u.Command -NoNewline -ForegroundColor Cyan
-            Write-Host ', then restart pwsh' -ForegroundColor Yellow
+            $reset = Get-PSMMAnsiReset
+            Write-Host ("$(Get-PSMMAnsi -Token 'warn')$([char]0x21E1) psmm v$($u.Latest) is out (you have v$($u.Current))$reset " +
+                "$(Get-PSMMAnsi -Token 'mute')$([char]0x2014)$reset $([char]27)[96m$($u.Command)$reset" +
+                "$(Get-PSMMAnsi -Token 'mute'), then restart pwsh$reset")
         }
     }
     $null = Start-PSMMSelfUpdateCheck

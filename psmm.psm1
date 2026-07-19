@@ -11,6 +11,7 @@ $script:PSMMUISourced = $false
 # Explicit file lists: deterministic order, no directory-glob cost at import.
 $psmmEngineFiles = @(
     'src/Engine/Settings.ps1'
+    'src/Engine/Theme.ps1'
     'src/Engine/Entry.ps1'
     'src/Engine/Discovery.ps1'
     'src/Engine/Save.ps1'

@@ -969,6 +969,68 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
     }
 }
 
+Describe 'Startup report v2 (docs/design-system-v2.md §8)' -Tag Engine {
+
+    BeforeEach { Set-UITestConfig }
+    AfterEach {
+        Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'theme tokens resolve one colour per token for markup and escapes (step 7)' {
+        InModuleScope psmm {
+            $t = Get-PSMMThemeTable
+            $t['key'].Markup | Should -Be 'salmon1'
+            $t['key'].Index | Should -Be 209
+            $t['accent'].Markup | Should -Be 'deepskyblue1'
+            $t['accent'].Index | Should -Be 39
+            $t['rowbg'].Index | Should -Be 235
+            $t['border'].Index | Should -Be 238
+            Get-PSMMAnsi -Token 'ok' | Should -Be "$([char]27)[38;5;34m"
+            Get-PSMMAnsi -Token 'brandbg' -Background | Should -Be "$([char]27)[48;5;209m"
+        }
+    }
+
+    It 'report lines: brand block, summary, glyph rows, bars, failure + retry hint, deferred row (step 7)' {
+        $lines = InModuleScope psmm {
+            Get-PSMMStartupReportLines -TotalMs 407 -Rows @(
+                [pscustomobject]@{ Kind = 'ok'; Name = 'Terminal-Icons'; Ms = 41; Note = '' }
+                [pscustomobject]@{ Kind = 'ok'; Name = 'Microsoft.Graph'; Ms = 312; Note = '' }
+                [pscustomobject]@{ Kind = 'skip'; Name = 'Az.Accounts'; Ms = $null; Note = "not installed $([char]0x00B7) check-only, nothing done" }
+                [pscustomobject]@{ Kind = 'fail'; Name = 'PnP.PowerShell'; Ms = $null; Note = "Version '3.x' is not a valid range" }
+                [pscustomobject]@{ Kind = 'defer'; Name = 'ImportExcel +2 more'; Ms = $null; Note = 'installing in the background'; Count = 3 }
+            )
+        }
+        $flat = $lines -join "`n"
+        $plain = $flat -replace '\x1b\[[0-9;]*m', ''
+        $plain | Should -Match ' psmm '
+        $plain | Should -Match "2 loaded $([char]0x00B7) 1 skipped $([char]0x00B7) 1 failed $([char]0x00B7) 3 in background $([char]0x00B7) 407 ms"
+        $plain | Should -Match "$([char]0x25CF) Terminal-Icons"
+        $plain | Should -Match '312 ms'
+        $plain | Should -Match 'slowest'
+        $plain | Should -Match "$([char]0x2715) PnP.PowerShell"
+        $plain | Should -Match ([regex]::Escape("Version '3.x' is not a valid range"))
+        $plain | Should -Match "$([char]0x2192) psmm, then i on the row retries"
+        $plain | Should -Match ([regex]::Escape("$([char]0x22EF) ImportExcel +2 more"))
+        $plain | Should -Match ([string][char]0x2588)          # proportional bar for the slowest
+        $flat | Should -Match '\x1b\[38;5;'                    # 256-colour escapes, not ConsoleColor
+        $flat | Should -Match '\x1b\[48;5;209m'                # brand block on salmon1
+        $plain | Should -Not -Match '> \w+ <'                  # old wrappers are gone
+    }
+
+    It 'Invoke-PSMMStartup prints the v2 report without the > Name < wrappers (step 7)' {
+        # no gallery traffic / no lingering background task from the test
+        $global:PSMM_UpdateCheck = $false
+        try {
+            $out = InModuleScope psmm { @(Invoke-PSMMStartup 6>&1 | ForEach-Object { "$_" }) }
+            ($out -join "`n") | Should -Match ' psmm '
+            ($out -join "`n") | Should -Not -Match '> .+ <'
+            ($out -join "`n") | Should -Match 'ms'
+        } finally {
+            Remove-Variable -Name PSMM_UpdateCheck -Scope Global -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'Task registry (engine)' -Tag Engine {
 
     It 'runs a task, harvests output, fingerprints and summarises' {
