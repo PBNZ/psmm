@@ -20,10 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            Prerelease   = 'beta7'
+            Prerelease   = 'beta8'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0-beta7 - v2 UI live-run fixes: the goto panel truly overlays the screen, higher-contrast borders, selection-only first column, m (unmanaged) back as a grid verb, by/author in gallery and module menu, hidden console cursor, esc aborts edit/add/pin/search prompts. See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta8 - v2 UI live-run fixes: goto panel centred over the content, one cursor design on every screen (full-row background, brighter, no bar mark), first-run welcome overlay with the three keys worth knowing. See CHANGELOG.md.'
         }
     }
 }

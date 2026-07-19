@@ -3,6 +3,32 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [0.1.0-beta8] — 2026-07-20
+
+Live-run feedback rounds two and three on the v2 UI.
+
+### Added
+- **First-run welcome overlay**: nothing on screen told a new user that `g`
+  hides the whole navigation layer, so the very first grid paint floats a
+  small tips panel (same overlay style as goto) with the three keys worth
+  knowing — `g` goto, `?` help, `enter` actions. Any key closes it; a
+  `psmm-welcome.json` marker next to the main config makes it once-ever.
+- **Design-consistency test**: every list screen (grid, files, tasks,
+  gallery, paths, commands, cleanup) is rendered and held to the identical
+  cursor treatment — any future screen that deviates fails the suite.
+
+### Changed
+- **The goto panel floats dead centre of the frame's content box** (not the
+  window, not the bottom): after four placements read as detached, it now
+  behaves like a modal over the content and only its rectangle is redrawn
+  on dismissal.
+- **One cursor design on every screen**: the `▌` bar is retired everywhere;
+  sub-screen tables paint the same edge-to-edge cursor-row background as
+  the grid (one shared table builder), with the bold accent name on top.
+- **Cursor-row background lifted `grey15` → `grey23`**: once the bar left
+  the grid, #262626 all but vanished on a black terminal; #3a3a3a reads as
+  a highlight and stays below the grey35 border.
+
 ## [0.1.0-beta7] — 2026-07-20
 
 Live-run feedback round on the v2 UI (thanks, first real session).
