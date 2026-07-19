@@ -3,6 +3,21 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [0.1.0-beta5] — 2026-07-19
+
+### Fixed
+- **Fresh-install crash revealed on exit**
+  ([#1](https://github.com/PBNZ/psmm/issues/1)): with exactly one managed
+  entry — what every fresh install has after the main config is seeded with
+  PwshSpectreConsole — the first `Sync-PSMMUIEntries -FullScan` threw
+  `op_Addition`: PowerShell's pipeline unrolling turns a single-element
+  `Get-PSMMAllEntries` result into a scalar `PSObject`, and scalar `+` array
+  is not defined. The error fired at startup *before* the alternate screen
+  opened, stayed hidden behind the TUI, and appeared when the original
+  buffer was restored on exit; the initial availability refresh also never
+  ran in that state. The call site now wraps the result in `@()`, with a
+  regression test covering the one-entry full scan.
+
 ## [0.1.0-beta4] — 2026-07-15
 
 ### Added
