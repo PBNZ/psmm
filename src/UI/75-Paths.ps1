@@ -43,8 +43,9 @@ function script:Build-PSMMPathsView {
             ' not something you did). cloud-only files there can stall or fail module loading -' +
             ' d downloads them, k keeps the folder on this device, s moves the primary location.[/]'))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'd=download cloud-only files', 'k=keep on device (pin)', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('d=download cloud-only files', 'k=keep on device (pin)'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('s=set primary location', 'r=remove primary override'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -54,7 +55,7 @@ function script:Show-PSMMPaths {
     $st = New-PSMMListState
     $st.Status = ''
     while ($true) {
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         $infos = @(Get-PSMMModulePathInfo)
         $cmd = @{ Name = $null }
         Clear-PSMMScreen
@@ -67,7 +68,12 @@ function script:Show-PSMMPaths {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
-                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+                if ($k.KeyChar -eq 'g') {
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPathsView -State $st -Infos $infos -StatusMarkup $st.Status) -Context $ctx
+                    if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                    continue
+                }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $infos.Count) { continue }
                 switch ($k.Key) {
@@ -80,7 +86,7 @@ function script:Show-PSMMPaths {
                 }
             }
         }
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         $cur = if ($infos.Count) { $infos[[Math]::Min($st.Cursor, $infos.Count - 1)] } else { $null }
         switch ($cmd.Name) {
             'help' { Show-PSMMHelpScreen -Topic 'paths' }

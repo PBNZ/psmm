@@ -28,12 +28,12 @@ function script:Build-PSMMCommandListView {
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Commands in $(ConvertTo-PSMMSafe $ModuleName)[/]$pos$of$(Get-PSMMFilterMarkup -State $State)"))
     $items.Add($T)
-    $hint = if ($State.FilterMode) {
-        Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter', 'up/dn=move')
+    if ($State.FilterMode) {
+        $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter', 'up/dn=move'))))
     } else {
-        Get-PSMMHint -Pairs @('up/dn=move', 'enter=details', '/=search', '?=help', 'esc=back', 'g h=home', '^q=quit')
+        $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=details'))))
+        $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '/=filter', '?=help', 'esc=back', '^q=quit'))))
     }
-    $items.Add([Spectre.Console.Markup]::new($hint))
     [Spectre.Console.Rows]::new($items)
 }
 
@@ -53,7 +53,7 @@ function script:Show-PSMMCommands {
     $st = New-PSMMListState
     $pick = @{ Name = $null }
     while ($true) {
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         $pick.Name = $null
         Clear-PSMMScreen
         Invoke-PSMMLive -Body {
@@ -72,7 +72,12 @@ function script:Show-PSMMCommands {
                     $null = Invoke-PSMMListNav -State $st -KeyInfo $k -Count $view.Count
                     continue
                 }
-                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+                if ($k.KeyChar -eq 'g') {
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMCommandListView -State $st -Commands $cmds -View $view -ModuleName $Entry.Name) -Context $ctx
+                    if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                    continue
+                }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $view.Count) { continue }
                 switch ($k.Key) {
                     ([ConsoleKey]::Escape) {
@@ -131,7 +136,8 @@ function script:Build-PSMMCommandDetailView {
     $panel.Border = [Spectre.Console.BoxBorder]::Rounded
     $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
     $items.Add($panel)
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('left/right=switch tab', 'up/dn=scroll', 'c=copy tab', 'esc=back', 'g h=home', '^q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('left/right=switch tab', 'up/dn=scroll', 'c=copy tab'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", 'esc=back', '^q=quit'))))
     if ($State.Status) { $items.Add([Spectre.Console.Markup]::new($State.Status)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -160,7 +166,12 @@ function script:Show-PSMMCommandDetail {
             $k = Read-PSMMKeyResize
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
-            if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+            if ($k.KeyChar -eq 'g') {
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMCommandDetailView -State $st -Name $Name -Content $content -Tabs $tabs) -Context $ctx
+                if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                continue
+            }
+            if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
             $st.Status = ''
             switch ($k.Key) {
                 ([ConsoleKey]::LeftArrow)  { $st.Tab = ($st.Tab + $tabs.Count - 1) % $tabs.Count; $st.Scroll = 0 }

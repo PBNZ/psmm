@@ -7,22 +7,15 @@ function script:Test-PSMMHardQuitKey {
      ($KeyInfo.Key -in [ConsoleKey]::Q, [ConsoleKey]::X))
 }
 
-# Is this the "go home" input? Primary: the vim-style goto chord 'g' then 'h'
-# (the only living TUI convention for jumping to a named top-level view -
-# yazi/ranger/spotify_player; there is no cross-TUI "home" key). Alias:
-# Ctrl+H where the terminal reports it distinctly (Windows Terminal/conhost
-# deliver full key records; over VT paths Ctrl+H IS backspace, so the chord
-# is the reliable route). A 'g' followed by anything else is swallowed.
+# Is this the "go home" alias? Ctrl+H where the terminal reports it
+# distinctly (Windows Terminal/conhost deliver full key records; over VT
+# paths Ctrl+H IS backspace). The primary route home is the g goto overlay
+# ('g' then 'h', 03-Goto.ps1) - plain 'g' is handled by each screen loop,
+# so this test answers immediately without a second key read.
 function script:Test-PSMMHomeKey {
     param([Parameter(Mandatory)] $KeyInfo)
-    if ((($KeyInfo.Modifiers -band [ConsoleModifiers]::Control) -ne 0) -and
-        ($KeyInfo.Key -eq [ConsoleKey]::H)) { return $true }
-    if ($KeyInfo.KeyChar -eq 'g') {
-        $k2 = [Console]::ReadKey($true)
-        if (Test-PSMMHardQuitKey $k2) { $script:PSMM_UI.HardQuit = $true; return $false }
-        return ($k2.KeyChar -eq 'h')
-    }
-    $false
+    ((($KeyInfo.Modifiers -band [ConsoleModifiers]::Control) -ne 0) -and
+     ($KeyInfo.Key -eq [ConsoleKey]::H))
 }
 
 # Key read that also notices terminal resizes and background-task activity:

@@ -34,8 +34,8 @@ function script:Build-PSMMFilesView {
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $cur.Path)[/]"))
         if ($cur.IncludesIgnored) { $items.Add([Spectre.Console.Markup]::new('[orange1]! this file has an Includes section that is being ignored (main config only)[/]')) }
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'space=enable/disable+save', 'a=apply to session', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('n=new config (templates)', 'm=move file', 'c=conflicts'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('space=enable/disable+save', 'a=apply to session', 'n=new config (templates)', 'm=move file'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     foreach ($w in @(Get-PSMMWarning | Select-Object -First 4)) { $items.Add([Spectre.Console.Markup]::new("[orange1]$(ConvertTo-PSMMSafe $w)[/]")) }
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
@@ -47,7 +47,7 @@ function script:Show-PSMMFiles {
     $st = New-PSMMListState
     $st.Status = ''
     while ($true) {
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         $cmd = @{ Name = $null }
         Clear-PSMMScreen
         Invoke-PSMMLive -Body {
@@ -60,7 +60,12 @@ function script:Show-PSMMFiles {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
-                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+                if ($k.KeyChar -eq 'g') {
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMFilesView -State $st -Metas $metas -StatusMarkup $st.Status) -Context $ctx
+                    if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                    continue
+                }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $metas.Count) { continue }
                 switch ($k.Key) {
@@ -78,7 +83,6 @@ function script:Show-PSMMFiles {
                     ([ConsoleKey]::A) { $cmd.Name = 'apply'; return }
                     ([ConsoleKey]::N) { $cmd.Name = 'new'; return }
                     ([ConsoleKey]::M) { $cmd.Name = 'move'; return }
-                    ([ConsoleKey]::C) { $cmd.Name = 'conflicts'; return }
                     ([ConsoleKey]::Escape) { return }
                     default { if ($k.KeyChar -eq '?') { $cmd.Name = 'help'; return } }
                 }
@@ -92,7 +96,6 @@ function script:Show-PSMMFiles {
             'apply'     { Invoke-PSMMApply }
             'new'       { New-PSMMConfigFile }
             'move'      { $metas = @((Get-PSMMFileMeta).Values); if ($metas.Count) { Move-PSMMConfigFile -Meta $metas[$st.Cursor] } }
-            'conflicts' { Show-PSMMConflicts }
             'help'      { Show-PSMMHelpScreen -Topic 'files' }
             default     { return }
         }

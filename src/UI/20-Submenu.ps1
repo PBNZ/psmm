@@ -61,7 +61,7 @@ function script:Build-PSMMModuleMenuView {
         $pairs += 's=check connection'
     }
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs $pairs)))
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('?=help', 'esc=back', 'g h=home', '^q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -78,14 +78,19 @@ function script:Show-PSMMModuleMenu {
 
     $status = ''
     while ($true) {
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         Clear-PSMMScreen
         Write-PSMMRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth -StatusMarkup $status)
         $status = ''
 
         $k = [Console]::ReadKey($true)
         if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
-        if (Test-PSMMHomeKey $k) { $ui.GoHome = $true; return }
+        if ($k.KeyChar -eq 'g') {
+            $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth)
+            if ($dest) { $ui.Goto = $dest; return }
+            continue
+        }
+        if (Test-PSMMHomeKey $k) { $ui.Goto = 'home'; return }
         $ctrl = ($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0
         switch ($k.Key) {
             ([ConsoleKey]::L) {

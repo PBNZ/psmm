@@ -315,7 +315,6 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $missing | Should -Match 'i\s+install'
         $missing | Should -Not -Match 'u\s+update'
         $missing | Should -Match '\^l\s+load'
-        $missing | Should -Match 'g h\s+home'
         $installed = Get-RenderedText {
             $e = $script:PSMM_UI.Entries[0]
             $e.Installed = $true; $e.InstalledVersion = [version]'1.0'
@@ -420,10 +419,9 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match 's\s+set primary location'
     }
 
-    It 'the grid offers p=paths and shows the OneDrive notice when the primary location is cloud-backed' {
+    It 'the grid shows the OneDrive notice when the primary location is cloud-backed' {
         InModuleScope psmm { $script:PSMM_UI.OneDrivePrimary = $true }
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match 'p\s+paths'
         $text | Should -Match 'primary module location is inside OneDrive'
         InModuleScope psmm { $script:PSMM_UI.OneDrivePrimary = $false }
         $text = Get-RenderedText { Build-PSMMGrid }
@@ -765,6 +763,73 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $flat | Should -Match 'AlphaMod .* background-installs at shell start when missing'
         $flat | Should -Match 'not imported this session'
         $flat | Should -Match 'v7\.8\.10 on disk, v7\.9\.0 available \(u updates\)'
+    }
+
+    # --- step 4: the g goto layer ------------------------------------------
+
+    It 'the goto table is complete: every v2 destination has its chord (step 4)' {
+        InModuleScope psmm {
+            $t = Get-PSMMGotoTable
+            $t['h'].Target | Should -Be 'home'
+            $t['g'].Target | Should -Be 'gallery'
+            $t['f'].Target | Should -Be 'files'
+            $t['p'].Target | Should -Be 'paths'
+            $t['t'].Target | Should -Be 'tasks'
+            $t['c'].Target | Should -Be 'conflicts'
+            $t['x'].Target | Should -Be 'cleanup'
+            $t['m'].Target | Should -Be 'unmanaged'
+            $t['?'].Target | Should -Be 'help'
+            @($t.Keys).Count | Should -Be 9
+        }
+    }
+
+    It 'the goto overlay panel names every destination and how to leave it (step 4)' {
+        $text = Get-RenderedText { Build-PSMMGotoPanel }
+        $text | Should -Match 'g\s+goto'
+        foreach ($label in 'home', 'gallery', 'files', 'paths', 'tasks', 'conflicts', 'cleanup', 'unmanaged', 'keys') {
+            $text | Should -Match $label
+        }
+        $text | Should -Match 'esc cancels'
+        $text | Should -Match 'swallowed'
+    }
+
+    It 'grid hints: single letters are verbs only, navigation lives in the persistent goto row (step 4)' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $text | Should -Match 'i\s+install'
+        $text | Should -Match 'a\s+add'
+        $text | Should -Match 'r\s+reload'
+        $text | Should -Match "g\s+goto$([char]0x2026)"
+        $text | Should -Match '/\s+filter'
+        $text | Should -Match '\?\s+help'
+        $text | Should -Match '\^q\s+quit'
+        # the screen-switch letters are gone from the hint rows
+        $text | Should -Not -Match 'f\s+files'
+        $text | Should -Not -Match 'x\s+cleanup'
+        $text | Should -Not -Match 'm\s+unmanaged'
+        $text | Should -Not -Match 't\s+tasks'
+        $text | Should -Not -Match 'c\s+conflicts'
+        $text | Should -Not -Match 'p\s+paths'
+        $text | Should -Not -Match 'g\s+gallery'
+    }
+
+    It 'Test-PSMMHomeKey answers plain g immediately (the overlay owns the chord now) (step 4)' {
+        InModuleScope psmm {
+            $ctrlH = [ConsoleKeyInfo]::new([char]8, [ConsoleKey]::H, $false, $false, $true)
+            Test-PSMMHomeKey -KeyInfo $ctrlH | Should -BeTrue
+            # 'g' must return false WITHOUT blocking on a second key read
+            $g = [ConsoleKeyInfo]::new('g', [ConsoleKey]::G, $false, $false, $false)
+            Test-PSMMHomeKey -KeyInfo $g | Should -BeFalse
+        }
+    }
+
+    It 'sub-screens carry the persistent row instead of per-screen quit hints (step 4)' {
+        $menu = Get-RenderedText { Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null }
+        $menu | Should -Match "g\s+goto$([char]0x2026)"
+        $menu | Should -Match 'esc\s+back'
+        $menu | Should -Not -Match 'g h\s+home'
+        $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
+        $files | Should -Match "g\s+goto$([char]0x2026)"
+        $files | Should -Not -Match 'c\s+conflicts'
     }
 
     It 'moving the cursor onto a row with a pending update does not change the table width (step 3)' {

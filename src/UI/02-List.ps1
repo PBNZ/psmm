@@ -113,7 +113,7 @@ function script:Build-PSMMPagerView {
         # blank lines every text document contains
         [Parameter(Mandatory)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines,
         [Parameter(Mandatory)][string]$TitleMarkup,
-        [string[]]$HintPairs = @('up/dn=scroll', 'c=copy', 'esc=back', 'g h=home', '^q=quit'),
+        [string[]]$HintPairs = @('up/dn=scroll', 'c=copy'),
         [string]$StatusMarkup,
         [int]$ReservedRows = 7
     )
@@ -131,6 +131,7 @@ function script:Build-PSMMPagerView {
     $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColMute)
     $items.Add($panel)
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs $HintPairs)))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -183,7 +184,12 @@ function script:Show-PSMMPager {
             $k = Read-PSMMKeyResize
             if ($null -eq $k) { continue }
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
-            if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+            if ($k.KeyChar -eq 'g') {
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMPagerView -State $st -Lines $Lines -TitleMarkup $TitleMarkup -StatusMarkup $st.Status) -Context $ctx
+                if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                continue
+            }
+            if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
             $st.Status = ''
             if (Invoke-PSMMPagerNav -State $st -KeyInfo $k) { continue }
             if ($k.Key -eq [ConsoleKey]::Escape) { return }

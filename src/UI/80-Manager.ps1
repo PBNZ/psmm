@@ -15,13 +15,24 @@ function script:Invoke-PSMMManagerLoop {
         while ($true) {
             $ui = $script:PSMM_UI
             if ($ui.HardQuit) { return }
-            $ui.GoHome = $false   # the grid IS home - the chord has unwound
-            $r = Invoke-PSMMGrid
-            if ($script:PSMM_UI.HardQuit) { return }
-            switch ($r.Cmd) {
-                'quit'      { return }
+            # a pending goto (set by any sub-screen via the g overlay) routes
+            # straight to its screen; 'home' - and no goto - lands on the grid
+            $goto = $ui.Goto
+            $ui.Goto = $null
+            $cmd = $null
+            $index = $null
+            if ($goto -and $goto -ne 'home') {
+                $cmd = $goto
+            } else {
+                $r = Invoke-PSMMGrid
+                if ($script:PSMM_UI.HardQuit) { return }
+                if ($r.Cmd -eq 'quit') { return }
+                $cmd = $r.Cmd
+                $index = $r.Index
+            }
+            switch ($cmd) {
                 'submenu'   {
-                    Show-PSMMModuleMenu -Entry $script:PSMM_UI.Entries[$r.Index]
+                    Show-PSMMModuleMenu -Entry $script:PSMM_UI.Entries[$index]
                     Update-PSMMLoaded -Entries $script:PSMM_UI.Entries
                 }
                 'add'       { New-PSMMEntry }
@@ -32,6 +43,7 @@ function script:Invoke-PSMMManagerLoop {
                 'cleanup'   { Show-PSMMCleanup }
                 'tasks'     { Show-PSMMTasks }
                 'help'      { Show-PSMMHelpScreen -Topic 'grid' }
+                'unmanaged' { Invoke-PSMMUnmanagedToggle }
                 'reload'    { $script:PSMM_UI.Dirty = $true }
             }
             if ($script:PSMM_UI.HardQuit) { return }

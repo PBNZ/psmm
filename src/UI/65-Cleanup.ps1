@@ -32,7 +32,8 @@ function script:Build-PSMMCleanupView {
     if (-not $script:PSMM_UI.Elevated) {
         $items.Add([Spectre.Console.Markup]::new('[grey66]session is not elevated: AllUsers copies are skipped automatically[/]'))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=clean this module', '^a=clean all', 'r=rescan', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=clean this module', '^a=clean all', 'r=rescan'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -44,7 +45,7 @@ function script:Show-PSMMCleanup {
     $dupes = @(Get-PSMMDuplicateVersion)
     $status = ''
     while ($true) {
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         if (-not $dupes.Count) {
             Clear-PSMMScreen
             Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old module versions[/]"
@@ -65,7 +66,12 @@ function script:Show-PSMMCleanup {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
-                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+                if ($k.KeyChar -eq 'g') {
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMCleanupView -State $st -Dupes $dupes -StatusMarkup $st.Status) -Context $ctx
+                    if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                    continue
+                }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $dupes.Count) { continue }
                 switch ($k.Key) {

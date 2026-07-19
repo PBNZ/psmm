@@ -21,7 +21,7 @@ function script:Receive-PSMMUITask {
                     Update-PSMMLoaded -Entries $ui.Entries
                 }
                 $fails = @($t.Output | Where-Object { "$_" -like 'FAILED *' })
-                $ui.Status = if ($fails.Count) { "[orange1]install/update: $($fails.Count) of $($names.Count) failed (t=details)[/]" }
+                $ui.Status = if ($fails.Count) { "[orange1]install/update: $($fails.Count) of $($names.Count) failed (g t=details)[/]" }
                              else { "[green3]install/update done: $($names -join ', ')[/]" }
             }
             'updatecheck' {
@@ -39,10 +39,10 @@ function script:Receive-PSMMUITask {
                     }
                     if ($e.UpdateAvailable) { $found++ }
                 }
-                $ui.Status = if ($found) { "[orange1]$found update(s) available ($([char]0x2191) in the Ver column - u updates the selection)[/]" } else { '[green3]everything up to date[/]' }
+                $ui.Status = if ($found) { "[orange1]$found update(s) available ($([char]0x21E1) in the version column - u updates the selection)[/]" } else { '[green3]everything up to date[/]' }
             }
             'updatehelp' {
-                $ui.Status = if ($t.Failed) { '[orange1]Update-Help finished with errors (t=details)[/]' } else { '[green3]Update-Help done[/]' }
+                $ui.Status = if ($t.Failed) { '[orange1]Update-Help finished with errors (g t=details)[/]' } else { '[green3]Update-Help done[/]' }
             }
             'selfupdate' {
                 # silent: the standing grid notice covers it; just refresh
@@ -50,7 +50,7 @@ function script:Receive-PSMMUITask {
                 $ui.SelfUpdate = Test-PSMMUpdateAvailable
             }
             default {
-                $ui.Status = if ($t.Failed) { "[orange1]task '$(ConvertTo-PSMMSafe $t.Label)' failed (t=details)[/]" }
+                $ui.Status = if ($t.Failed) { "[orange1]task '$(ConvertTo-PSMMSafe $t.Label)' failed (g t=details)[/]" }
                              else { "[green3]task '$(ConvertTo-PSMMSafe $t.Label)' done[/]" }
             }
         }
@@ -102,7 +102,8 @@ function script:Build-PSMMTasksView {
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]Background tasks[/]$pos"))
     $items.Add($T)
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=move', 'enter=view output', 'u=run update-help', 'c=clear finished', '?=help', 'esc=back', 'g h=home', '^q=quit'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=view output', 'u=run update-help', 'c=clear finished'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -111,7 +112,7 @@ function script:Show-PSMMTasks {
     $ui = $script:PSMM_UI
     $status = ''
     while ($true) {
-        if ($ui.HardQuit -or $ui.GoHome) { return }
+        if ($ui.HardQuit -or $ui.Goto) { return }
         Update-PSMMTask
         $tasks = @(Get-PSMMTask)
         $st = New-PSMMListState
@@ -125,6 +126,11 @@ function script:Show-PSMMTasks {
             Write-PSMMLine (Get-PSMMHint -Pairs @('u=run update-help', 'esc=back'))
             $k = [Console]::ReadKey($true)
             if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
+            if ($k.KeyChar -eq 'g') {
+                $dest = Read-PSMMGotoKey
+                if ($dest) { $ui.Goto = $dest; return }
+                continue
+            }
             if ($k.Key -eq [ConsoleKey]::U) { Start-PSMMUpdateHelpTask; continue }
             return
         }
@@ -140,7 +146,12 @@ function script:Show-PSMMTasks {
                 $k = Read-PSMMKeyResize
                 if ($null -eq $k) { continue }
                 if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; return }
-                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.GoHome = $true; return }
+                if ($k.KeyChar -eq 'g') {
+                    $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMTasksView -State $st -Tasks $tasks -StatusMarkup $st.Status) -Context $ctx
+                    if ($dest) { $script:PSMM_UI.Goto = $dest; return }
+                    continue
+                }
+                if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $tasks.Count) { continue }
                 switch ($k.Key) {

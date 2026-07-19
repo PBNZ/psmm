@@ -151,8 +151,8 @@ function script:Build-PSMMGrid {
     $flt = Get-PSMMFilterMarkup -State $ui
     $head = if ($sel) { "[$script:PSMM_ColOk]$([char]0x25AA) $sel selected[/]$pos$flt" } else { "[$script:PSMM_ColMute]none selected[/]$pos$flt" }
 
-    # short hint rows (a single long row collapses to '...' when narrow):
-    # navigation, module verbs, screen switching (design system row order)
+    # two tiers (design v2 §3): contextual verb rows, then the persistent
+    # strip - navigation letters live in the g goto overlay, not here
     $hintRows = if ($ui.FilterMode) {
         @(
             (Get-PSMMHint -Pairs @('type=filter', 'enter=apply', 'esc=clear & exit filter')),
@@ -160,9 +160,9 @@ function script:Build-PSMMGrid {
         )
     } else {
         @(
-            (Get-PSMMHint -Pairs @('up/dn=move', 'space=select', 'enter=actions', '/=search', '?=help', 'esc=quit')),
-            (Get-PSMMHint -Pairs @('^l=load', '^u=unload', 'i=install', 'u=update', 'k=check updates', 'r=reload')),
-            (Get-PSMMHint -Pairs @('a=add', 'g=gallery', 'x=cleanup', 'f=files', 'p=paths', 'c=conflicts', 't=tasks', 'm=unmanaged'))
+            (Get-PSMMHint -Pairs @('i=install', 'u=update', 'k=check updates', '^l=load', '^u=unload')),
+            (Get-PSMMHint -Pairs @('space=select', 'enter=actions', 'a=add', 'r=reload')),
+            (Get-PSMMPersistentHint)
         )
     }
 
@@ -182,13 +182,13 @@ function script:Build-PSMMGrid {
     # background tasks side overlay (#25) - one unobtrusive line
     $ts = Get-PSMMTaskSummary
     if ($ts) {
-        $spin = if ($ts.RunningCount) { '[steelblue1]~[/] ' } else { '' }
-        $items.Add([Spectre.Console.Markup]::new("$spin[$script:PSMM_ColMute]tasks: $(ConvertTo-PSMMSafe $ts.Text)  (t=details)[/]"))
+        $spin = if ($ts.RunningCount) { "[$script:PSMM_ColInfo]~[/] " } else { '' }
+        $items.Add([Spectre.Console.Markup]::new("$spin[$script:PSMM_ColMute]tasks: $(ConvertTo-PSMMSafe $ts.Text)  (g t=details)[/]"))
     }
 
     # unmanaged notice, once the scan is in and the rows are hidden
     if ($ui.Unmanaged -and -not $ui.ShowUnmanaged -and @($ui.Unmanaged).Count) {
-        $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - m shows them[/]"))
+        $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(@($ui.Unmanaged).Count) installed module(s) not in your config - g m shows them[/]"))
     }
 
     # newer psmm available (daily cached check): the verified update command,
@@ -200,11 +200,11 @@ function script:Build-PSMMGrid {
 
     # standing OneDrive diagnosis (cached at init - no per-frame path checks)
     if ($ui.OneDrivePrimary) {
-        $items.Add([Spectre.Console.Markup]::new('[orange1]primary module location is inside OneDrive - cloud-only files can break loading (p=details)[/]'))
+        $items.Add([Spectre.Console.Markup]::new('[orange1]primary module location is inside OneDrive - cloud-only files can break loading (g p=details)[/]'))
     }
 
     $warnings = Get-PSMMWarning
-    if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[orange1]$($warnings.Count) config warning(s) - press f or c for details[/]")) }
+    if ($warnings.Count) { $items.Add([Spectre.Console.Markup]::new("[orange1]$($warnings.Count) config warning(s) - g f / g c show details[/]")) }
     if ($ui.Status) { $items.Add([Spectre.Console.Markup]::new($ui.Status)) }
     [Spectre.Console.Rows]::new($items)
 }
@@ -262,6 +262,20 @@ function script:Get-PSMMStartupJobMarkup {
     }
     if ($j.State -in 'Failed', 'Stopped') { return '[indianred1]background startup job failed - see t (tasks)[/]' }
     ''
+}
+
+# Show/hide the unmanaged rows (the g m chord). Shared by the grid loop and
+# the manager loop (a g m pressed on any sub-screen lands here via Goto).
+function script:Invoke-PSMMUnmanagedToggle {
+    $ui = $script:PSMM_UI
+    if ($ui.Unmanaged) {
+        $ui.ShowUnmanaged = -not $ui.ShowUnmanaged
+        Sync-PSMMUIEntries
+        $ui.Status = if ($ui.ShowUnmanaged) { "[$script:PSMM_ColOk]showing $(@($ui.Unmanaged).Count) unmanaged module(s)[/]" }
+                     else { "[$script:PSMM_ColMute]unmanaged modules hidden[/]" }
+    } else {
+        $ui.Status = "[$script:PSMM_ColWarn]unmanaged scan still running (g t=details)[/]"
+    }
 }
 
 # Quiet, fast actions that stay inside the live grid. $Context lets us
@@ -375,7 +389,7 @@ function script:Start-PSMMUpdateCheckTask {
             } catch { }
         }
     }
-    $ui.Status = "[$script:PSMM_ColAccent]update check started in the background (t=details)[/]"
+    $ui.Status = "[$script:PSMM_ColAccent]update check started in the background (g t=details)[/]"
 }
 
 # The live grid loop. Returns a command hashtable for full-screen actions.
@@ -406,6 +420,16 @@ function script:Invoke-PSMMGrid {
 
             if (Invoke-PSMMListNav -State $ui -KeyInfo $k -Count $n) { continue }
 
+            # the g goto layer (v2 §4): overlay + second key; single letters
+            # below are verbs only
+            if ($k.KeyChar -eq 'g') {
+                $dest = Read-PSMMGotoKey -BaseRenderable (Build-PSMMGrid) -Context $ctx
+                if ($script:PSMM_UI.HardQuit) { $result.Cmd = 'quit'; return }
+                if ($dest -eq 'unmanaged') { Invoke-PSMMUnmanagedToggle }
+                elseif ($dest -and $dest -ne 'home') { $result.Cmd = $dest; return }
+                continue
+            }
+
             switch ($k.Key) {
                 ([ConsoleKey]::Spacebar) {
                     if ($n) {
@@ -435,27 +459,8 @@ function script:Invoke-PSMMGrid {
                 }
                 ([ConsoleKey]::I) { if (-not $ctrl) { Start-PSMMInstallTask }; continue }
                 ([ConsoleKey]::K) { if (-not $ctrl) { Start-PSMMUpdateCheckTask }; continue }
-                ([ConsoleKey]::P) { if (-not $ctrl) { $result.Cmd = 'paths'; return }; continue }
                 ([ConsoleKey]::A) { if (-not $ctrl) { $result.Cmd = 'add'; return }; continue }
-                ([ConsoleKey]::C) { if (-not $ctrl) { $result.Cmd = 'conflicts'; return }; continue }
                 ([ConsoleKey]::R) { if (-not $ctrl) { $result.Cmd = 'reload'; return }; continue }
-                ([ConsoleKey]::F) { if (-not $ctrl) { $result.Cmd = 'files'; return }; continue }
-                ([ConsoleKey]::G) { if (-not $ctrl) { $result.Cmd = 'gallery'; return }; continue }
-                ([ConsoleKey]::X) { if (-not $ctrl) { $result.Cmd = 'cleanup'; return }; continue }
-                ([ConsoleKey]::T) { if (-not $ctrl) { $result.Cmd = 'tasks'; return }; continue }
-                ([ConsoleKey]::H) { if (-not $ctrl) { $result.Cmd = 'help'; return }; continue }
-                ([ConsoleKey]::M) {
-                    if (-not $ctrl) {
-                        if ($ui.Unmanaged) {
-                            $ui.ShowUnmanaged = -not $ui.ShowUnmanaged
-                            Sync-PSMMUIEntries
-                            $ui.Status = if ($ui.ShowUnmanaged) { "[green3]showing $(@($ui.Unmanaged).Count) unmanaged module(s)[/]" } else { '[grey66]unmanaged modules hidden[/]' }
-                        } else {
-                            $ui.Status = '[orange1]unmanaged scan still running (t=details)[/]'
-                        }
-                    }
-                    continue
-                }
                 ([ConsoleKey]::Oem2) {
                     # '/' and '?' share this key on most layouts - split by char
                     if ($k.KeyChar -eq '?') { $result.Cmd = 'help'; return }
