@@ -269,7 +269,11 @@ function script:Show-PSMMModuleMenu {
                 }
             }
             ([ConsoleKey]::U) {
-                if ($ctrl) {
+                if ($ctrl -and (Test-PSMMOwnModule -Name $Entry.Name)) {
+                    # unloading psmm or its UI engine kills the screen you are
+                    # standing on (gh#16)
+                    $status = "[$script:PSMM_ColWarn]$(ConvertTo-PSMMSafe $Entry.Name) is psmm's own - unloading it would take the manager down with it[/]"
+                } elseif ($ctrl) {
                     Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
                     try { Remove-Module -Name $Entry.Name -Force -ErrorAction Stop; $status = "[$script:PSMM_ColOk]unloaded[/]" }
                     catch { $status = "[$script:PSMM_ColErr]$(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }

@@ -405,6 +405,81 @@ Describe 'User input never crashes a screen' -Tag UI -Skip:(-not $SpectreAvailab
     }
 }
 
+Describe 'psmm''s own modules read as infrastructure' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    It 'shows "psmm''s own" instead of loaded/installed once the module is present' {
+        InModuleScope psmm {
+            $e = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'PwshSpectreConsole' }) -Source 'x.json' -Writable $true
+            $e.Installed = $true
+            [Spectre.Console.Markup]::Remove((Get-PSMMStateMarkup -Entry $e)) | Should -Match "psmm's own"
+            $e.Loaded = $true
+            [Spectre.Console.Markup]::Remove((Get-PSMMStateMarkup -Entry $e)) | Should -Match "psmm's own"
+            # ... but a MISSING dependency is a real problem and still says so
+            $e.Installed = $false; $e.Loaded = $false
+            [Spectre.Console.Markup]::Remove((Get-PSMMStateMarkup -Entry $e)) | Should -Match 'missing'
+            # and a normal module is unaffected
+            $n = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'ImportExcel' }) -Source 'x.json' -Writable $true
+            $n.Loaded = $true
+            [Spectre.Console.Markup]::Remove((Get-PSMMStateMarkup -Entry $n)) | Should -Match 'loaded'
+        }
+    }
+
+    It 'the "N loaded" count excludes psmm''s own even when it IS loaded' {
+        $text = Get-RenderedText {
+            $mine = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'PwshSpectreConsole' }) -Source 'x.json' -Writable $true
+            $mine.Loaded = $true; $mine.Installed = $true; $mine.InstalledVersion = [version]'2.6.3'
+            $yours = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'ImportExcel' }) -Source 'x.json' -Writable $true
+            $yours.Loaded = $true; $yours.Installed = $true; $yours.InstalledVersion = [version]'7.8.10'
+            $script:PSMM_UI.Entries = [System.Collections.Generic.List[object]]::new()
+            $script:PSMM_UI.Entries.Add($mine); $script:PSMM_UI.Entries.Add($yours)
+            $script:PSMM_UI.Cursor = 0
+            Build-PSMMGrid
+        }
+        # both rows say loaded; only one of them is YOURS
+        $text | Should -Match '2 modules'
+        $text | Should -Match '1 loaded'
+        $text | Should -Match "psmm's own"
+    }
+
+    It 'the context sentence tells the truth about whose session it is in' {
+        $notYours = Get-RenderedText {
+            $mine = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'PwshSpectreConsole' }) -Source 'x.json' -Writable $true
+            $mine.Installed = $true; $mine.InstalledVersion = [version]'2.6.3'   # imported privately -> not Loaded
+            $script:PSMM_UI.Entries = [System.Collections.Generic.List[object]]::new()
+            $script:PSMM_UI.Entries.Add($mine)
+            $script:PSMM_UI.Cursor = 0
+            Build-PSMMGrid
+        }
+        $notYours | Should -Match 'not part of your session'
+
+        $alsoYours = Get-RenderedText {
+            $mine = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'PwshSpectreConsole' }) -Source 'x.json' -Writable $true
+            $mine.Installed = $true; $mine.Loaded = $true; $mine.InstalledVersion = [version]'2.6.3'
+            $script:PSMM_UI.Entries = [System.Collections.Generic.List[object]]::new()
+            $script:PSMM_UI.Entries.Add($mine)
+            $script:PSMM_UI.Cursor = 0
+            Build-PSMMGrid
+        }
+        $alsoYours | Should -Match 'also imported in your own session'
+    }
+
+    It 'never unloads psmm or its UI engine, in bulk or from the module menu' {
+        InModuleScope psmm {
+            $mine = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'PwshSpectreConsole' }) -Source 'x.json' -Writable $true
+            $mine.Loaded = $true; $mine.Installed = $true
+            $script:PSMM_UI.Entries = [System.Collections.Generic.List[object]]::new()
+            $script:PSMM_UI.Entries.Add($mine)
+            $script:PSMM_UI.Cursor = 0
+            $script:PSMM_UI.View = @(0)
+            $script:PSMM_UI.Sel.Clear()
+            Mock Remove-Module { }
+            Invoke-PSMMBulk -Action Unload
+            Should -Invoke Remove-Module -Times 0 -Exactly
+            $script:PSMM_UI.Status | Should -Match "psmm's own"
+        }
+    }
+}
+
 Describe 'Destructive actions are gated' -Tag UI -Skip:(-not $SpectreAvailable) {
 
     It 'the typed confirmation accepts only the phrase - not y, not enter, not esc' {

@@ -210,3 +210,38 @@ paragraphs running the full width of a 200-column terminal. The palette rule
 source plus a guard test is what actually holds a UI together over time; this
 extends the same discipline from colour to the four other things every screen
 shows.
+
+## D-OWN-MODULES — psmm's own modules are infrastructure, not the user's session (2026-07-22)
+
+**Decision:** psmm imports its UI dependency into its OWN session state (no
+`-Global`), tracks what it imported by instance, and treats psmm + that
+dependency as infrastructure everywhere in the UI: rendered as `◈ psmm's own`,
+excluded from the "N loaded" count and the unmanaged scan, never unloaded.
+They remain visible, installable and updatable.
+
+**Why:** psmm manages the modules the user asked for. Before this, psmm wrote
+its own dependency into the user's config, imported it `-Global` into the
+user's session, counted itself in "N loaded", and offered both under `m` as
+modules to adopt. None of that is the user's business.
+
+**Why not hide them entirely:** a broken UI dependency would become unfixable
+from inside the tool that needs it to render the repair screen. Visible but
+marked is the honest middle.
+
+**The coupling that makes this subtle:** `Get-Module` inside psmm returns the
+global module table PLUS psmm's private state, so the moment psmm imports
+anything privately, `Update-PSMMLoaded` must subtract it or it reports
+"loaded" for a module the user's prompt cannot see - the D-IMPORT-SCOPE bug
+again, smaller. The two rules are one mechanism and a single guard test
+enforces both halves: an import registered via `Register-PSMMPrivateImport`
+must NOT be `-Global`; every other import must be.
+
+**Subtraction is by INSTANCE, not by name.** Verified: when the user imports
+the same module globally themselves, `Get-Module` inside psmm returns THEIR
+instance, so a by-name exclusion would hide a module they really do have
+loaded. Reference equality gets both cases right.
+
+**Also fixed by this:** `files > apply` unloads anything "managed but not
+active", and `$managed` includes entries from disabled files - so disabling
+the file holding the seeded dependency entry made psmm target its own engine,
+and itself, for `Remove-Module` mid-session. Reproduced before fixing.

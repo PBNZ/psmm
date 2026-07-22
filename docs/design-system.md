@@ -149,6 +149,7 @@ Format (mockup 2d):
 | `▌` | cursor row (far-left mark slot, left of the selection dot) |
 | `▪` | selected row |
 | `● ◐ ○ ◌` | loaded / installed / missing / unmanaged |
+| `◈` | psmm's own (its UI engine, and psmm itself) — infrastructure, dim |
 | `⚠` | entry has validation issues |
 | `⇡` | update available (Ver column, header bar, startup report) |
 | `↑ ↓` after `showing x-y` | more rows above/below (unchanged) |
@@ -208,6 +209,15 @@ Two more rules that fall out of this:
   (`Read-PSMMConfirmPhrase`), not by `y`/`enter` — those are one keystroke
   away from navigation. Moving a whole module location's contents is the
   first user of this.
+- **psmm's own modules are infrastructure, not content.** The grid is a
+  picture of *the user's* session; psmm itself and the UI engine it imports
+  to draw that picture render as `◈ psmm's own` (dim), are excluded from the
+  `N loaded` count and the unmanaged scan, and are never unloaded by psmm —
+  it would take the screen down with them. They stay visible and
+  installable/updatable, because a broken UI dependency must be repairable
+  from inside the tool that needs it. Membership is `Test-PSMMOwnModule`;
+  what psmm imported into its *own* session state is tracked separately, by
+  instance, and subtracted in `Update-PSMMLoaded`.
 
 ## Migration order (safe increments)
 

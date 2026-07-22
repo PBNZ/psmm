@@ -16,27 +16,47 @@ BeforeAll {
 
 Describe 'Import scope' -Tag Engine {
 
-    It 'every Import-Module psmm actually RUNS passes -Global' {
-        # Static guard: the failure mode is silent and only shows up at the
-        # user's prompt, so it must be impossible to reintroduce by editing.
-        # AST, not regex - Import-Module appears in help text and doc comments
-        # all over the UI, and those are strings, not invocations.
+    It 'imports land in the right session state: the user''s globally, psmm''s own privately' {
+        # Static guard for BOTH halves of the invariant, because each failure
+        # mode is silent:
+        #   no -Global      -> the user's module lands in psmm's private state
+        #                      and their prompt cannot see it (gh#2)
+        #   -Global on ours -> psmm's UI engine pollutes the user's session and
+        #                      shows up as if they had asked for it (gh#16)
+        # An import is "psmm's own" when it is registered as a private import
+        # on the spot, which is also what keeps Update-PSMMLoaded honest.
+        # AST, not regex: Import-Module appears in help text all over the UI,
+        # and those are strings, not invocations.
         $bad = foreach ($f in Get-ChildItem (Join-Path $PSScriptRoot '..' 'src') -Recurse -Filter '*.ps1') {
             $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
-            $calls = $ast.FindAll({
+            $registrations = $ast.FindAll({
+                    param($n)
+                    $n -is [System.Management.Automation.Language.CommandAst] -and
+                    "$($n.GetCommandName())" -eq 'Register-PSMMPrivateImport'
+                }, $true)
+            $imports = $ast.FindAll({
                     param($n)
                     $n -is [System.Management.Automation.Language.CommandAst] -and
                     "$($n.GetCommandName())" -eq 'Import-Module'
                 }, $true)
-            foreach ($c in $calls) {
+            foreach ($c in $imports) {
                 $hasGlobal = @($c.CommandElements | Where-Object {
                         $_ -is [System.Management.Automation.Language.CommandParameterAst] -and
                         $_.ParameterName -eq 'Global'
                     }).Count -gt 0
-                if (-not $hasGlobal) { "$($f.Name):$($c.Extent.StartLineNumber): $($c.Extent.Text)" }
+                # is this import nested inside a Register-PSMMPrivateImport call?
+                $isOwn = @($registrations | Where-Object {
+                        $_.Extent.StartOffset -le $c.Extent.StartOffset -and
+                        $_.Extent.EndOffset -ge $c.Extent.EndOffset
+                    }).Count -gt 0
+                if ($isOwn -and $hasGlobal) {
+                    "$($f.Name):$($c.Extent.StartLineNumber): psmm's OWN import must not be -Global: $($c.Extent.Text)"
+                } elseif (-not $isOwn -and -not $hasGlobal) {
+                    "$($f.Name):$($c.Extent.StartLineNumber): user-facing import needs -Global: $($c.Extent.Text)"
+                }
             }
         }
-        $bad | Should -BeNullOrEmpty -Because 'an import without -Global lands in psmm''s private session state (gh#2)'
+        $bad | Should -BeNullOrEmpty
     }
 
     It 'Import-PSMMModuleTimed makes the module visible in the CALLER''s session, not just psmm''s' {
@@ -66,6 +86,72 @@ if (Get-Module -Name PsmmFixtureMod) { 'VISIBLE-GLOBALLY' } else { 'HIDDEN-IN-PS
 
         $out = (& (Get-Process -Id $PID).Path -NoProfile -NonInteractive -File $probe) -join "`n"
         $out | Should -Match 'VISIBLE-GLOBALLY'
+    }
+}
+
+Describe 'psmm''s own modules vs the user''s session' -Tag Engine {
+
+    It 'knows which modules are its own, case-insensitively' {
+        InModuleScope psmm {
+            Test-PSMMOwnModule -Name 'psmm' | Should -BeTrue
+            Test-PSMMOwnModule -Name 'PWSHSPECTRECONSOLE' | Should -BeTrue
+            Test-PSMMOwnModule -Name 'ImportExcel' | Should -BeFalse
+            Test-PSMMOwnModule -Name '' | Should -BeFalse
+            Test-PSMMOwnModule -Name $null | Should -BeFalse
+        }
+    }
+
+    It 'a privately-imported module is NOT reported as loaded in the user''s session' {
+        InModuleScope psmm {
+            # Pester itself is genuinely loaded, so it stands in for "a module
+            # the user really has" - claim it as psmm's private import and the
+            # entry must flip to not-loaded
+            $e = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'Pester' }) -Source 'x' -Writable $true
+            Update-PSMMLoaded -Entries @($e)
+            $e.Loaded | Should -BeTrue -Because 'baseline: Pester is loaded'
+
+            $instance = @(Get-Module -Name Pester) | Select-Object -First 1
+            Register-PSMMPrivateImport -Module $instance
+            try {
+                Update-PSMMLoaded -Entries @($e)
+                $e.Loaded | Should -BeFalse -Because 'psmm''s own copy is not in the user''s session (gh#16)'
+                $e.LoadedVersion | Should -BeNullOrEmpty
+            } finally { $script:PSMM_PrivateImports = $null }
+
+            Update-PSMMLoaded -Entries @($e)
+            $e.Loaded | Should -BeTrue -Because 'and it comes back once the claim is dropped'
+        }
+    }
+
+    It 'the private-import registry matches by INSTANCE, not by name' {
+        # if the user imports the same module themselves, their instance must
+        # still count as loaded - a by-name exclusion would hide it
+        InModuleScope psmm {
+            $mine = [pscustomobject]@{ Name = 'Pester' }        # a different object
+            Register-PSMMPrivateImport -Module $mine
+            try {
+                Test-PSMMPrivateImport -Module $mine | Should -BeTrue
+                $theirs = @(Get-Module -Name Pester) | Select-Object -First 1
+                Test-PSMMPrivateImport -Module $theirs | Should -BeFalse
+                $e = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'Pester' }) -Source 'x' -Writable $true
+                Update-PSMMLoaded -Entries @($e)
+                $e.Loaded | Should -BeTrue
+            } finally { $script:PSMM_PrivateImports = $null }
+        }
+    }
+
+    It 'the unmanaged scan never offers psmm''s own modules for adoption' {
+        $un = InModuleScope psmm {
+            Mock Get-Module {
+                @(
+                    [pscustomobject]@{ Name = 'psmm'; Version = [version]'0.1.0'; ModuleBase = 'C:\m\psmm\0.1.0'; Description = '' }
+                    [pscustomobject]@{ Name = 'PwshSpectreConsole'; Version = [version]'2.6.3'; ModuleBase = 'C:\m\Pwsh\2.6.3'; Description = '' }
+                    [pscustomobject]@{ Name = 'Rogue'; Version = [version]'1.0'; ModuleBase = 'C:\m\Rogue\1.0'; Description = '' }
+                )
+            } -ParameterFilter { $ListAvailable }
+            Get-PSMMUnmanagedModule -ManagedNames @('SomethingElse')
+        }
+        @($un).Name | Should -Be @('Rogue')
     }
 }
 

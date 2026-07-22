@@ -136,11 +136,18 @@ function script:Invoke-PSMMApply {
         }
     }
     foreach ($m in @(Get-Module)) {
-        if ($managed.ContainsKey($m.Name) -and -not $active.ContainsKey($m.Name)) {
-            Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $m.Name) (no longer active)...[/]"
-            try { Remove-Module -Name $m.Name -Force -ErrorAction Stop; $did++ }
-            catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+        if (-not ($managed.ContainsKey($m.Name) -and -not $active.ContainsKey($m.Name))) { continue }
+        # $managed includes entries from DISABLED files, so disabling the file
+        # that holds psmm's seeded UI-dependency entry (or your own psmm entry)
+        # used to make apply unload psmm's engine - or psmm itself - out from
+        # under the running manager. Verified before fixing (gh#16).
+        if (Test-PSMMOwnModule -Name $m.Name) {
+            Write-PSMMLine "[$script:PSMM_ColMute]keeping $(ConvertTo-PSMMSafe $m.Name) - psmm's own, never unloaded[/]"
+            continue
         }
+        Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $m.Name) (no longer active)...[/]"
+        try { Remove-Module -Name $m.Name -Force -ErrorAction Stop; $did++ }
+        catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
     }
     $ui.Dirty = $true
     Write-PSMMLine "[$script:PSMM_ColOk]$did change(s) applied.[/]"

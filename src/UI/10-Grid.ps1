@@ -194,7 +194,9 @@ function script:Build-PSMMGrid {
         )
     }
 
-    $loaded = @($entries | Where-Object { $_.Loaded }).Count
+    # psmm and its UI engine are infrastructure: counting them as "loaded"
+    # overstates what YOUR session is carrying (gh#16)
+    $loaded = @($entries | Where-Object { $_.Loaded -and -not (Test-PSMMOwnModule -Name $_.Name) }).Count
     $updates = @($entries | Where-Object { $_.UpdateAvailable }).Count
     $counts = "$($entries.Count) modules $([char]0x00B7) $loaded loaded$(if ($updates) { " $([char]0x00B7) $updates updates" })"
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
@@ -241,6 +243,18 @@ function script:Build-PSMMGrid {
 function script:Get-PSMMContextMarkup {
     param([Parameter(Mandatory)] $Entry)
     $isUnmanaged = [bool]$Entry.PSObject.Properties['Unmanaged']
+    # the columns say "psmm's own"; the sentence is where that gets explained
+    if (-not $isUnmanaged -and (Test-PSMMOwnModule -Name $Entry.Name) -and ($Entry.Loaded -or $Entry.Installed)) {
+        # .Loaded is the honest answer for the USER's session: psmm's own copy
+        # is imported privately and deliberately does not count (gh#16)
+        $what = if ($Entry.Loaded) { 'also imported in your own session' }
+                else { 'psmm imports it privately - not part of your session' }
+        $ver = Get-PSMMVersionText -Version $Entry.InstalledVersion -Prerelease $Entry.InstalledPrerelease
+        $upd = if ($Entry.UpdateAvailable -and $Entry.LatestVersion) {
+            ", v$(Get-PSMMVersionText -Version $Entry.LatestVersion -Prerelease $Entry.LatestPrerelease) available (u updates)"
+        } else { '' }
+        return "[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Entry.Name)[/] [$script:PSMM_ColMute]$([char]0x2014) psmm's own $([char]0x00B7) $what $([char]0x00B7) v$(ConvertTo-PSMMSafe $ver) on disk$(ConvertTo-PSMMSafe $upd)[/]"
+    }
     $startup = if ($isUnmanaged) { 'installed but not in any config file' }
                else {
                    switch ("$($Entry.Mode)") {
@@ -315,9 +329,12 @@ function script:Invoke-PSMMBulk {
     param([ValidateSet('Load', 'Unload')][string]$Action, $Context)
     $ui = $script:PSMM_UI
     $targets = Get-PSMMTargets
-    $ok = 0; $fail = 0; $i = 0
+    $ok = 0; $fail = 0; $i = 0; $skippedOwn = 0
     foreach ($t in $targets) {
         $e = $ui.Entries[$t]; $i++
+        # psmm never unloads itself or its own UI engine - that pulls the rug
+        # out from under the screen you are looking at (gh#16)
+        if ($Action -eq 'Unload' -and (Test-PSMMOwnModule -Name $e.Name)) { $skippedOwn++; continue }
         $verbing = if ($Action -eq 'Load') { 'loading' } else { 'unloading' }
         $ui.Status = "[$script:PSMM_ColAccent]$verbing $(ConvertTo-PSMMSafe $e.Name) ($i/$($targets.Count))...[/]"
         if ($Context) { $Context.UpdateTarget((Build-PSMMGrid)); $Context.Refresh() }
@@ -351,7 +368,8 @@ function script:Invoke-PSMMBulk {
     }
     $ui.Sel.Clear()
     $verb = if ($Action -eq 'Load') { 'loaded' } else { 'unloaded' }
-    $ui.Status = if ($fail) { "[$script:PSMM_ColWarn]$verb $ok, $fail failed[/]" } else { "[$script:PSMM_ColOk]$verb $ok[/]" }
+    $own = if ($skippedOwn) { " [$script:PSMM_ColMute]($skippedOwn skipped - psmm's own)[/]" } else { '' }
+    $ui.Status = if ($fail) { "[$script:PSMM_ColWarn]$verb $ok, $fail failed[/]$own" } else { "[$script:PSMM_ColOk]$verb $ok[/]$own" }
 }
 
 # Launch install (or update, with -Update) of the targeted rows as a

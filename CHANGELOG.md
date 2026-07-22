@@ -38,6 +38,16 @@ Live-run feedback round four, and one serious bug it uncovered.
 - On a PowerShellGet-only machine, the deferred startup job no longer calls
   `Install-PSResource` for a prerelease update; it falls back like its
   siblings.
+- **psmm no longer reports its own modules as if they were yours** (gh#16).
+  Its UI engine is imported into psmm's own session state instead of yours, so
+  it stops appearing in your `Get-Module`; psmm and that engine render as
+  `◈ psmm's own`, are left out of the `N loaded` count and the unmanaged scan,
+  and are never unloaded by psmm. They stay visible and updatable — a broken UI
+  dependency has to be repairable from inside the tool that needs it.
+  **`files › apply` could unload psmm itself**: it unloads anything "managed
+  but not active", and `$managed` includes entries from *disabled* files, so
+  disabling the file holding psmm's seeded dependency entry made it target its
+  own engine — and psmm — for `Remove-Module` mid-session.
 
 ### Added
 - **Prerelease versions, per module** (gh#6): new optional `"Prerelease":

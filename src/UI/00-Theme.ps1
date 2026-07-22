@@ -418,9 +418,15 @@ function script:Get-PSMMGalleryWord {
 }
 
 # State glyph + word (§5): glyph and word travel together, never glyph alone.
+# psmm's own modules read as infrastructure (◈, dim) rather than as something
+# you asked for (gh#16) - but only once they are actually present: a MISSING
+# dependency is a real problem and must still say so.
 function script:Get-PSMMStateMarkup {
     param([Parameter(Mandatory)] $Entry)
     if ($Entry.PSObject.Properties['Unmanaged']) { return "[$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/]" }
+    if ((Test-PSMMOwnModule -Name $Entry.Name) -and ($Entry.Loaded -or $Entry.Installed)) {
+        return "[$script:PSMM_ColDim]$([char]0x25C8) psmm's own[/]"
+    }
     if ($Entry.Loaded)    { return "[$script:PSMM_ColOk]$([char]0x25CF) loaded[/]" }
     if ($Entry.Installed) { return "[$script:PSMM_ColWarn]$([char]0x25D0) installed[/]" }
     "[$script:PSMM_ColErr]$([char]0x25CB) missing[/]"

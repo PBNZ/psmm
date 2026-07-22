@@ -2,25 +2,39 @@
 
 # Ensure PwshSpectreConsole (ships the Spectre.Console assembly) is loaded,
 # offering to install it on first use. NEVER runs at profile import.
+#
+# Imported WITHOUT -Global on purpose (gh#16). This is psmm's own UI engine,
+# not something the user asked for, and it has no business appearing in their
+# `Get-Module`. A private import is enough for psmm's needs: the Spectre
+# assembly loads process-wide so the types resolve either way, and the
+# PwshSpectreConsole cmdlets psmm calls (Read-SpectreConfirm /
+# Read-SpectreSelection) are visible in psmm's own session state - verified.
+# Note the asymmetry with Import-PSMMModuleTimed, which MUST use -Global: the
+# user's modules belong in the user's session, psmm's belong in psmm's.
 function script:Initialize-PSMMUI {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
         Justification = 'First-use install prompt is interactive host output by design (mirrors the original block).')]
     [CmdletBinding()] param()
+    $dep = Get-PSMMUIDependencyName
     if (-not ('Spectre.Console.AnsiConsole' -as [type])) {
-        if (Get-Module -ListAvailable -Name PwshSpectreConsole) {
-            Import-Module PwshSpectreConsole -ErrorAction Stop -Global
+        if (Get-Module -ListAvailable -Name $dep) {
+            Register-PSMMPrivateImport -Module (Import-Module $dep -PassThru -ErrorAction Stop)
         } else {
-            Write-Host 'PwshSpectreConsole is required for the interactive manager.' -ForegroundColor Yellow
+            Write-Host "$dep is required for the interactive manager." -ForegroundColor Yellow
             if ((Read-Host 'Install it now from the PowerShell Gallery? (y/N)') -notmatch '^(y|yes)$') { return $false }
             try {
-                Install-PSMMModule -Name PwshSpectreConsole
-                Import-Module PwshSpectreConsole -ErrorAction Stop -Global
+                Install-PSMMModule -Name $dep
+                Register-PSMMPrivateImport -Module (Import-Module $dep -PassThru -ErrorAction Stop)
             } catch {
-                Write-Warning "Could not install PwshSpectreConsole: $($_.Exception.Message)"
+                Write-Warning "Could not install ${dep}: $($_.Exception.Message)"
                 return $false
             }
         }
     }
+    # NB: when the type already resolves nothing is imported and nothing is
+    # registered - the copy in play is the user's own (or an earlier psmm run's,
+    # already registered), and either way the grid should report it as it finds
+    # it.
     $null = Get-PSMMConsole
     $true
 }
@@ -130,7 +144,9 @@ function script:Sync-PSMMUIEntries {
 # unobtrusive overlay line; 'm' shows them in the grid.
 function script:Start-PSMMUnmanagedScan {
     [CmdletBinding()] param()
-    $managed = @((Get-PSMMAllEntries).Name | Where-Object { $_ })
+    # psmm's own modules are excluded like managed ones: they are infrastructure,
+    # not something to adopt into a config (gh#16)
+    $managed = @(@((Get-PSMMAllEntries).Name | Where-Object { $_ }) + @(Get-PSMMOwnModuleName))
     $null = Start-PSMMTask -Label 'scan: unmanaged modules' -Kind 'unmanagedscan' -ArgumentList (, $managed) -ScriptBlock {
         param($managedNames)
         $managedSet = [System.Collections.Generic.HashSet[string]]::new(
