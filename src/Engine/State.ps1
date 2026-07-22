@@ -4,15 +4,23 @@
 # NB: $Entries params here allow null/empty - an empty entry set is a normal
 # state (fresh machine, zero configs), and PowerShell returns empty arrays
 # from functions as $null.
+#
+# Session-state caveat (gh#2): `Get-Module` run inside the psmm module returns
+# the GLOBAL module table plus anything imported into psmm's own private state.
+# Those two are the same set only because every psmm import passes -Global (see
+# Import-PSMMModuleTimed) - drop that and this function starts reporting
+# "loaded" for modules the user's prompt cannot see.
 function Update-PSMMLoaded {
     [CmdletBinding()]
     param([AllowNull()][AllowEmptyCollection()] $Entries)
     if (-not $Entries) { return }
     $loaded = @{}
-    Get-Module -ErrorAction SilentlyContinue | ForEach-Object { $loaded[$_.Name] = $_.Version }
+    Get-Module -ErrorAction SilentlyContinue | ForEach-Object { $loaded[$_.Name] = $_ }
     foreach ($e in $Entries) {
+        $m = $loaded[$e.Name]
         $e.Loaded = $loaded.ContainsKey($e.Name)
-        $e.LoadedVersion = $loaded[$e.Name]
+        $e.LoadedVersion = if ($m) { $m.Version } else { $null }
+        $e.LoadedPrerelease = Get-PSMMPrereleaseLabel -ModuleInfo $m
     }
 }
 
@@ -31,11 +39,17 @@ function Update-PSMMAvailable {
         $sorted = @($mods | Sort-Object Version -Descending)
         $entry.Installed         = [bool]$sorted
         $entry.InstalledVersion  = if ($sorted) { $sorted[0].Version } else { $null }
+        # the prerelease label rides along from the manifest we already have in
+        # hand - no extra disk cost, and versions must never be shown without it
+        $entry.InstalledPrerelease = if ($sorted) { Get-PSMMPrereleaseLabel -ModuleInfo $sorted[0] } else { '' }
         $entry.InstalledVersions = @($sorted | ForEach-Object {
             [pscustomobject]@{
-                Version = $_.Version
-                Path    = $_.ModuleBase
-                Scope   = Get-PSMMScopeForPath -Path $_.ModuleBase
+                Version    = $_.Version
+                Prerelease = (Get-PSMMPrereleaseLabel -ModuleInfo $_)
+                Path       = $_.ModuleBase
+                Scope      = Get-PSMMScopeForPath -Path $_.ModuleBase
+                ModuleType = "$($_.ModuleType)"
+                Manifest   = "$($_.Path)"
             }
         })
         $scopes = @($entry.InstalledVersions.Scope | Select-Object -Unique)

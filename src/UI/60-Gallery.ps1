@@ -32,7 +32,7 @@ function script:Build-PSMMGalleryView {
         $cur = $Results[$State.Cursor]
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe (Get-PSMMTrunc "by $($cur.Author) - $($cur.Description -replace '\s+', ' ')" ($win.Width - 6)))[/]"))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=add to config', '/=new search'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=add to config', 'left/right=back / add', '/=new search'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
@@ -79,6 +79,10 @@ function script:Show-PSMMGallery {
                 if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $results.Count) { continue }
+                # left/right: same everywhere (gh#7) - right adds, like enter
+                $drill = Get-PSMMDrillKey -KeyInfo $k
+                if ($drill -eq 'out') { $action.Name = 'back'; return }
+                if ($drill -eq 'in') { $action.Name = 'add'; return }
                 switch ($k.Key) {
                     ([ConsoleKey]::Enter)  { $action.Name = 'add'; return }
                     ([ConsoleKey]::Escape) { $action.Name = 'back'; return }

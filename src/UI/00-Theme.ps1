@@ -314,10 +314,20 @@ function script:Get-PSMMWinSize {
     [pscustomobject]@{ Height = $h; Width = $w }
 }
 
+# ONE key capsule (§3): reverse-video key block on the capsule background.
+# Every rendering of a key - hint rows, help tabs, prose - goes through here,
+# so the capsule is defined exactly once. Keys are always lowercase, and
+# multi-key names are spelled out ('left/right', 'up/dn', 'pgup/pgdn'), never
+# drawn as arrow glyphs: the arrows are reserved for the scroll indicator
+# (design system §9, gh#7).
+function script:Get-PSMMKeyCap {
+    param([Parameter(Mandatory)][string]$Key)
+    "[$script:PSMM_ColKey on $script:PSMM_ColCapsule] $($Key.ToLowerInvariant()) [/]"
+}
+
 # Render "key=action" pairs as one consistently-styled hint line.
-# Design system v2 (§3): every key is a capsule - reverse-video key block on
-# the capsule background, mute label, two-space separator. Keys are always
-# lowercase; '^' before a key means ctrl, and any line using a '^' chord
+# Design system v2 (§3): every key is a capsule, mute label, two-space
+# separator. '^' before a key means ctrl, and any line using a '^' chord
 # carries the dim '^ = ctrl' legend at the end of the row.
 function script:Get-PSMMHint {
     param(
@@ -328,7 +338,7 @@ function script:Get-PSMMHint {
     )
     $parts = foreach ($p in $Pairs) {
         $k, $v = $p -split '=', 2
-        "[$script:PSMM_ColKey on $script:PSMM_ColCapsule] $($k.ToLowerInvariant()) [/] [$script:PSMM_ColMute]$v[/]"
+        "$(Get-PSMMKeyCap -Key $k) [$script:PSMM_ColMute]$v[/]"
     }
     if (-not $NoLegend -and @($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
         $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")

@@ -27,15 +27,19 @@ function script:Receive-PSMMUITask {
             'updatecheck' {
                 $found = 0
                 $byName = @{}
-                foreach ($o in $t.Output) { if ($o.Name) { $byName[$o.Name] = "$($o.Latest)" } }
+                foreach ($o in $t.Output) { if ($o.Name) { $byName[$o.Name] = $o } }
                 foreach ($e in $ui.Entries) {
                     if (-not $byName.ContainsKey($e.Name)) { continue }
-                    $e.LatestVersion = $byName[$e.Name]
+                    $hit = $byName[$e.Name]
+                    $e.LatestVersion = "$($hit.Latest)"
+                    $e.LatestPrerelease = "$($hit.Prerelease)"
                     $e.UpdateAvailable = $false
                     if ($e.PinnedExact) { continue }
                     if ($e.InstalledVersion) {
-                        $lv = $byName[$e.Name] -replace '-.*$', ''
-                        try { $e.UpdateAvailable = ([version]$lv -gt [version]"$($e.InstalledVersion)") } catch { }
+                        # prerelease-aware: 0.1.0-beta8 is newer than
+                        # 0.1.0-beta2 but older than 0.1.0 (gh#6)
+                        $e.UpdateAvailable = (Compare-PSMMEntryVersion -VersionA $e.LatestVersion -PrereleaseA $e.LatestPrerelease `
+                                -VersionB "$($e.InstalledVersion)" -PrereleaseB "$($e.InstalledPrerelease)") -gt 0
                     }
                     if ($e.UpdateAvailable) { $found++ }
                 }
@@ -100,7 +104,7 @@ function script:Build-PSMMTasksView {
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'tasks') -CountsMarkup $pos)))
     $items.Add($T)
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=view output', 'u=run update-help', 'c=clear finished'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=view output', 'u=run update-help', 'c=clear finished', 'left/right=back / open'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
@@ -152,6 +156,10 @@ function script:Show-PSMMTasks {
                 if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $tasks.Count) { continue }
+                # left/right: same everywhere (gh#7) - right opens the output
+                $drill = Get-PSMMDrillKey -KeyInfo $k
+                if ($drill -eq 'out') { $action.Name = 'back'; return }
+                if ($drill -eq 'in') { $action.Name = 'view'; return }
                 switch ($k.Key) {
                     ([ConsoleKey]::Enter)  { $action.Name = 'view'; return }
                     ([ConsoleKey]::U)      { Start-PSMMUpdateHelpTask; continue }

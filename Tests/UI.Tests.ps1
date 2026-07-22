@@ -997,8 +997,13 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
         $tabs = InModuleScope psmm { Get-PSMMHelpTabs -Topic 'grid' }
         $about = @($tabs['about']) -join "`n"
+        # the command is syntax-highlighted now (gh#9), so assert on the
+        # markup-stripped text, not on the raw markup
+        $aboutPlain = @($tabs['about'] | ForEach-Object {
+                InModuleScope psmm -Parameters @{ l = $_ } { [Spectre.Console.Markup]::Remove($l) }
+            }) -join "`n"
         $about | Should -Match 'v0\.1\.0-beta4 is available'
-        $about | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
+        $aboutPlain | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
         $grid = Get-RenderedText { Build-PSMMGrid }
         $grid | Should -Not -Match 'is available \(you have'   # detail moved to help - about
         $grid | Should -Match "$([char]0x21E1) update"         # the header flag remains
@@ -1069,7 +1074,8 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
 
     It 'the module menu facts panel shows the author when known (live-run fix)' {
         $text = Get-RenderedText {
-            Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null -Author 'Douglas Finke'
+            Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null `
+                -Manifest ([pscustomobject]@{ Author = 'Douglas Finke'; ProjectUri = ''; ModuleType = ''; CommandCount = 0; CloudOnly = 0 })
         }
         ($text -replace '\s+', ' ') | Should -Match 'by\s+Douglas Finke'
         # and without an author the row is simply absent

@@ -33,6 +33,7 @@ function script:Build-PSMMFilesView {
         if ($cur.IncludesIgnored) { $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]! this file has an Includes section that is being ignored (main config only)[/]")) }
     }
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('space=enable/disable+save', 'a=apply to session', 'n=new config (templates)', 'm=move file'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('left=back') -NoLegend)))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     foreach ($w in @(Get-PSMMWarning | Select-Object -First 4)) { $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColWarn]$(ConvertTo-PSMMSafe $w)[/]")) }
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
@@ -66,6 +67,11 @@ function script:Show-PSMMFiles {
                 if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $metas.Count) { continue }
+                # left/right: same everywhere (gh#7). A config file has no
+                # sub-screen, so right says so rather than doing nothing.
+                $drill = Get-PSMMDrillKey -KeyInfo $k
+                if ($drill -eq 'out') { return }
+                if ($drill -eq 'in') { $st.Status = Get-PSMMNoDrillStatus; continue }
                 switch ($k.Key) {
                     ([ConsoleKey]::Spacebar) {
                         $m = $metas[$st.Cursor]

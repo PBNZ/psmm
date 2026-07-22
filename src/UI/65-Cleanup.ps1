@@ -29,7 +29,7 @@ function script:Build-PSMMCleanupView {
     if (-not $script:PSMM_UI.Elevated) {
         $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColMute]session is not elevated: AllUsers copies are skipped automatically[/]"))
     }
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=clean this module', '^a=clean all', 'r=rescan'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=clean this module', '^a=clean all', 'r=rescan', 'left/right=back / clean'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
@@ -71,6 +71,10 @@ function script:Show-PSMMCleanup {
                 if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
                 $st.Status = ''
                 if (Invoke-PSMMListNav -State $st -KeyInfo $k -Count $dupes.Count) { continue }
+                # left/right: same everywhere (gh#7) - right cleans, like enter
+                $drill = Get-PSMMDrillKey -KeyInfo $k
+                if ($drill -eq 'out') { $action.Name = 'back'; return }
+                if ($drill -eq 'in') { $action.Name = 'one'; return }
                 switch ($k.Key) {
                     ([ConsoleKey]::Enter)  { $action.Name = 'one'; return }
                     ([ConsoleKey]::A)      {

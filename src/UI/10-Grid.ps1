@@ -17,7 +17,8 @@ function script:Build-PSMMGrid {
     # filtered view: array of entry indices currently visible
     $ui.View = if ($ui.Filter) {
         @(0..([Math]::Max(0, $entries.Count - 1)) | Where-Object {
-            $entries[$_].Name -like "*$($ui.Filter)*" -or $entries[$_].FriendlyName -like "*$($ui.Filter)*"
+            (Test-PSMMFilterMatch -Text $entries[$_].Name -Filter $ui.Filter) -or
+            (Test-PSMMFilterMatch -Text $entries[$_].FriendlyName -Filter $ui.Filter)
         })
     } elseif ($entries.Count) { @(0..($entries.Count - 1)) } else { @() }
     $n = $ui.View.Count
@@ -61,16 +62,26 @@ function script:Build-PSMMGrid {
         }
         $startupWord = Get-PSMMStartupWord $e.Mode
         $startup = if ($startupWord -in 'off', '-') { "[$script:PSMM_ColDim]$startupWord[/]" } else { $startupWord }
-        $gallery = "[$script:PSMM_ColDim]$(Get-PSMMGalleryWord $e.Install)[/]"
-        $verBase = if ($e.LoadedVersion) { "$($e.LoadedVersion)" } elseif ($e.InstalledVersion) { "$($e.InstalledVersion)" } else { '-' }
+        $galleryWord = Get-PSMMGalleryWord $e.Install
+        # prerelease opt-in is part of the gallery policy, so it reads there
+        if ($e.AllowPrerelease) { $galleryWord += '+pre' }
+        $gallery = "[$script:PSMM_ColDim]$galleryWord[/]"
+        # the version shown always carries its prerelease label (gh#6):
+        # 0.1.0-beta8 and 0.1.0 share one [version] and must not look alike
+        $verBase = if ($e.LoadedVersion) { Get-PSMMVersionMarkup -Version $e.LoadedVersion -Prerelease $e.LoadedPrerelease }
+                   else { Get-PSMMVersionMarkup -Version $e.InstalledVersion -Prerelease $e.InstalledPrerelease }
+        $verPlain = if ($e.LoadedVersion) { Get-PSMMVersionText -Version $e.LoadedVersion -Prerelease $e.LoadedPrerelease }
+                    else { Get-PSMMVersionText -Version $e.InstalledVersion -Prerelease $e.InstalledPrerelease }
+        if (-not $verPlain) { $verPlain = '-' }
         $pin = if ($e.PinnedExact) { " [$script:PSMM_ColDim]pin[/]" } else { '' }
         # '⇡', not '^': the design system reserves '^' for the ctrl legend
         $ver = $verBase
         if ($e.UpdateAvailable) {
-            $ver = if ($isCur -and $e.LatestVersion) { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1) $($e.LatestVersion)[/]" }
+            $latestTxt = Get-PSMMVersionText -Version $e.LatestVersion -Prerelease $e.LatestPrerelease
+            $ver = if ($isCur -and $e.LatestVersion) { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1) $(ConvertTo-PSMMSafe $latestTxt)[/]" }
                    else { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1)[/]" }
             if ($e.LatestVersion) {
-                $wide = $verBase.Length + 3 + "$($e.LatestVersion)".Length + $(if ($pin) { 4 } else { 0 })
+                $wide = $verPlain.Length + 3 + $latestTxt.Length + $(if ($pin) { 4 } else { 0 })
                 if ($wide -gt $verGhost) { $verGhost = $wide }
             }
         }
@@ -178,7 +189,7 @@ function script:Build-PSMMGrid {
     } else {
         @(
             (Get-PSMMHint -Pairs @('i=install', 'u=update', 'k=check updates', '^l=load', '^u=unload')),
-            (Get-PSMMHint -Pairs @('space=select', 'enter=actions', 'a=add', 'r=reload', 'm=unmanaged')),
+            (Get-PSMMHint -Pairs @('space=select', 'enter=actions', 'left/right=back / open', 'a=add', 'r=reload', 'm=unmanaged')),
             (Get-PSMMPersistentHint)
         )
     }
@@ -251,11 +262,15 @@ function script:Get-PSMMContextMarkup {
                        default  { 'no startup action' }
                    }
                }
-    $session = if ($Entry.Loaded) { "imported this session (v$($Entry.LoadedVersion))" } else { 'not imported this session' }
+    $session = if ($Entry.Loaded) { "imported this session (v$(Get-PSMMVersionText -Version $Entry.LoadedVersion -Prerelease $Entry.LoadedPrerelease))" }
+               else { 'not imported this session' }
     $disk = if ($Entry.Installed) {
-        $d = "v$($Entry.InstalledVersion) on disk"
-        if ($Entry.UpdateAvailable -and $Entry.LatestVersion) { $d += ", v$($Entry.LatestVersion) available (u updates)" }
+        $d = "v$(Get-PSMMVersionText -Version $Entry.InstalledVersion -Prerelease $Entry.InstalledPrerelease) on disk"
+        if ($Entry.UpdateAvailable -and $Entry.LatestVersion) {
+            $d += ", v$(Get-PSMMVersionText -Version $Entry.LatestVersion -Prerelease $Entry.LatestPrerelease) available (u updates)"
+        }
         if ($Entry.Version) { $d += " - pinned to $($Entry.Version)" }
+        if ($Entry.AllowPrerelease) { $d += ' - prereleases allowed' }
         $d
     } else { 'not installed' }
     "[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Entry.Name)[/] [$script:PSMM_ColMute]$([char]0x2014) $startup $([char]0x00B7) $session $([char]0x00B7) $(ConvertTo-PSMMSafe $disk)[/]"
@@ -311,14 +326,24 @@ function script:Invoke-PSMMBulk {
         if ($Action -eq 'Load') {
             $cloud = @(Get-PSMMModuleCloudOnlyFile -Name $e.Name)
             if ($cloud.Count) {
-                $ui.Status = "[$script:PSMM_ColWarn]downloading $($cloud.Count) cloud-only file(s) for $(ConvertTo-PSMMSafe $e.Name) from OneDrive...[/]"
+                # parallel at the default concurrency - no prompt inside the
+                # live grid, but no reason to crawl either (gh#14)
+                $par = Get-PSMMHydrationDefault
+                $ui.Status = "[$script:PSMM_ColWarn]downloading $($cloud.Count) cloud-only file(s) for $(ConvertTo-PSMMSafe $e.Name) from OneDrive ($par at a time)...[/]"
                 if ($Context) { $Context.UpdateTarget((Build-PSMMGrid)); $Context.Refresh() }
-                $null = Invoke-PSMMFileHydration -Files $cloud
+                $null = Invoke-PSMMFileHydration -Files $cloud -ThrottleLimit $par
             }
         }
         try {
-            if ($Action -eq 'Load') { $null = Import-Module -Name $e.Name -Force -ErrorAction Stop -WarningAction SilentlyContinue }
-            else { Remove-Module -Name $e.Name -Force -ErrorAction Stop }
+            if ($Action -eq 'Load') {
+                # via Import-PSMMModuleTimed, not a bare Import-Module: it is
+                # the one place that knows about -Global (gh#2) AND about
+                # honouring an exact version pin - the grid's bulk load used to
+                # quietly load whatever version came first
+                Import-PSMMModuleTimed -Entry $e
+            } else {
+                Remove-Module -Name $e.Name -Force -ErrorAction Stop
+            }
             $ok++
         } catch { $fail++ }
         Update-PSMMLoaded -Entries $ui.Entries
@@ -349,7 +374,7 @@ function script:Start-PSMMInstallTask {
     }
     $mods = @(foreach ($t in $targets) {
         $e = $ui.Entries[$t]
-        [pscustomobject]@{ Name = $e.Name; Update = [bool]$Update; Version = $e.Version }
+        [pscustomobject]@{ Name = $e.Name; Update = [bool]$Update; Version = $e.Version; Prerelease = [bool]$e.AllowPrerelease }
     })
     $names = @($mods.Name)
     $null = Start-PSMMTask -Label "${verb}: $($names -join ', ')" -Kind 'install' -Data $names -ArgumentList (, $mods) -ScriptBlock {
@@ -366,12 +391,13 @@ function script:Start-PSMMInstallTask {
                     $pre = $null
                     $newest = @(Get-Module -ListAvailable -Name $m.Name -ErrorAction SilentlyContinue | Sort-Object Version -Descending) | Select-Object -First 1
                     if ($newest) { try { $pre = $newest.PrivateData.PSData.Prerelease } catch { } }
-                    if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -TrustRepository -Reinstall:$m.Update -ErrorAction Stop }
-                    elseif ($m.Update -and $newest -and $pre) { Install-PSResource -Name $m.Name -Prerelease -Reinstall -Scope CurrentUser -TrustRepository -ErrorAction Stop }
-                    elseif ($m.Update -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue) -and $newest) { Update-PSResource -Name $m.Name -ErrorAction Stop }
-                    else { Install-PSResource -Name $m.Name -Scope CurrentUser -TrustRepository -ErrorAction Stop }
+                    $wantPre = [bool]$m.Prerelease   # the entry's opt-in (gh#6)
+                    if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -Prerelease:$wantPre -TrustRepository -Reinstall:$m.Update -ErrorAction Stop }
+                    elseif ($m.Update -and $newest -and ($wantPre -or $pre)) { Install-PSResource -Name $m.Name -Prerelease -Reinstall -Scope CurrentUser -TrustRepository -ErrorAction Stop }
+                    elseif ($m.Update -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue) -and $newest) { Update-PSResource -Name $m.Name -Prerelease:$wantPre -ErrorAction Stop }
+                    else { Install-PSResource -Name $m.Name -Scope CurrentUser -Prerelease:$wantPre -TrustRepository -ErrorAction Stop }
                 } else {
-                    Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+                    Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -AllowPrerelease:([bool]$m.Prerelease) -ErrorAction Stop
                 }
                 "ok $($m.Name)"
             } catch { "FAILED $($m.Name): $($_.Exception.Message)" }
@@ -387,20 +413,29 @@ function script:Start-PSMMUpdateCheckTask {
     $ui = $script:PSMM_UI
     $installed = @($ui.Entries | Where-Object { $_.Installed -and -not $_.PSObject.Properties['Unmanaged'] })
     if (-not $installed.Count) { $ui.Status = "[$script:PSMM_ColWarn]no installed modules to check[/]"; return }
-    $payload = @($installed | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Installed = "$($_.InstalledVersion)" } })
+    $payload = @($installed | ForEach-Object {
+        [pscustomobject]@{ Name = $_.Name; Installed = "$($_.InstalledVersion)"; Prerelease = [bool]$_.AllowPrerelease }
+    })
     $null = Start-PSMMTask -Label "update check ($($payload.Count) modules)" -Kind 'updatecheck' -ArgumentList (, $payload) -ScriptBlock {
         param($mods)
         $psrg = [bool](Get-Command Find-PSResource -ErrorAction SilentlyContinue)
         foreach ($m in $mods) {
             try {
-                $latest = if ($psrg) {
-                    (Find-PSResource -Name $m.Name -ErrorAction Stop |
-                        Sort-Object { [version]($_.Version -replace '-.*$', '') } -Descending |
-                        Select-Object -First 1).Version
-                } else {
-                    (Find-Module -Name $m.Name -ErrorAction Stop).Version
+                $pre = [bool]$m.Prerelease
+                $hits = if ($psrg) { @(Find-PSResource -Name $m.Name -Prerelease:$pre -ErrorAction Stop) }
+                        else { @(Find-Module -Name $m.Name -AllowPrerelease:$pre -ErrorAction Stop) }
+                # newest by base version; the label is reported alongside so the
+                # UI can order 0.1.0-beta2 / 0.1.0-beta8 / 0.1.0 properly
+                $best = $hits | Sort-Object { [version]("$($_.Version)" -replace '-.*$', '') } -Descending | Select-Object -First 1
+                if ($best) {
+                    $label = "$($best.Prerelease)".TrimStart('-')
+                    if (-not $label -and "$($best.Version)" -match '^[^-]+-(.+)$') { $label = $Matches[1] }
+                    [pscustomobject]@{
+                        Name       = $m.Name
+                        Latest     = ("$($best.Version)" -replace '-.*$', '')
+                        Prerelease = $label
+                    }
                 }
-                if ($latest) { [pscustomobject]@{ Name = $m.Name; Latest = "$latest" } }
             } catch { }
         }
     }
@@ -474,6 +509,14 @@ function script:Invoke-PSMMGrid {
                 ([ConsoleKey]::RightArrow) {
                     # "move into" the module (#24) - same as enter
                     if ($n) { $result.Cmd = 'submenu'; $result.Index = $ui.View[$ui.Cursor]; return }
+                    continue
+                }
+                ([ConsoleKey]::LeftArrow) {
+                    # left backs out one level everywhere (gh#7). Like esc, it
+                    # clears an active filter first; home is the top level, so
+                    # beyond that it says so rather than doing nothing silently
+                    if ($ui.Filter) { $ui.Filter = ''; $ui.Cursor = 0; continue }
+                    $ui.Status = "[$script:PSMM_ColMute]home is the top level $([char]0x00B7) right opens the row, ^q quits[/]"
                     continue
                 }
                 ([ConsoleKey]::Escape) {

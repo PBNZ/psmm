@@ -3,6 +3,90 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+Live-run feedback round four, and one serious bug it uncovered.
+
+### Fixed
+- **Modules are imported into YOUR session again** (gh#2). `Import-Module`
+  called from inside a module imports into *that module's* session state
+  unless `-Global` is passed — and psmm is a module. Every module psmm
+  loaded (at startup, from the grid, from the module menu, via files ›
+  apply) therefore landed in psmm's private state: invisible to
+  `Get-Module`, its commands "not recognized" at the prompt — while psmm's
+  own state check, which sees its private imports too, reported `● loaded`
+  for the rest of the session. Command auto-loading hid this for modules
+  that export explicit names; a module whose manifest exports `*` (e.g.
+  `Microsoft.Online.SharePoint.PowerShell`) cannot auto-load and broke
+  outright. Every import now passes `-Global`, with an AST-based guard test
+  so it cannot come back.
+- **Long prose no longer runs the full terminal width** (gh#11): every
+  explanation wraps at `min(window − 4, 84)` columns, like the tables and
+  hint rows already did.
+- **A filter containing `[` no longer takes the screen down.** `-like "*[*"`
+  throws *"the specified wildcard character pattern is not valid"*; filters
+  are free text, so they now use a plain case-insensitive substring test.
+- **A path containing `[` or `]` no longer crashes a confirmation prompt** —
+  those are legal in Windows filenames and Spectre parses a prompt message as
+  markup. Every prompt that interpolates text now escapes it, with a guard
+  test.
+- **A prerelease version can actually be pinned.** The pin accepts
+  `1.2.3-beta4`, installs with `-Prerelease`, and imports by its base version
+  (`-RequiredVersion` is typed `[version]` and throws on a label).
+- **The grid's bulk `ctrl+l` honours an exact version pin** — it used to load
+  whichever version PowerShell found first, unlike every other load path.
+- On a PowerShellGet-only machine, the deferred startup job no longer calls
+  `Install-PSResource` for a prerelease update; it falls back like its
+  siblings.
+
+### Added
+- **Prerelease versions, per module** (gh#6): new optional `"Prerelease":
+  true` config field (`w` in the module menu toggles it) makes install,
+  update, the update check and the pin picker consider prereleases. Every
+  version psmm shows now carries its label — `0.1.0-beta8` no longer renders
+  as `0.1.0` — and the gallery column flags the opt-in with `+pre`.
+- **The module details screen answers "which copy, and from where?"**
+  (gh#3): install path, the `$env:PSModulePath` root above it with its
+  search order and OneDrive status, every installed version with its scope,
+  module type, exported-command count, cloud-only file count, and the
+  project URL as a clickable link.
+- **Move a module's files to another location** (gh#4): `p` in the module
+  menu moves the whole `<root>\<Name>` tree (all versions together) to
+  another writable module location, refusing collisions and telling you to
+  unload a module whose files are in use.
+- **The paths screen can add a location** (gh#12): `n` creates the folder if
+  needed, adds it to the session search path first or last, and offers to
+  persist it in the user `PSModulePath` environment variable.
+- **…and move a location's contents elsewhere** (gh#13): `m` shows what will
+  move and what will be skipped (loaded modules, name collisions), then
+  requires you to type `really move` — `y`/`enter` are one keystroke away
+  from navigation and this is not undoable from psmm.
+- **Cloud-only downloads run in parallel** (gh#14): `d` now asks how many
+  files to fetch at once, defaulted sensibly and capped at the machine's
+  logical processor count *with the reason shown*. Pre-load hydration uses
+  the default concurrency without prompting.
+- **The version pin picker** (gh#5): `v` lists the versions that actually
+  exist — on disk and in the gallery — with the current pin preselected,
+  plus "type it myself" for NuGet ranges and an explicit "remove the pin".
+- **Syntax highlighting for code and commands** (gh#9) and **real
+  ctrl+clickable hyperlinks** (gh#10), both through shared primitives in
+  `src/UI/04-Render.ps1` and written down as design-system §11 so new
+  screens inherit them.
+
+### Changed
+- **`left`/`right` work on every screen and are documented** (gh#7): `left`
+  backs out one level everywhere, `right` opens the cursor row where there
+  is something to open (and says so where there is not). They appear in the
+  on-screen legend, and the three different notations for them — `→`, `←`,
+  and prose — collapse into one: `left/right`, spelled out. Arrow glyphs are
+  now banned as key names, with a guard test.
+- **Help looks like the screens it documents** (gh#8): the `this screen` tab
+  renders real key capsules and real state glyphs in their live colours
+  instead of flat monospace, and the config/startup/about tabs highlight
+  their code. `c` copy still yields plain text.
+- The paths screen gained a `modules` count column and a details drill-in
+  (`right`/`enter`) listing what a location holds, by size.
+
 ## [0.1.0-beta8] — 2026-07-20
 
 Live-run feedback rounds two and three on the v2 UI.

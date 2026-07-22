@@ -152,9 +152,16 @@ Format (mockup 2d):
 | `⚠` | entry has validation issues |
 | `⇡` | update available (Ver column, header bar, startup report) |
 | `↑ ↓` after `showing x-y` | more rows above/below (unchanged) |
+| `→` | "next step" pointer in prose only — **never** a key |
 | `…` | truncated (unchanged) |
 | `~` | background activity spinner line (unchanged) |
 | `^` | ctrl, and nothing else (unchanged) |
+
+**Arrow keys are never drawn as glyphs.** A key is always spelled out and
+capsuled: `left/right`, `up/dn`, `pgup/pgdn`, `home/end`. `←`/`→` as key
+names are banned outright — they collide with the `↑ ↓` scroll indicator and
+the `→` prose pointer, and they made one pair of keys read three different
+ways across the UI. A guard test checks every key-rendering call site.
 
 ## 10. Unchanged rules (restated so tests keep passing)
 
@@ -169,6 +176,38 @@ Format (mockup 2d):
 - Too-small terminal → explicit one-line message with current/required size.
 - Status/labels lowercase, no trailing periods; errors show exception text;
   durations in ms; versions `v`-prefixed.
+
+## 11. Rendering primitives (added 2026-07-22)
+
+Four things every screen shows — code, links, prose, versions — used to be
+hand-formatted at each call site, which is why they drifted: the config JSON
+was flat text, one update command was hand-coloured cyan, URLs were dead text
+and a paragraph ran a 200-column terminal edge to edge. **A screen never
+formats one of these itself.** All four live in `src/UI/04-Render.ps1`, take
+theme tokens only, and return balanced markup *per line* (every
+`Markup`/`Write-PSMMLine` is parsed on its own).
+
+| you are showing | go through | rule |
+|---|---|---|
+| code or a command | `Format-PSMMCode -Text <lines> [-Language powershell\|json]` | PowerShell is tokenised with `[PSParser]::Tokenize` (command / parameter / string / variable / number / comment / keyword). Unparseable input degrades to escaped plain text — never throws. JSON is regex-highlighted because the samples carry `//` comments and are deliberately not valid JSON. |
+| one inline command | `Get-PSMMCommandMarkup -Command <string>` | same tokens, single line |
+| a URL | `Get-PSMMLinkMarkup -Url <url> [-Text <label>]` | emits Spectre `[link=…]`, i.e. a real OSC 8 hyperlink — ctrl+clickable in Windows Terminal. Degrades to styled plain text when the URL cannot be expressed as a tag. `Markup::Remove` still yields the label, so `c` copy and the tests are unaffected. |
+| a paragraph | `Get-PSMMProseMarkup` / `Write-PSMMProse` (measure: `Get-PSMMProseWidth`) | wraps at `min(window − 4, 84)` columns. Tables, panels and hint rows are all measured; prose has to be too. |
+| a version | `Get-PSMMVersionMarkup` / `Get-PSMMVersionText` | the prerelease label is part of the version and is always shown, tinted `info`: `0.1.0-beta8` must never render as `0.1.0` |
+| a key | `Get-PSMMKeyCap` (used by `Get-PSMMHint`) | one capsule definition for the whole UI; keys lowercase and spelled out (§9) |
+
+Two more rules that fall out of this:
+
+- **Help is markup, not escaped text.** Every help tab — including
+  `this screen` — renders through the same primitives as the screen it
+  documents: real key capsules, real state glyphs in their real colours,
+  highlighted code. Help that describes a coloured UI in flat monospace does
+  not look like the thing it describes. `Get-PSMMHelpText` flattens it back to
+  plain text for `c` copy and the tests.
+- **Destructive, hard-to-undo actions are gated by a typed phrase**
+  (`Read-PSMMConfirmPhrase`), not by `y`/`enter` — those are one keystroke
+  away from navigation. Moving a whole module location's contents is the
+  first user of this.
 
 ## Migration order (safe increments)
 

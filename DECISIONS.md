@@ -148,3 +148,65 @@ prerelease flag in `psmm.psd1`, history in `CHANGELOG.md`, release state in
 of truth for those facts, which contradicts the pattern's own core rule
 ("every volatile fact lives in exactly one place"). Revisit only if psmm docs
 ever start duplicating status across files.
+
+## D-IMPORT-SCOPE — every module import passes `-Global` (2026-07-22)
+
+**Decision:** every `Import-Module` psmm performs on a managed module passes
+`-Global`. A static AST guard test (`Tests/Engine.Load.Tests.ps1`) fails the
+build if one appears without it.
+
+**Why:** `Import-Module` called from inside a module imports into *that
+module's* session state, not the global one (about_Modules; `Import-Module
+-Scope`, whose default is `Local` when called from a module). psmm is a
+module, so without `-Global` every module it loads lands in psmm's private
+state: `Get-Module` at the prompt does not list it and its commands are "not
+recognized" — while psmm's own `Get-Module`, which sees global *plus* its own
+private imports, keeps reporting `● loaded` for the rest of the session. It
+looked like a stale cache; it was two different session states.
+
+**Why nobody noticed for eight betas:** PowerShell command auto-loading. For a
+module whose manifest lists its exports, typing one of its commands
+auto-loads it into the global state on demand, so the private import is
+invisible. A module that exports `*` (verified with
+`Microsoft.Online.SharePoint.PowerShell` 16.0.27313.12000) cannot be
+auto-loaded by command name, and the failure becomes total.
+
+**Consequence for state:** `Update-PSMMLoaded` deliberately keeps using plain
+`Get-Module`. That is only honest *because* nothing is imported privately any
+more — the two sets are identical. There is no supported way to enumerate the
+global module table from inside a module, so the invariant is enforced by the
+guard test rather than by a smarter query.
+
+## D-PARALLEL — `ForEach-Object -Parallel` for cloud-file hydration (2026-07-22)
+
+**Decision:** `Invoke-PSMMFileHydration -ThrottleLimit n` (n > 1) uses
+`ForEach-Object -Parallel`. `n = 1` keeps the original sequential loop.
+
+**Why:** hydrating a OneDrive placeholder is one blocking read per file, each
+waiting on a network round trip — latency-bound work that overlaps almost
+perfectly. `ForEach-Object -Parallel` streams each result as it lands, so the
+caller's progress callback still runs on the calling thread (invoking a
+caller-supplied scriptblock from a worker runspace would not be safe) and
+per-file error handling is unchanged. It is PowerShell 7.0+, which matches the
+module's floor (D4) — that entry's note that it is "not used" is now
+superseded for this one code path.
+
+**Bound:** concurrency is capped at the machine's logical processor count
+(floor 2, ceiling 16). Each reader holds a runspace and a thread; past one per
+core the extra threads queue behind the ones already waiting, and the sync
+client — not psmm — becomes the limit. The UI shows both the cap and that
+reason, because a bare "max 16" tells the user nothing.
+
+## D-RENDER — cross-cutting rendering primitives (2026-07-22)
+
+**Decision:** code/commands, links, prose and versions are rendered only via
+the primitives in `src/UI/04-Render.ps1` (design-system §11). No screen
+hand-formats them.
+
+**Why:** each of those four had drifted into per-call-site formatting — flat
+uncoloured JSON in help, one hand-cyaned update command, dead URLs, and
+paragraphs running the full width of a 200-column terminal. The palette rule
+("no colour literal outside the theme sources") already proved that a single
+source plus a guard test is what actually holds a UI together over time; this
+extends the same discipline from colour to the four other things every screen
+shows.

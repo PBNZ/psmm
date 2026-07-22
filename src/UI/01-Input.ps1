@@ -54,3 +54,93 @@ function script:Wait-PSMMKey {
     }
     return $true
 }
+
+# left/right = back out / drill in, the same on EVERY screen (gh#7). Returns
+# 'out', 'in' or ''. Screens with nothing to drill into answer 'in' with
+# Get-PSMMNoDrillStatus instead of silently doing nothing - a key that does
+# nothing on some screens is worse than no key.
+function script:Get-PSMMDrillKey {
+    param([Parameter(Mandatory)] $KeyInfo)
+    switch ($KeyInfo.Key) {
+        ([ConsoleKey]::LeftArrow)  { return 'out' }
+        ([ConsoleKey]::RightArrow) { return 'in' }
+    }
+    ''
+}
+
+function script:Get-PSMMNoDrillStatus {
+    "[$script:PSMM_ColMute]nothing to open on this row $([char]0x00B7) left backs out[/]"
+}
+
+# Typed-phrase confirmation for destructive, hard-to-undo actions (gh#13).
+# y/n and enter are one keystroke away from navigation; moving a whole module
+# tree must not be. The user has to type the phrase - anything else, including
+# empty input and esc, cancels. Comparison ignores case and extra whitespace,
+# not content.
+function script:Read-PSMMConfirmPhrase {
+    param(
+        [Parameter(Mandatory)][string]$Phrase,
+        [string]$Warning
+    )
+    if ($Warning) { Write-PSMMProse -Text $Warning -Colour $script:PSMM_ColWarn }
+    Write-PSMMLine "[$script:PSMM_ColMute]this cannot be undone from psmm $([char]0x2014) type [/][$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Phrase)[/][$script:PSMM_ColMute] to go ahead, anything else cancels[/]"
+    $typed = Read-PSMMText -Message "confirm" -AllowEmpty
+    if ($null -eq $typed) { return $false }
+    $norm = ("$typed".Trim() -replace '\s+', ' ')
+    [string]::Equals($norm, $Phrase, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+# Bounded number picker (gh#14): a small panel with a sensible default
+# preselected, up/dn to adjust, enter to accept, esc to cancel. $MaxReason is
+# shown verbatim - a bare "max 16" tells the user nothing about why.
+# Returns the chosen [int], or $null when cancelled.
+function script:Read-PSMMNumber {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '',
+        Justification = 'Every parameter is used inside the live-display scriptblock; the rule cannot see into it.')]
+    param(
+        [Parameter(Mandatory)][string]$Title,
+        [string]$Message,
+        [int]$Default = 1,
+        [int]$Min = 1,
+        [int]$Max = 8,
+        [string]$MaxReason,
+        [string]$Unit = ''
+    )
+    $state = @{ Value = [Math]::Max($Min, [Math]::Min($Max, $Default)); Cancelled = $false }
+    Invoke-PSMMLive -Body {
+        param($ctx)
+        while ($true) {
+            $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
+            $items.Add([Spectre.Console.Markup]::new("[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Title)[/]"))
+            if ($Message) {
+                foreach ($l in (Get-PSMMProseMarkup -Text $Message)) { $items.Add([Spectre.Console.Markup]::new($l)) }
+            }
+            $bar = ('#' * ($state.Value - $Min + 1)).PadRight([Math]::Max(1, $Max - $Min + 1), '.')
+            $items.Add([Spectre.Console.Markup]::new(
+                    "[$script:PSMM_ColOk]$($state.Value)[/][$script:PSMM_ColMute]$(if ($Unit) { " $(ConvertTo-PSMMSafe $Unit)" })[/]  [$script:PSMM_ColDim]$bar  (min $Min, max $Max)[/]"))
+            if ($MaxReason) {
+                foreach ($l in (Get-PSMMProseMarkup -Text $MaxReason -Colour $script:PSMM_ColDim)) { $items.Add([Spectre.Console.Markup]::new($l)) }
+            }
+            $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('up/dn=change', 'enter=go', 'esc=cancel') -NoLegend)))
+            $panel = [Spectre.Console.Panel]::new([Spectre.Console.Rows]::new($items))
+            $panel.Border = [Spectre.Console.BoxBorder]::Rounded
+            $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColAccent)
+            $ctx.UpdateTarget($panel)
+            $ctx.Refresh()
+            $k = [Console]::ReadKey($true)
+            if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; $state.Cancelled = $true; return }
+            switch ($k.Key) {
+                ([ConsoleKey]::UpArrow)    { $state.Value = [Math]::Min($Max, $state.Value + 1) }
+                ([ConsoleKey]::RightArrow) { $state.Value = [Math]::Min($Max, $state.Value + 1) }
+                ([ConsoleKey]::DownArrow)  { $state.Value = [Math]::Max($Min, $state.Value - 1) }
+                ([ConsoleKey]::LeftArrow)  { $state.Value = [Math]::Max($Min, $state.Value - 1) }
+                ([ConsoleKey]::Home)       { $state.Value = $Min }
+                ([ConsoleKey]::End)        { $state.Value = $Max }
+                ([ConsoleKey]::Enter)      { return }
+                ([ConsoleKey]::Escape)     { $state.Cancelled = $true; return }
+            }
+        }
+    }
+    if ($state.Cancelled) { return $null }
+    $state.Value
+}

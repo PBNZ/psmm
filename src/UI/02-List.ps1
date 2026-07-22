@@ -95,6 +95,19 @@ function script:Get-PSMMPositionMarkup {
     $pos
 }
 
+# Does this text contain the filter? A plain case-insensitive substring test,
+# deliberately NOT -like: a filter is free text the user types, and a single
+# '[' makes -like throw "the specified wildcard character pattern is not
+# valid" - which killed the screen mid-keystroke.
+function script:Test-PSMMFilterMatch {
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Text,
+        [AllowEmptyString()][AllowNull()][string]$Filter
+    )
+    if ([string]::IsNullOrEmpty($Filter)) { return $true }
+    "$Text".IndexOf($Filter, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+}
+
 # Filter status markup for a list header ('' when no filter in play).
 function script:Get-PSMMFilterMarkup {
     param([Parameter(Mandatory)] $State)
@@ -115,7 +128,7 @@ function script:Build-PSMMPagerView {
         [Parameter(Mandatory)][string]$TitleMarkup,
         # when given, the v2 header bar replaces the plain title line
         [string[]]$Breadcrumb,
-        [string[]]$HintPairs = @('up/dn=scroll', 'c=copy'),
+        [string[]]$HintPairs = @('up/dn=scroll', 'left=back', 'c=copy'),
         [string]$StatusMarkup,
         [int]$ReservedRows = 7
     )
@@ -196,6 +209,10 @@ function script:Show-PSMMPager {
             if (Test-PSMMHomeKey $k) { $script:PSMM_UI.Goto = 'home'; return }
             $st.Status = ''
             if (Invoke-PSMMPagerNav -State $st -KeyInfo $k) { continue }
+            # left backs out here too (gh#7); a text page has nothing to open
+            $drill = Get-PSMMDrillKey -KeyInfo $k
+            if ($drill -eq 'out') { return }
+            if ($drill -eq 'in') { $st.Status = Get-PSMMNoDrillStatus; continue }
             if ($k.Key -eq [ConsoleKey]::Escape) { return }
             if ($k.KeyChar -eq 'c') { $st.Status = Copy-PSMMText -Text ($Lines -join [Environment]::NewLine) }
         }
