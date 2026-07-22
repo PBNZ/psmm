@@ -175,7 +175,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match 'BetaMod'
         $text | Should -Match '2\.0\.0 \(exact\)'      # version pin display
         $text | Should -Match 'import took 123 ms'     # ImportMs surfaced
-        $text | Should -Match 'gallery: check-only'    # display words (v2)
+        $text | Should -Match 'upkeep: check-only'    # display words (v2)
     }
 
     It 'module menu shows connection status when auth is known (#32)' {
@@ -692,15 +692,15 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
 
     # --- step 3: plain-word columns, state glyphs, context line -------------
 
-    It 'grid columns speak plain words: module state startup gallery version scope file (step 3)' {
+    It 'grid columns speak plain words: module state startup upkeep version scope file (step 3)' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $header = ($text -split "`r?`n" | Where-Object { $_ -match '│.*module' } | Select-Object -First 1)
-        $header | Should -Match 'module\s+state\s+startup\s+gallery\s+version\s+scope\s+file'
+        $header | Should -Match 'module\s+state\s+startup\s+upkeep\s+version\s+scope\s+file'
         $text | Should -Not -Match '│\s*mode\s*│'
         $text | Should -Not -Match '│\s*inst\s*│'
     }
 
-    It 'startup and gallery cells map the config enums to display words (step 3)' {
+    It 'startup and upkeep cells map the config enums to display words (step 3)' {
         # fixture: AlphaMod = IfMissing/Ignore, BetaMod = CheckOnly/Ignore
         $text = Get-RenderedText { Build-PSMMGrid }
         $text | Should -Match 'off'
@@ -1207,13 +1207,13 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             Build-PSMMModuleMenuView -Entry $e -Auth $null
         }
         foreach ($label in 'what', 'entry', 'disk', 'session') { $menu | Should -Match $label }
-        $menu | Should -Match 'gallery: check-only'
+        $menu | Should -Match 'upkeep: check-only'
         $menu | Should -Match 'off at startup'
         $menu | Should -Match 'pin 2\.0\.0 \(exact\)'
         $menu | Should -Match 'import took 123 ms'
         # action groups
         ($menu -replace '\s+', ' ') | Should -Match 'session .*\^l\s+load'
-        ($menu -replace '\s+', ' ') | Should -Match 'gallery .*u\s+update'
+        ($menu -replace '\s+', ' ') | Should -Match 'upkeep .*u\s+update'
         ($menu -replace '\s+', ' ') | Should -Match 'entry .*e\s+edit'
     }
 

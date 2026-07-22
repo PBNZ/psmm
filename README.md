@@ -107,7 +107,8 @@ background job; the report tells you what happened.
 quick-tips panel over the grid — the three keys worth knowing, shown once):
 
 - one grid row per module: state (`●` loaded / `◐` installed / `○` missing /
-  `◌` unmanaged), what happens at **startup**, what the **gallery** may do,
+  `◌` unmanaged), what happens at **startup**, how psmm keeps it on disk
+  (**upkeep**),
   version (`⇡` = update available), scope, file — plus a plain-words context
   sentence for the row under the cursor
 - `space` select · `^l`/`^u` load/unload (`^` = ctrl) · `i` install · `u` update

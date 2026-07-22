@@ -71,7 +71,7 @@ function script:Get-PSMMHelpSection {
             (Get-PSMMHelpTerm 'state' ("[$script:PSMM_ColOk]$([char]0x25CF) loaded[/][$script:PSMM_ColMute] (this session) $mid [/][$script:PSMM_ColWarn]$([char]0x25D0) installed[/][$script:PSMM_ColMute] (on disk)[/]"))
             (Get-PSMMHelpTerm '' ("[$script:PSMM_ColErr]$([char]0x25CB) missing[/][$script:PSMM_ColMute] $mid [/][$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/][$script:PSMM_ColMute] (in no config file - m shows them)[/]"))
             (Get-PSMMHelpTerm 'startup' (Get-PSMMHelpText1 'what happens at shell start: load / install (background) / off'))
-            (Get-PSMMHelpTerm 'gallery' (Get-PSMMHelpText1 'what the gallery may do: if-missing / check-only / latest'))
+            (Get-PSMMHelpTerm 'upkeep' (Get-PSMMHelpText1 'how psmm keeps it on disk: if-missing / check-only / latest'))
             (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 '+pre means prerelease versions are allowed for that entry'))
             (Get-PSMMHelpTerm 'version' (Get-PSMMHelpText1 'loaded (or newest installed), prerelease label and all:'))
             (Get-PSMMHelpTerm '' ("$(Get-PSMMVersionMarkup -Version '0.1.0' -Prerelease 'beta8')[$script:PSMM_ColMute] is not [/]$(Get-PSMMVersionMarkup -Version '0.1.0')"))
@@ -102,7 +102,7 @@ function script:Get-PSMMHelpSection {
         'module' { @(
             (Get-PSMMHelpHead 'MODULE MENU')
             (Get-PSMMHelpText1 'Facts and actions for one module, grouped by what they touch:')
-            (Get-PSMMHelpText1 'session (this pwsh), gallery (disk/network), entry (the config')
+            (Get-PSMMHelpText1 'session (this pwsh), upkeep (install/update/clean), entry (the config')
             (Get-PSMMHelpText1 'file line), files (the folders on disk), connection (Connect-*')
             (Get-PSMMHelpText1 'modules). Only actions that make sense for the row are offered.')
             ''
@@ -307,7 +307,7 @@ function script:Get-PSMMHelpConfigLines {
     foreach ($l in (Format-PSMMCode -Text $json -Language json)) { $out.Add($l) }
     $out.Add('')
     $out.Add((Get-PSMMHelpText1 '  The UI shows Mode as the startup column (load / install / off) and'))
-    $out.Add((Get-PSMMHelpText1 '  Install as the gallery column (if-missing / check-only / latest);'))
+    $out.Add((Get-PSMMHelpText1 '  Install as the upkeep column (if-missing / check-only / latest);'))
     $out.Add((Get-PSMMHelpText1 '  Prerelease shows there too, as "+pre".'))
     $out.Add('')
     foreach ($l in (Get-PSMMHelpHead 'RULES')) { $out.Add($l) }

@@ -407,7 +407,7 @@ function script:Get-PSMMStartupWord {
     }
 }
 
-function script:Get-PSMMGalleryWord {
+function script:Get-PSMMUpkeepWord {
     param($Install)
     switch ("$Install") {
         'IfMissing' { 'if-missing' }

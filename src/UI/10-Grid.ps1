@@ -62,10 +62,10 @@ function script:Build-PSMMGrid {
         }
         $startupWord = Get-PSMMStartupWord $e.Mode
         $startup = if ($startupWord -in 'off', '-') { "[$script:PSMM_ColDim]$startupWord[/]" } else { $startupWord }
-        $galleryWord = Get-PSMMGalleryWord $e.Install
-        # prerelease opt-in is part of the gallery policy, so it reads there
-        if ($e.AllowPrerelease) { $galleryWord += '+pre' }
-        $gallery = "[$script:PSMM_ColDim]$galleryWord[/]"
+        $upkeepWord = Get-PSMMUpkeepWord $e.Install
+        # prerelease opt-in is part of the upkeep policy, so it reads there
+        if ($e.AllowPrerelease) { $upkeepWord += '+pre' }
+        $upkeep = "[$script:PSMM_ColDim]$upkeepWord[/]"
         # the version shown always carries its prerelease label (gh#6):
         # 0.1.0-beta8 and 0.1.0 share one [version] and must not look alike
         $verBase = if ($e.LoadedVersion) { Get-PSMMVersionMarkup -Version $e.LoadedVersion -Prerelease $e.LoadedPrerelease }
@@ -91,12 +91,12 @@ function script:Build-PSMMGrid {
         # must never cover the dot (live-run feedback 2026-07-20)
         $mark = if ($ui.Sel.Contains($idx)) { "[$script:PSMM_ColOk]$([char]0x25AA)[/]" } else { ' ' }
         $issueFlags.Add([bool]$e.Issues.Count)
-        $rows.Add([string[]]@($mark, $name, $state, $startup, $gallery, $ver, $scope, $file))
+        $rows.Add([string[]]@($mark, $name, $state, $startup, $upkeep, $ver, $scope, $file))
     }
 
     # lowercase + dim headers, plain-word column names (design §5); plain text
     # here for width maths, dim markup applied when the columns are created
-    $headers = @(' ', 'module', 'state', 'startup', 'gallery', 'version', 'scope', 'file')
+    $headers = @(' ', 'module', 'state', 'startup', 'upkeep', 'version', 'scope', 'file')
     $nameCol = 1
     $widths = @(foreach ($h in $headers) { $h.Length })
     for ($ci = 0; $ci -lt $headers.Count; $ci++) {

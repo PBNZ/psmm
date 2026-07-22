@@ -84,6 +84,18 @@ Live-run feedback round four, and one serious bug it uncovered.
   screens inherit them.
 
 ### Changed
+- **The `gallery` column is now `upkeep`.** It named the source rather than
+  the behaviour — its values answer *how does psmm keep this module on disk*,
+  not *what is the gallery*. `upkeep` reads correctly with all three
+  (`if-missing` / `check-only` / `latest`); `install` would have been the most
+  literal name but collides with the `startup` column's own `install` value.
+  The module menu's action group is renamed to match. JSON schema untouched.
+- **The module details path is shown whole**, wrapped at folder boundaries
+  rather than truncated — the tail of a path (which module, which version) is
+  the half worth reading. Also added there: size on disk, when the folder was
+  written, what the module requires of the host (`PowerShell x+`, edition),
+  and a warning when the manifest declares its exports as `*` — the reason a
+  module's commands cannot auto-load, and the mechanism that hid gh#2.
 - **`left`/`right` work on every screen and are documented** (gh#7): `left`
   backs out one level everywhere, `right` opens the cursor row where there
   is something to open (and says so where there is not). They appear in the

@@ -147,6 +147,24 @@ Describe 'Links' -Tag UI -Skip:(-not $SpectreAvailable) {
 
 Describe 'Prose wrapping' -Tag UI -Skip:(-not $SpectreAvailable) {
 
+    It 'wraps a path at separator boundaries, keeping every character' {
+        InModuleScope psmm {
+            $p = 'C:\Users\someone\OneDrive - A Long Org Name\Documents\PowerShell\Modules\Some.Module\1.2.3'
+            $lines = @(Get-PSMMWrapPath -Path $p -Width 50)
+            $lines.Count | Should -BeGreaterThan 1
+            foreach ($l in $lines) { $l.Length | Should -BeLessOrEqual 50 }
+            ($lines -join '') | Should -Be $p          # nothing lost, nothing added
+            $lines[0] | Should -Match '\\$'            # broke after a separator
+            # short paths come back untouched, on one line
+            @(Get-PSMMWrapPath -Path 'C:\short' -Width 50) | Should -Be @('C:\short')
+            # a single folder name longer than the measure still fits somehow
+            $long = 'C:\' + ('x' * 120)
+            $hard = @(Get-PSMMWrapPath -Path $long -Width 40)
+            ($hard -join '') | Should -Be $long
+            foreach ($l in $hard) { $l.Length | Should -BeLessOrEqual 40 }
+        }
+    }
+
     It 'wraps at a readable measure, never the raw window width' {
         InModuleScope psmm {
             $long = 'word ' * 120
@@ -315,7 +333,81 @@ Describe 'Help looks like the screens it documents' -Tag UI -Skip:(-not $Spectre
     }
 }
 
+Describe 'The upkeep column' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    It 'is called upkeep, not gallery - it names the behaviour, not the source' {
+        $text = Get-RenderedText {
+            $script:PSMM_UI.Entries = [System.Collections.Generic.List[object]]::new()
+            $script:PSMM_UI.Entries.Add((Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'A'; Install = 'IfMissing' }) -Source 'x.json' -Writable $true))
+            Build-PSMMGrid
+        }
+        ($text -replace '\s+', ' ') | Should -Match 'module state startup upkeep version scope file'
+        $text | Should -Not -Match '\bgallery\b'
+    }
+
+    It 'reads correctly with every value the config can hold' {
+        InModuleScope psmm {
+            Get-PSMMUpkeepWord 'IfMissing' | Should -Be 'if-missing'
+            Get-PSMMUpkeepWord 'CheckOnly' | Should -Be 'check-only'
+            Get-PSMMUpkeepWord 'Latest' | Should -Be 'latest'
+        }
+    }
+}
+
 Describe 'Module details answer "which copy, from where?"' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    It 'shows the FULL install path - the tail is the informative half' {
+        # regression: the path was truncated at the window width, cutting off
+        # the module and version folders, i.e. exactly what was being asked for
+        $deep = 'C:\Users\someone\OneDrive - A Very Long Organisation Name Here\Documents\PowerShell\Modules\Some.Very.Long.Module.Name\16.0.27313.12000'
+        $text = InModuleScope psmm -Parameters @{ p = $deep } {
+            $e = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'Some.Very.Long.Module.Name' }) -Source 'x.json' -Writable $true
+            $e.Installed = $true
+            $e.InstalledVersion = [version]'16.0.27313.12000'
+            $e.InstalledVersions = @([pscustomobject]@{ Version = [version]'16.0.27313.12000'; Prerelease = ''; Path = $p; Scope = 'CurrentUser' })
+            $sw = [System.IO.StringWriter]::new()
+            $s = [Spectre.Console.AnsiConsoleSettings]::new()
+            $s.Out = [Spectre.Console.AnsiConsoleOutput]::new($sw)
+            $s.Interactive = [Spectre.Console.InteractionSupport]::No
+            $s.Ansi = [Spectre.Console.AnsiSupport]::No
+            $c = [Spectre.Console.AnsiConsole]::Create($s); $c.Profile.Width = 118
+            $c.Write((Build-PSMMModuleMenuView -Entry $e -Auth $null))
+            $sw.ToString() -replace '\x1b\[[0-9;?]*[A-Za-z]', ''
+        }
+        # the path wraps across lines rather than being cut - join them back up
+        $joined = ($text -split "`r?`n" | ForEach-Object { ($_ -replace '^\s*.\s*', '') -replace '\s+.\s*$', '' }) -join ''
+        # the WHOLE path survives, head and tail: the tail (module + version
+        # folder) is the half the old truncation threw away
+        $joined | Should -Match ([regex]::Escape($deep))
+        # and the path row itself carries no ellipsis (the frame has one in
+        # 'g goto…', so this must be scoped to the row)
+        $pathRow = @($text -split "`r?`n" | Where-Object { $_ -match 'path\s+C:\\' })
+        @($pathRow).Count | Should -Be 1
+        $pathRow[0] | Should -Not -Match ([char]0x2026)
+    }
+
+    It 'warns when a manifest exports with wildcards - the reason a module cannot autoload' {
+        InModuleScope psmm {
+            $dir = Join-Path $TestDrive 'wild\WildMod\1.0.0'
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $dir 'WildMod.psm1') -Value 'function Get-Wild { 1 }'
+            New-ModuleManifest -Path (Join-Path $dir 'WildMod.psd1') -RootModule 'WildMod.psm1' `
+                -ModuleVersion '1.0.0' -FunctionsToExport '*' -CmdletsToExport '*' -AliasesToExport '*'
+            $prev = $env:PSModulePath
+            $env:PSModulePath = (Join-Path $TestDrive 'wild') + [System.IO.Path]::PathSeparator + $prev
+            try {
+                $e = Resolve-PSMMEntry -Raw ([pscustomobject]@{ Name = 'WildMod' }) -Source 'x.json' -Writable $true
+                Update-PSMMAvailable -Entries @($e) -Name 'WildMod'
+                $facts = Resolve-PSMMModuleFacts -Entry $e
+                $facts.Exports | Should -Be 'wildcard'
+                $facts.Bytes | Should -BeGreaterThan 0
+                $facts.InstalledAt | Should -Not -BeNullOrEmpty
+            } finally { $env:PSModulePath = $prev }
+        }
+    }
+}
+
+Describe 'Module details: the original screen' -Tag UI -Skip:(-not $SpectreAvailable) {
 
     It 'shows the install path, the search-path root it sits under and every version' {
         $text = InModuleScope psmm {

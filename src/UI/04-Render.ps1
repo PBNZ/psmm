@@ -46,6 +46,42 @@ function script:Get-PSMMWrapText {
     @($out)
 }
 
+# Wrap a filesystem path at SEPARATOR boundaries. Neither of the two obvious
+# options works for a path: word wrap does nothing (a path is one long token,
+# so the grid reflows it into ragged nonsense and blows the label column out),
+# and truncation throws away the tail - which is the half that says WHICH
+# module and WHICH version. Breaking after a '\' keeps every character and
+# stays readable.
+function script:Get-PSMMWrapPath {
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Path,
+        [int]$Width = 0
+    )
+    if ($Width -le 0) { $Width = Get-PSMMProseWidth }
+    $Width = [Math]::Max(12, $Width)
+    if ([string]::IsNullOrEmpty($Path)) { return @('') }
+    if ($Path.Length -le $Width) { return @($Path) }
+    # each separator stays attached to the segment before it, so a wrapped
+    # path still reads as a path
+    $parts = @([regex]::Matches($Path, '[^\\/]*[\\/]?') | ForEach-Object { $_.Value } | Where-Object { $_ -ne '' })
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $cur = ''
+    foreach ($part in $parts) {
+        $p = $part
+        if ($cur -and ($cur.Length + $p.Length) -gt $Width) { $lines.Add($cur); $cur = '' }
+        # one segment longer than the measure: hard-split it, there is no
+        # better break point inside a single folder name
+        while ($p.Length -gt $Width) {
+            if ($cur) { $lines.Add($cur); $cur = '' }
+            $lines.Add($p.Substring(0, $Width))
+            $p = $p.Substring($Width)
+        }
+        $cur += $p
+    }
+    if ($cur) { $lines.Add($cur) }
+    @($lines)
+}
+
 # Wrapped, escaped, styled prose as one markup string per line. Each line
 # carries its own balanced tags, which is mandatory: every Markup/Write-PSMMLine
 # is parsed on its own (there is a test for it).

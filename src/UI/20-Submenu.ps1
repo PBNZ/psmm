@@ -16,8 +16,21 @@ function script:Get-PSMMModuleLocationFacts {
     $vers = @($Entry.InstalledVersions)
     if (-not $vers.Count) { return @($rows) }
     $mid = [char]0x00B7
-    $cap = [Math]::Max(30, (Get-PSMMWinSize).Width - 20)
-    $rows.Add(@('path', "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe (Get-PSMMTrunc "$($vers[0].Path)" $cap))[/]"))
+    # The path is shown WHOLE - truncating it threw away the module and
+    # version folders, i.e. the answer. Pre-wrapped at separator boundaries so
+    # the grid never has to reflow it (left to itself it ragged-wraps the path
+    # and blows the label column out to ~60 chars).
+    $cap = [Math]::Max(30, (Get-PSMMWinSize).Width - 22)
+    $addWrapped = {
+        param($Label, $Text, $Suffix)
+        $lines = @(Get-PSMMWrapPath -Path "$Text" -Width $cap)
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $tail = if ($i -eq $lines.Count - 1 -and $Suffix) { " $mid $Suffix" } else { '' }
+            $rows.Add(@($(if ($i -eq 0) { $Label } else { '' }),
+                    "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe $lines[$i])[/]$tail"))
+        }
+    }
+    & $addWrapped 'path' "$($vers[0].Path)" $null
     if ($Manifest -and $Manifest.Root) {
         $notes = @()
         if ($null -ne $Manifest.RootOrder) {
@@ -26,7 +39,7 @@ function script:Get-PSMMModuleLocationFacts {
         } else {
             $notes += "[$script:PSMM_ColWarn]not on the module search path[/]"
         }
-        $rows.Add(@('location', "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe (Get-PSMMTrunc "$($Manifest.Root)" $cap))[/] $mid $($notes -join " $mid ")"))
+        & $addWrapped 'location' "$($Manifest.Root)" ($notes -join " $mid ")
     }
     if ($vers.Count -gt 1) {
         $shown = @($vers | Select-Object -First 4 | ForEach-Object {
@@ -48,6 +61,7 @@ function script:Resolve-PSMMModuleFacts {
     $facts = [pscustomobject]@{
         Author = ''; ProjectUri = ''; ModuleType = ''; CommandCount = 0; CloudOnly = 0
         Root = ''; RootOrder = $null; RootOneDrive = $false
+        Requires = ''; Exports = ''; Bytes = 0L; InstalledAt = $null
     }
     try {
         $m = Get-Module -Name $Entry.Name -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -65,6 +79,25 @@ function script:Resolve-PSMMModuleFacts {
                 $uri = $m.PrivateData.PSData.ProjectUri
                 if ($uri -and (Test-PSMMUrl -Text "$uri")) { $facts.ProjectUri = "$uri" }
             } catch { }
+            # what the module demands of the host. CompatiblePSEditions in
+            # particular is the answer to "why won't this load in pwsh 7".
+            $req = @()
+            try { if ($m.PowerShellVersion) { $req += "PowerShell $($m.PowerShellVersion)+" } } catch { }
+            try {
+                $eds = @($m.CompatiblePSEditions)
+                if ($eds.Count) { $req += "edition $($eds -join '/')" }
+            } catch { }
+            $facts.Requires = $req -join " $([char]0x00B7) "
+            # How the manifest declares its exports. '*' means PowerShell
+            # cannot resolve a command name to this module without importing
+            # it first - no auto-loading - which is exactly how gh#2 hid.
+            try {
+                $d = Import-PowerShellDataFile -Path $m.Path -ErrorAction Stop
+                $wild = @('CmdletsToExport', 'FunctionsToExport', 'AliasesToExport' | Where-Object {
+                        @($d[$_]) -contains '*'
+                    })
+                if ($wild.Count) { $facts.Exports = 'wildcard' }
+            } catch { }
         }
     } catch { }
     $vers = @($Entry.InstalledVersions)
@@ -76,6 +109,10 @@ function script:Resolve-PSMMModuleFacts {
                     $_.Path.TrimEnd('\', '/') -eq "$($tree.Root)".TrimEnd('\', '/')
                 }) | Select-Object -First 1
             if ($match) { $facts.RootOrder = $match.Order; $facts.RootOneDrive = [bool]$match.OneDrive }
+            # how much disk the whole module tree takes, and when it landed -
+            # "when did this get here" is a real troubleshooting question
+            $facts.Bytes = Get-PSMMFolderSize -Path $tree.Tree
+            $facts.InstalledAt = (Get-Item -LiteralPath "$($vers[0].Path)" -ErrorAction Stop).LastWriteTime
         } catch { }
     }
     # only ever scans OneDrive module bases (see Get-PSMMModuleCloudOnlyFile)
@@ -111,7 +148,7 @@ function script:Build-PSMMModuleMenuView {
                     $srcLeaf = if ($Entry.Source -eq '<profile inline>') { 'profile inline' } else { Split-Path $Entry.Source -Leaf }
                     $rwTxt = if ($Entry.Writable -and $Entry.Source -ne '<profile inline>') { 'rw' } else { 'ro' }
                     $preTxt = if ($Entry.AllowPrerelease) { " $mid [$script:PSMM_ColInfo]prereleases allowed[/]" } else { '' }
-                    "$(Get-PSMMStartupWord $Entry.Mode) at startup $mid gallery: $(Get-PSMMGalleryWord $Entry.Install) $mid $pinTxt$preTxt [$script:PSMM_ColDim]$mid $(ConvertTo-PSMMSafe $srcLeaf) ($rwTxt)[/]"
+                    "$(Get-PSMMStartupWord $Entry.Mode) at startup $mid upkeep: $(Get-PSMMUpkeepWord $Entry.Install) $mid $pinTxt$preTxt [$script:PSMM_ColDim]$mid $(ConvertTo-PSMMSafe $srcLeaf) ($rwTxt)[/]"
                 }
     $disk = if ($Entry.Installed) {
         $vers = @($Entry.InstalledVersions)
@@ -140,7 +177,19 @@ function script:Build-PSMMModuleMenuView {
         $bits = @()
         if ($Manifest.ModuleType) { $bits += "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe "$($Manifest.ModuleType)") module[/]" }
         if ($Manifest.CommandCount) { $bits += "[$script:PSMM_ColDim]$($Manifest.CommandCount) command(s) (b browses them)[/]" }
+        if ($Manifest.Bytes) { $bits += "[$script:PSMM_ColDim]$(Format-PSMMSize $Manifest.Bytes) on disk[/]" }
+        if ($Manifest.InstalledAt) {
+            $bits += "[$script:PSMM_ColDim]written $($Manifest.InstalledAt.ToString('yyyy-MM-dd'))[/]"
+        }
         if ($bits.Count) { $facts.Add(@('kind', ($bits -join " $mid "))) }
+        if ($Manifest.Requires) {
+            $facts.Add(@('requires', "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe $Manifest.Requires)[/]"))
+        }
+        # a wildcard-export manifest cannot be auto-loaded by command name -
+        # the exact reason a "loaded" module can look completely absent (gh#2)
+        if ($Manifest.Exports -eq 'wildcard' -and -not $Entry.Loaded) {
+            $facts.Add(@('exports', "[$script:PSMM_ColWarn]declared as '*'[/] [$script:PSMM_ColDim]$mid its commands cannot autoload $mid import it before using them[/]"))
+        }
         if ($Manifest.ProjectUri) {
             $facts.Add(@('project', (Get-PSMMLinkMarkup -Url "$($Manifest.ProjectUri)")))
         }
@@ -169,15 +218,15 @@ function script:Build-PSMMModuleMenuView {
     $panel.BorderStyle = Get-PSMMBorderStyle
 
     # --- actions grouped by what they touch (§2e); same verbs, same keys --
-    $galleryPairs = @()
+    $upkeepPairs = @()
     if ($Entry.Installed) {
         # the target version keeps its prerelease label here too, or the hint
         # would offer "update to 0.1.0" when it means 0.1.0-beta9 (gh#6)
-        $galleryPairs += if ($Entry.UpdateAvailable -and $Entry.LatestVersion) {
+        $upkeepPairs += if ($Entry.UpdateAvailable -and $Entry.LatestVersion) {
             "u=update to $(Get-PSMMVersionText -Version $Entry.LatestVersion -Prerelease $Entry.LatestPrerelease)"
         } else { 'u=update' }
-        if (@($Entry.InstalledVersions).Count -gt 1) { $galleryPairs += "x=clean $(@($Entry.InstalledVersions).Count - 1) old version(s)" }
-    } else { $galleryPairs += 'i=install' }
+        if (@($Entry.InstalledVersions).Count -gt 1) { $upkeepPairs += "x=clean $(@($Entry.InstalledVersions).Count - 1) old version(s)" }
+    } else { $upkeepPairs += 'i=install' }
     $entryPairs = if ($isUnmanaged) { @('a=add to config') }
                   elseif ($Entry.Writable -and $Entry.Source -ne '<profile inline>') {
                       @('e=edit', 'v=pin version',
@@ -195,7 +244,7 @@ function script:Build-PSMMModuleMenuView {
     $diskPairs = if ($Entry.Installed) { @('p=move to another location') } else { @() }
     $groups = @(
         , @('session', @('^l=load', '^u=unload', 'b=browse commands'))
-        , @('gallery', $galleryPairs)
+        , @('upkeep', $upkeepPairs)
         , @('entry', $entryPairs)
         , @('files', $diskPairs)
         , @('connection', $connPairs)

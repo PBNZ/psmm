@@ -92,11 +92,17 @@ anywhere).
 
 ## 5. Grid columns: plain words + context line
 
-- Rename headers, lowercase + dim: `module state startup gallery version
+- Rename headers, lowercase + dim: `module state startup upkeep version
   scope file`.
 - `Mode` → **startup**: `load` / `install` / `off` (Load / InstallOnly /
-  Ignore). `Install` → **gallery**: `if-missing` / `check-only` / `latest`.
+  Ignore). `Install` → **upkeep**: `if-missing` / `check-only` / `latest`.
   JSON schema is untouched — this is display language only.
+  *(Amended 2026-07-22: the column was **gallery**, which named the source
+  rather than the behaviour — the values answer "how does psmm keep this
+  module on disk", not "what is the gallery". `upkeep` reads correctly with
+  all three: upkeep if-missing / check-only / latest. `install` would have
+  been the most literal name but collides with the `startup` column's own
+  `install` value.)*
 - **state** gets glyphs: `● loaded` (ok) · `◐ installed` (warn) · `○ missing`
   (err) · `◌ unmanaged` (info). Glyph + word, never glyph alone.
 - `!` column dies; issues render as `⚠` (err) after the module name.
