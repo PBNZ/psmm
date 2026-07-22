@@ -24,39 +24,63 @@ function Resolve-PSMMEntry {
     $mode = if ($Raw.PSObject.Properties['Mode'] -and $Raw.Mode) { [string]$Raw.Mode } else { 'Load' }
     if ($mode -notin $validMode) { $issues.Add("Invalid Mode '$mode' (using Load)"); $mode = 'Load' }
 
-    # Optional version pin: exact ("1.2.3") or NuGet range ("[1.0,2.0)").
+    # Optional version pin: exact ("1.2.3"), exact prerelease ("1.2.3-beta4")
+    # or NuGet range ("[1.0,2.0)").
+    #
+    # The prerelease label is part of the pin (gh#6): 0.1.0-beta8 and 0.1.0 are
+    # different releases that share one [version]. It is kept SEPARATE from the
+    # base version because Import-Module -RequiredVersion is typed [version]
+    # and throws on a label - see Import-PSMMModuleTimed.
     $version = $null
     if ($Raw.PSObject.Properties['Version'] -and $Raw.Version) { $version = ([string]$Raw.Version).Trim() }
     $pinnedExact = $false
+    $pinnedBase = $null
+    $pinnedLabel = ''
     if ($version) {
-        if ($version -match '^\d+(\.\d+){1,3}$') {
+        if ($version -match '^(?<base>\d+(\.\d+){1,3})(-(?<label>[A-Za-z0-9][A-Za-z0-9.-]*))?$') {
             $pinnedExact = $true
+            $pinnedBase = $Matches['base']
+            $pinnedLabel = "$($Matches['label'])"
         } elseif ($version -notmatch '^[\[\(][0-9\.\,\s\*\-A-Za-z]*[\]\)]$') {
             $issues.Add("Invalid Version '$version' (ignoring pin)")
             $version = $null
         }
     }
 
+    # Optional prerelease opt-in (gh#6): "Prerelease": true lets install/update
+    # and the pin picker consider prerelease versions from the gallery.
+    $allowPre = $false
+    if ($Raw.PSObject.Properties['Prerelease'] -and $null -ne $Raw.Prerelease) {
+        try { $allowPre = [bool]$Raw.Prerelease }
+        catch { $issues.Add("Invalid Prerelease '$($Raw.Prerelease)' (using false)") }
+    }
+
     [pscustomobject]@{
-        Name              = $name
-        FriendlyName      = if ($Raw.FriendlyName) { [string]$Raw.FriendlyName } else { $name }
-        Description       = [string]$Raw.Description
-        Install           = $install
-        Mode              = $mode
-        Version           = $version
-        PinnedExact       = $pinnedExact
-        Source            = $Source
-        Writable          = $Writable
-        Issues            = $issues.ToArray()
-        Installed         = $false
-        InstalledVersion  = $null
-        InstalledVersions = @()      # every installed version (duplicate-cleanup feature)
-        InstallScope      = $null    # CurrentUser | AllUsers | mixed | $null (unknown)
-        Loaded            = $false
-        LoadedVersion     = $null
-        LatestVersion     = $null
-        UpdateAvailable   = $false
-        ImportMs          = $null    # measured import duration (startup / UI load)
+        Name               = $name
+        FriendlyName       = if ($Raw.FriendlyName) { [string]$Raw.FriendlyName } else { $name }
+        Description        = [string]$Raw.Description
+        Install            = $install
+        Mode               = $mode
+        Version            = $version
+        PinnedExact        = $pinnedExact
+        PinnedBaseVersion  = $pinnedBase    # the pin without its prerelease label
+        PinnedPrerelease   = $pinnedLabel   # '' unless the pin names a prerelease
+        AllowPrerelease    = $allowPre      # config "Prerelease": true
+        Source             = $Source
+        Writable           = $Writable
+        Issues             = $issues.ToArray()
+        Installed          = $false
+        InstalledVersion   = $null
+        InstalledPrerelease = ''     # label of the newest installed copy ('' = stable)
+        InstalledVersions  = @()     # every installed version (duplicate-cleanup feature)
+        InstallScope       = $null   # CurrentUser | AllUsers | mixed | $null (unknown)
+        Loaded             = $false
+        LoadedVersion      = $null
+        LoadedPrerelease   = ''
+        LatestVersion      = $null
+        LatestPrerelease   = ''
+        UpdateAvailable    = $false
+        ImportMs           = $null   # measured import duration (startup / UI load)
     }
 }
 

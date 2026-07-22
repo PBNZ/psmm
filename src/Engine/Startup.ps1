@@ -96,7 +96,7 @@ function Start-PSMMDeferredJob {
     [CmdletBinding()]
     param([Parameter(Mandatory)] $Entries)
     $payload = @($Entries | ForEach-Object {
-        [pscustomobject]@{ Name = $_.Name; Install = $_.Install; Version = $_.Version }
+        [pscustomobject]@{ Name = $_.Name; Install = $_.Install; Version = $_.Version; Prerelease = [bool]$_.AllowPrerelease }
     })
     $script:PSMM_JobTotal = $payload.Count
     $script:PSMM_StartupJob = Start-ThreadJob -Name 'PSMM-Startup' -ScriptBlock {
@@ -106,12 +106,13 @@ function Start-PSMMDeferredJob {
             try {
                 $have = Get-Module -ListAvailable -Name $m.Name
                 $psrg = [bool](Get-Command Install-PSResource -ErrorAction SilentlyContinue)
+                $pre = [bool]$m.Prerelease
                 $installLatest = {
                     if ($psrg) {
-                        if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -TrustRepository -ErrorAction Stop }
-                        else { Install-PSResource -Name $m.Name -Scope CurrentUser -TrustRepository -ErrorAction Stop }
+                        if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -Prerelease:$pre -TrustRepository -ErrorAction Stop }
+                        else { Install-PSResource -Name $m.Name -Scope CurrentUser -Prerelease:$pre -TrustRepository -ErrorAction Stop }
                     } else {
-                        Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+                        Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -AllowPrerelease:$pre -ErrorAction Stop
                     }
                 }
                 switch ($m.Install) {
@@ -123,7 +124,11 @@ function Start-PSMMDeferredJob {
                     }
                     'Latest' {
                         if ($m.Version) { & $installLatest }
-                        elseif ($have -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue)) { Update-PSResource -Name $m.Name -ErrorAction Stop }
+                        # $psrg, not just $have: Install-PSResource does not
+                        # exist on a PowerShellGet-only machine, and this is
+                        # the one branch that names it directly
+                        elseif ($have -and $pre -and $psrg) { Install-PSResource -Name $m.Name -Prerelease -Reinstall -Scope CurrentUser -TrustRepository -ErrorAction Stop }
+                        elseif ($have -and $psrg -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue)) { Update-PSResource -Name $m.Name -ErrorAction Stop }
                         else { & $installLatest }
                         "updated $($m.Name)"
                     }

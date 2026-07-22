@@ -107,23 +107,30 @@ background job; the report tells you what happened.
 quick-tips panel over the grid — the three keys worth knowing, shown once):
 
 - one grid row per module: state (`●` loaded / `◐` installed / `○` missing /
-  `◌` unmanaged), what happens at **startup**, what the **gallery** may do,
+  `◌` unmanaged), what happens at **startup**, how psmm keeps it on disk
+  (**upkeep**),
   version (`⇡` = update available), scope, file — plus a plain-words context
   sentence for the row under the cursor
 - `space` select · `^l`/`^u` load/unload (`^` = ctrl) · `i` install · `u` update
   · `k` check for updates
+- `left`/`right` back out / open the row — the same pair on every screen
 - `g` opens the **goto layer** (anywhere): `g h` home · `g g` gallery search ·
   `g f` config files · `g p` module locations · `g t` background tasks ·
   `g c` conflicts · `g x` version cleanup
 - `/` filter (everywhere) · `?` tabbed help (everywhere) · `^q` quit (anywhere)
+- per module: where it actually lives on disk and under which search root,
+  every installed version, pin a version from a list of what exists, allow
+  prereleases (`w`), browse its commands, or move its folder to another
+  module location (`p`)
 - gallery search adds modules straight into your config; cleanup prunes
   stacked old module versions; `m` shows/hides installed-but-unmanaged
   modules so you can adopt them into a config
 - module locations: see `$env:PSModulePath`, get warned when your
   CurrentUser module folder lives inside OneDrive (PowerShell's default when
-  OneDrive backs up Documents), download or pin cloud-only module files, and
-  move the primary location via the documented `powershell.config.json`
-  override
+  OneDrive backs up Documents), download cloud-only module files in parallel
+  or pin them local, add a new location (`n`), move a location's contents
+  somewhere else (`m`, behind a typed confirmation), and move the primary
+  location via the documented `powershell.config.json` override
 - three colour themes — `glacier` (default), `ember`, `moss` — via
   `$PSMM_Theme` in your `$PROFILE`
 
@@ -151,7 +158,8 @@ version: up to five sources (inline JSON, the main config at
 `~/.psmm/psmm-config.json`, its `Includes`, a profile-directory config,
 legacy globs); per-module `Install` policy (`CheckOnly` / `IfMissing` /
 `Latest`) is independent of `Mode` (`Load` / `InstallOnly` / `Ignore`);
-optional `Version` pins an exact version or NuGet range; `"Enabled": false`
+optional `Version` pins an exact version or NuGet range; optional
+`"Prerelease": true` lets a module track prerelease builds; `"Enabled": false`
 parks a whole file without losing it; the main config wins name conflicts.
 
 Ready-made scenario configs ship in [`Configs/`](Configs/) (Microsoft 365

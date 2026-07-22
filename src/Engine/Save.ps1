@@ -26,7 +26,9 @@ function Save-PSMMFile {
         [Parameter(Mandatory)][string]$Path,
         [AllowNull()][AllowEmptyCollection()] $Entries   # empty set = normal (zero configs)
     )
-    $meta    = $script:PSMM_FileMeta[$Path]
+    # file metadata may not have been built yet (Get-PSMMEntry populates it):
+    # saving a brand-new file is a normal path and must not depend on it
+    $meta    = if ($script:PSMM_FileMeta) { $script:PSMM_FileMeta[$Path] } else { $null }
     $forFile = @($Entries | Where-Object Source -eq $Path)
     $modules = if (-not $forFile.Count -and $meta -and -not $meta.Enabled) {
         @($meta.RawModules)   # disabled file: its entries are not in memory — keep them
@@ -38,13 +40,15 @@ function Save-PSMMFile {
             $o.Install = $e.Install
             $o.Mode    = $e.Mode
             if ($e.Version) { $o.Version = $e.Version }
+            # only written when opted in: the default stays invisible in the file
+            if ($e.AllowPrerelease) { $o.Prerelease = $true }
             [pscustomobject]$o
         })
     }
     $root = [ordered]@{}
     if ($meta -and ($meta.HasEnabled -or -not $meta.Enabled)) { $root['Enabled'] = [bool]$meta.Enabled }
     if ($meta -and $meta.Kind -eq 'main') { $root['Includes'] = @($meta.Includes) }
-    $legend = $script:PSMM_Legends[$Path]
+    $legend = if ($script:PSMM_Legends) { $script:PSMM_Legends[$Path] } else { $null }
     if ($legend) { $root['_legend'] = $legend }
     $root['Modules'] = @($modules)
     ([pscustomobject]$root | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $Path -Encoding utf8

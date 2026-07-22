@@ -175,7 +175,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
         $text | Should -Match 'BetaMod'
         $text | Should -Match '2\.0\.0 \(exact\)'      # version pin display
         $text | Should -Match 'import took 123 ms'     # ImportMs surfaced
-        $text | Should -Match 'gallery: check-only'    # display words (v2)
+        $text | Should -Match 'upkeep: check-only'    # display words (v2)
     }
 
     It 'module menu shows connection status when auth is known (#32)' {
@@ -643,16 +643,16 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         $ansi | Should -Match '38;5;242'               # grey42 dim headers
     }
 
-    It 'the grid cursor is the row background + bold name; column one is selection-only (step 1, live-run fix)' {
-        # the ▌ bar in column one read as a broken checkbox next to ▪ marks -
-        # on the grid the cursor is carried by the row bg and bold accent name
+    It 'the grid cursor bar sits LEFT of the selection dot - both visible at once (mockup 2a, live-run fix 4)' {
+        # the bar used to share the selection slot and covered the dot; per
+        # mockup 2a it lives in its own far-left slot, dot right of it
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Not -Match ([regex]::Escape([string][char]0x258C))
+        $text | Should -Match ([regex]::Escape([string][char]0x258C))   # bar on the cursor row
         @($text -split "`r?`n" | Where-Object { $_ -match '^\s*│\s*>' }).Count | Should -Be 0
-        # selecting the CURSOR row still shows its selection mark
         InModuleScope psmm { [void]$script:PSMM_UI.Sel.Add(0); $script:PSMM_UI.Cursor = 0 }
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match ([regex]::Escape([string][char]0x25AA))
+        # bar immediately followed by the dot: ▌▪ - neither covers the other
+        $text | Should -Match ([regex]::Escape("$([char]0x258C)$([char]0x25AA)"))
     }
 
     It 'a selected row is marked with a filled square, and the status area counts the selection (step 1)' {
@@ -692,15 +692,15 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
 
     # --- step 3: plain-word columns, state glyphs, context line -------------
 
-    It 'grid columns speak plain words: module state startup gallery version scope file (step 3)' {
+    It 'grid columns speak plain words: module state startup upkeep version scope file (step 3)' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $header = ($text -split "`r?`n" | Where-Object { $_ -match '│.*module' } | Select-Object -First 1)
-        $header | Should -Match 'module\s*│\s*state\s*│\s*startup\s*│\s*gallery\s*│\s*version\s*│\s*scope\s*│\s*file'
+        $header | Should -Match 'module\s+state\s+startup\s+upkeep\s+version\s+scope\s+file'
         $text | Should -Not -Match '│\s*mode\s*│'
         $text | Should -Not -Match '│\s*inst\s*│'
     }
 
-    It 'startup and gallery cells map the config enums to display words (step 3)' {
+    It 'startup and upkeep cells map the config enums to display words (step 3)' {
         # fixture: AlphaMod = IfMissing/Ignore, BetaMod = CheckOnly/Ignore
         $text = Get-RenderedText { Build-PSMMGrid }
         $text | Should -Match 'off'
@@ -714,9 +714,11 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $script:PSMM_UI.Entries[1].Install = 'Latest'
         }
         $text = Get-RenderedText { Build-PSMMGrid }
-        $text | Should -Match '│\s*load\s*│'
-        $text | Should -Match '│\s*install\s*│'
-        $text | Should -Match 'latest'
+        $alpha = ($text -split "`r?`n" | Where-Object { $_ -match '^\s*│.*AlphaMod' } | Select-Object -First 1)
+        $alpha | Should -Match '\sload\s'
+        $beta = ($text -split "`r?`n" | Where-Object { $_ -match '^\s*│.*BetaMod' } | Select-Object -First 1)
+        $beta | Should -Match '\sinstall\s'
+        $beta | Should -Match 'latest'
     }
 
     It 'the state column pairs a glyph with the word, never the glyph alone (step 3)' {
@@ -870,6 +872,43 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
+    It 'the cursor row background is continuous - blank mark cells must not inflate their column (live-run fix 5)' {
+        # [Spectre.Console.Markup]::Remove collapses whitespace-only cells to
+        # '' - measured as 0 they get extra padding, the column stretches and
+        # the OTHER rows get unstyled fill: a black hole in the cursor row bg
+        # right next to the bar (needs a non-cursor, non-selected row - the
+        # BetaMod fixture row - to trigger)
+        $esc = [char]27
+        $ansi = Get-RenderedAnsi { Build-PSMMGrid }
+        $cursorLine = ($ansi -split "`r?`n" | Where-Object { $_ -match '48;5;237' } | Select-Object -First 1)
+        $cursorLine | Should -Not -BeNullOrEmpty
+        # no unstyled spaces between a style reset and the next background
+        # segment anywhere inside the row
+        $cursorLine | Should -Not -Match "$([regex]::Escape("$esc[0m")) +$([regex]::Escape("$esc["))48;5;237m"
+    }
+
+    It 'a blank line separates the verb rows from the persistent goto row (mockup 2a, live-run fix 4)' {
+        $text = Get-RenderedText { Build-PSMMGrid }
+        $lines = @($text -split "`r?`n")
+        $gi = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match "g\s+goto$([char]0x2026)") { $gi = $i; break } }
+        $gi | Should -BeGreaterThan 0
+        $lines[$gi - 1].Trim() | Should -Be ''
+    }
+
+    It 'the conflicts content tables are borderless inside and use the border token (live-run fix 4)' {
+        $lines = InModuleScope psmm {
+            Build-PSMMConflictLines -Conflict ([pscustomobject]@{
+                Validation = @([pscustomobject]@{ Name = 'M'; Source = 'C:\a\b.json'; Issues = 'bad pin'; Writable = $true })
+                Duplicates = @([pscustomobject]@{ Name = 'M'; Count = 2; Sources = 'a, b' })
+                Shadowed   = @()
+            })
+        }
+        $flat = ($lines -join "`n")
+        $flat | Should -Not -Match '[┬┴┼├┤]'
+        $flat | Should -Match 'bad pin'
+    }
+
     It 'grid hints: single letters are verbs only, navigation lives in the persistent goto row (step 4)' {
         $text = Get-RenderedText { Build-PSMMGrid }
         $text | Should -Match 'i\s+install'
@@ -958,8 +997,13 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
         $tabs = InModuleScope psmm { Get-PSMMHelpTabs -Topic 'grid' }
         $about = @($tabs['about']) -join "`n"
+        # the command is syntax-highlighted now (gh#9), so assert on the
+        # markup-stripped text, not on the raw markup
+        $aboutPlain = @($tabs['about'] | ForEach-Object {
+                InModuleScope psmm -Parameters @{ l = $_ } { [Spectre.Console.Markup]::Remove($l) }
+            }) -join "`n"
         $about | Should -Match 'v0\.1\.0-beta4 is available'
-        $about | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
+        $aboutPlain | Should -Match 'Install-PSResource psmm -Prerelease -Reinstall'
         $grid = Get-RenderedText { Build-PSMMGrid }
         $grid | Should -Not -Match 'is available \(you have'   # detail moved to help - about
         $grid | Should -Match "$([char]0x21E1) update"         # the header flag remains
@@ -1001,15 +1045,19 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
         foreach ($name in $builders.Keys) {
             $text = Get-RenderedText $builders[$name]
-            $text | Should -Not -Match ([regex]::Escape([string][char]0x258C)) -Because "$name must not use the retired cursor bar"
+            # mockup 2a: outer rounded frame only - no column separators, no
+            # header rule inside the table
+            $text | Should -Not -Match '[┬┴┼├┤]' -Because "$name must have no inner table borders"
+            # the cursor bar sits in the far-left mark slot of the cursor row
+            $text | Should -Match ([regex]::Escape([string][char]0x258C)) -Because "$name must show the cursor bar"
             @($text -split "`r?`n" | Where-Object { $_ -match '^\s*│\s*>' }).Count | Should -Be 0
             $ansi = Get-RenderedAnsi $builders[$name]
             $ansi | Should -Match '48;5;237' -Because "$name must paint the grey23 cursor-row background"
             $ansi | Should -Match '38;5;240' -Because "$name must use the border token"
         }
         $files = Get-RenderedText { Build-PSMMFilesView -State (New-PSMMListState) -Metas @((Get-PSMMFileMeta).Values) }
-        $files | Should -Not -CMatch '│\s*File\s*│'           # headers lowercase
-        $files | Should -Match '│\s*file\s*│'
+        $files | Should -Not -CMatch '\sFile\s'               # headers lowercase
+        $files | Should -Match 'file\s+kind\s+on\s+rw\s+mods'
     }
 
     # --- live-run feedback round -------------------------------------------
@@ -1020,13 +1068,14 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $results = @([pscustomobject]@{ Name = 'ImportExcel'; Version = '7.8.9'; Description = 'Excel without Excel'; Author = 'dfinke' })
             Build-PSMMGalleryView -State $st -Results $results -Query 'excel'
         }
-        $text | Should -Match '│\s*by\s*│'
+        $text | Should -Match 'version\s+by\s+description'
         $text | Should -Match 'dfinke'
     }
 
     It 'the module menu facts panel shows the author when known (live-run fix)' {
         $text = Get-RenderedText {
-            Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null -Author 'Douglas Finke'
+            Build-PSMMModuleMenuView -Entry ($script:PSMM_UI.Entries[0]) -Auth $null `
+                -Manifest ([pscustomobject]@{ Author = 'Douglas Finke'; ProjectUri = ''; ModuleType = ''; CommandCount = 0; CloudOnly = 0 })
         }
         ($text -replace '\s+', ' ') | Should -Match 'by\s+Douglas Finke'
         # and without an author the row is simply absent
@@ -1158,13 +1207,13 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             Build-PSMMModuleMenuView -Entry $e -Auth $null
         }
         foreach ($label in 'what', 'entry', 'disk', 'session') { $menu | Should -Match $label }
-        $menu | Should -Match 'gallery: check-only'
+        $menu | Should -Match 'upkeep: check-only'
         $menu | Should -Match 'off at startup'
         $menu | Should -Match 'pin 2\.0\.0 \(exact\)'
         $menu | Should -Match 'import took 123 ms'
         # action groups
         ($menu -replace '\s+', ' ') | Should -Match 'session .*\^l\s+load'
-        ($menu -replace '\s+', ' ') | Should -Match 'gallery .*u\s+update'
+        ($menu -replace '\s+', ' ') | Should -Match 'upkeep .*u\s+update'
         ($menu -replace '\s+', ' ') | Should -Match 'entry .*e\s+edit'
     }
 

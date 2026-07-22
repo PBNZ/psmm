@@ -10,12 +10,10 @@ function script:Build-PSMMConflictLines {
         $lines.Add('')
         $lines.Add("== $Title ==")
         if (-not $Rows.Count) { $lines.Add('   none'); return }
-        $T = [Spectre.Console.Table]::new()
-        $T.Border = [Spectre.Console.TableBorder]::Rounded
-        foreach ($c in $Columns) { [void][Spectre.Console.TableExtensions]::AddColumn($T, $c) }
-        foreach ($r in $Rows) {
-            [void][Spectre.Console.TableExtensions]::AddRow($T, [string[]]@($r | ForEach-Object { ConvertTo-PSMMSafe "$_" }))
-        }
+        # same borderless chrome as every other list table (mockup 2a)
+        $safe = [System.Collections.Generic.List[string[]]]::new()
+        foreach ($r in $Rows) { $safe.Add([string[]]@($r | ForEach-Object { ConvertTo-PSMMSafe "$_" })) }
+        $T = New-PSMMTable -Headers ([string[]]$Columns) -Rows $safe
         foreach ($l in (ConvertTo-PSMMTextLines -Renderable $T)) { $lines.Add($l) }
     }
 

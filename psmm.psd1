@@ -20,10 +20,10 @@
     PrivateData          = @{
         PSData = @{
             Tags         = @('module-management', 'modules', 'profile', 'startup', 'TUI', 'terminal', 'PSEdition_Core', 'Windows')
-            Prerelease   = 'beta8'
+            Prerelease   = 'beta9'
             ProjectUri   = 'https://github.com/PBNZ/psmm'
             LicenseUri   = 'https://github.com/PBNZ/psmm/blob/main/LICENSE'
-            ReleaseNotes = 'v0.1.0-beta8 - v2 UI live-run fixes: goto panel centred over the content, one cursor design on every screen (full-row background, brighter, no bar mark), first-run welcome overlay with the three keys worth knowing. See CHANGELOG.md.'
+            ReleaseNotes = 'v0.1.0-beta9 - modules now load into YOUR session, not psmm''s own (Import-Module -Global); psmm''s own modules read as infrastructure; prerelease support; module install paths and locations; parallel cloud-file downloads; left/right everywhere; coloured help with syntax highlighting. See CHANGELOG.md.'
         }
     }
 }

@@ -92,11 +92,17 @@ anywhere).
 
 ## 5. Grid columns: plain words + context line
 
-- Rename headers, lowercase + dim: `module state startup gallery version
+- Rename headers, lowercase + dim: `module state startup upkeep version
   scope file`.
 - `Mode` → **startup**: `load` / `install` / `off` (Load / InstallOnly /
-  Ignore). `Install` → **gallery**: `if-missing` / `check-only` / `latest`.
+  Ignore). `Install` → **upkeep**: `if-missing` / `check-only` / `latest`.
   JSON schema is untouched — this is display language only.
+  *(Amended 2026-07-22: the column was **gallery**, which named the source
+  rather than the behaviour — the values answer "how does psmm keep this
+  module on disk", not "what is the gallery". `upkeep` reads correctly with
+  all three: upkeep if-missing / check-only / latest. `install` would have
+  been the most literal name but collides with the `startup` column's own
+  `install` value.)*
 - **state** gets glyphs: `● loaded` (ok) · `◐ installed` (warn) · `○ missing`
   (err) · `◌ unmanaged` (info). Glyph + word, never glyph alone.
 - `!` column dies; issues render as `⚠` (err) after the module name.
@@ -146,15 +152,23 @@ Format (mockup 2d):
 
 | symbol | meaning |
 |---|---|
-| `▌` | RETIRED (was cursor; now full-row `rowbg` background + bold name) |
+| `▌` | cursor row (far-left mark slot, left of the selection dot) |
 | `▪` | selected row |
 | `● ◐ ○ ◌` | loaded / installed / missing / unmanaged |
+| `◈` | psmm's own (its UI engine, and psmm itself) — infrastructure, dim |
 | `⚠` | entry has validation issues |
 | `⇡` | update available (Ver column, header bar, startup report) |
 | `↑ ↓` after `showing x-y` | more rows above/below (unchanged) |
+| `→` | "next step" pointer in prose only — **never** a key |
 | `…` | truncated (unchanged) |
 | `~` | background activity spinner line (unchanged) |
 | `^` | ctrl, and nothing else (unchanged) |
+
+**Arrow keys are never drawn as glyphs.** A key is always spelled out and
+capsuled: `left/right`, `up/dn`, `pgup/pgdn`, `home/end`. `←`/`→` as key
+names are banned outright — they collide with the `↑ ↓` scroll indicator and
+the `→` prose pointer, and they made one pair of keys read three different
+ways across the UI. A guard test checks every key-rendering call site.
 
 ## 10. Unchanged rules (restated so tests keep passing)
 
@@ -169,6 +183,47 @@ Format (mockup 2d):
 - Too-small terminal → explicit one-line message with current/required size.
 - Status/labels lowercase, no trailing periods; errors show exception text;
   durations in ms; versions `v`-prefixed.
+
+## 11. Rendering primitives (added 2026-07-22)
+
+Four things every screen shows — code, links, prose, versions — used to be
+hand-formatted at each call site, which is why they drifted: the config JSON
+was flat text, one update command was hand-coloured cyan, URLs were dead text
+and a paragraph ran a 200-column terminal edge to edge. **A screen never
+formats one of these itself.** All four live in `src/UI/04-Render.ps1`, take
+theme tokens only, and return balanced markup *per line* (every
+`Markup`/`Write-PSMMLine` is parsed on its own).
+
+| you are showing | go through | rule |
+|---|---|---|
+| code or a command | `Format-PSMMCode -Text <lines> [-Language powershell\|json]` | PowerShell is tokenised with `[PSParser]::Tokenize` (command / parameter / string / variable / number / comment / keyword). Unparseable input degrades to escaped plain text — never throws. JSON is regex-highlighted because the samples carry `//` comments and are deliberately not valid JSON. |
+| one inline command | `Get-PSMMCommandMarkup -Command <string>` | same tokens, single line |
+| a URL | `Get-PSMMLinkMarkup -Url <url> [-Text <label>]` | emits Spectre `[link=…]`, i.e. a real OSC 8 hyperlink — ctrl+clickable in Windows Terminal. Degrades to styled plain text when the URL cannot be expressed as a tag. `Markup::Remove` still yields the label, so `c` copy and the tests are unaffected. |
+| a paragraph | `Get-PSMMProseMarkup` / `Write-PSMMProse` (measure: `Get-PSMMProseWidth`) | wraps at `min(window − 4, 84)` columns. Tables, panels and hint rows are all measured; prose has to be too. |
+| a version | `Get-PSMMVersionMarkup` / `Get-PSMMVersionText` | the prerelease label is part of the version and is always shown, tinted `info`: `0.1.0-beta8` must never render as `0.1.0` |
+| a key | `Get-PSMMKeyCap` (used by `Get-PSMMHint`) | one capsule definition for the whole UI; keys lowercase and spelled out (§9) |
+
+Two more rules that fall out of this:
+
+- **Help is markup, not escaped text.** Every help tab — including
+  `this screen` — renders through the same primitives as the screen it
+  documents: real key capsules, real state glyphs in their real colours,
+  highlighted code. Help that describes a coloured UI in flat monospace does
+  not look like the thing it describes. `Get-PSMMHelpText` flattens it back to
+  plain text for `c` copy and the tests.
+- **Destructive, hard-to-undo actions are gated by a typed phrase**
+  (`Read-PSMMConfirmPhrase`), not by `y`/`enter` — those are one keystroke
+  away from navigation. Moving a whole module location's contents is the
+  first user of this.
+- **psmm's own modules are infrastructure, not content.** The grid is a
+  picture of *the user's* session; psmm itself and the UI engine it imports
+  to draw that picture render as `◈ psmm's own` (dim), are excluded from the
+  `N loaded` count and the unmanaged scan, and are never unloaded by psmm —
+  it would take the screen down with them. They stay visible and
+  installable/updatable, because a broken UI dependency must be repairable
+  from inside the tool that needs it. Membership is `Test-PSMMOwnModule`;
+  what psmm imported into its *own* session state is tracked separately, by
+  instance, and subtracted in `Update-PSMMLoaded`.
 
 ## Migration order (safe increments)
 
@@ -201,13 +256,19 @@ All 8 steps shipped in 0.1.0-beta6; a live-run feedback round shipped in
   bottom-left, middle-left and window-centre all read as detached. On
   dismissal only the panel rectangle is blanked and the caller's repaint
   restores what was underneath.
-- **The `▌` cursor bar is RETIRED on every screen** (live-run feedback
-  2026-07-20, two rounds): next to the grid's selection marks it read as a
-  broken checkbox, and on sub-screen tables it read as an artifact. The
-  cursor is the full-row `rowbg` background + bold accent name on the grid
-  AND every sub-screen list — one design on all pages; a design-consistency
-  test renders every list screen and holds them to it. Grid column one is
-  selection-only (`▪`).
+- **Tables are borderless inside** (mockup 2a, live-run feedback 2026-07-20
+  round 4): outer rounded frame only — no column separators, no header
+  rule. One shared builder renders every list table; the grid builds inline
+  (hot path) with the identical technique.
+- **The `▌` cursor bar lives in its own far-left mark slot**, immediately
+  LEFT of the selection dot — the earlier complaints were the bar *sharing*
+  the selection slot and covering the `▪` dot (and, with column borders,
+  reading as a broken checkbox). Cursor = bar + full-row `rowbg` background
+  + bold accent name, identical on the grid and every sub-screen list; the
+  design-consistency test renders every list screen and holds them to it.
+- **A blank line separates the verb rows from the persistent goto row**
+  (mockup 2a); it ships inside `Get-PSMMPersistentHint`, so every screen
+  gets it for free.
 - **`m` (show/hide unmanaged) is a grid verb**, not a goto chord.
 - **The console cursor is hidden** while the TUI runs (it blinked over the
   frames); text prompts show it for the duration.

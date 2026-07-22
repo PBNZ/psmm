@@ -58,7 +58,7 @@ function script:Show-PSMMCommands {
             param($ctx)
             while ($true) {
                 if ($script:PSMM_UI.HardQuit) { return }
-                $view = if ($st.Filter) { @($cmds | Where-Object { $_.Name -like "*$($st.Filter)*" }) } else { $cmds }
+                $view = if ($st.Filter) { @($cmds | Where-Object { Test-PSMMFilterMatch -Text $_.Name -Filter $st.Filter }) } else { $cmds }
                 $ctx.UpdateTarget((Build-PSMMCommandListView -State $st -Commands $cmds -View $view -ModuleName $Entry.Name))
                 $ctx.Refresh()
                 $k = Read-PSMMKeyResize
@@ -91,7 +91,12 @@ function script:Show-PSMMCommands {
                         if ($view.Count) { $pick.Name = $view[$st.Cursor].Name; return }
                         continue
                     }
-                    ([ConsoleKey]::LeftArrow) { if (-not $st.Filter) { return }; continue }   # back out (#24)
+                    ([ConsoleKey]::LeftArrow) {
+                        # back out one level (#24, gh#7) - like esc, it clears
+                        # an active filter first instead of doing nothing
+                        if ($st.Filter) { $st.Filter = ''; $st.Cursor = 0; continue }
+                        return
+                    }
                     ([ConsoleKey]::Oem2) {
                         if ($k.KeyChar -ne '?') { $st.FilterMode = $true; continue }
                     }

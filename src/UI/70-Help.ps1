@@ -2,135 +2,227 @@
 # screen's help as tabs `this screen | keys | config | startup | about`;
 # left/right switches, '/' filters within the visible tab, 'c' copies it,
 # esc backs out (clearing an active filter first).
-# Tab content lines are Spectre MARKUP strings (plain text pre-escaped), so
-# the keys tab renders capsules; Get-PSMMHelpText flattens to plain text.
+#
+# EVERY tab is Spectre MARKUP, not escaped plain text (gh#8): help that
+# describes a coloured, capsuled screen in flat monospace does not look like
+# the thing it documents. Keys render as real capsules through Get-PSMMKeyCap,
+# state glyphs carry their live colours, code goes through Format-PSMMCode and
+# URLs through Get-PSMMLinkMarkup. Get-PSMMHelpText flattens all of it back to
+# plain text for `c` copy and the tests.
+
+# --- section building blocks ---------------------------------------------
+
+# 14, not 12: a key capsule renders as ' key ', i.e. two columns wider than the
+# key itself, and the widest key in the help is 'left/right' (12 columns). At
+# 12 the pad floor of 1 pushed long-key rows one column right of everything
+# else - the description column has to line up or the block reads as ragged.
+$script:PSMM_HelpKeyWidth = 14
+
+function script:Get-PSMMHelpHead {
+    param([Parameter(Mandatory)][string]$Text)
+    @(
+        "[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Text)[/]"
+        "[$script:PSMM_ColDim]$('-' * $Text.Length)[/]"
+    )
+}
+
+# "  <capsule>   description" - the shape the live screens use.
+function script:Get-PSMMHelpRow {
+    param(
+        [Parameter(Mandatory)][string]$Key,
+        [AllowEmptyString()][string]$Text
+    )
+    $pad = ' ' * [Math]::Max(1, $script:PSMM_HelpKeyWidth - ($Key.Length + 2))
+    "  $(Get-PSMMKeyCap -Key $Key)$pad[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $Text)[/]"
+}
+
+# Continuation line under a key row, aligned with its description column.
+function script:Get-PSMMHelpCont {
+    param([AllowEmptyString()][string]$Text)
+    "  $(' ' * $script:PSMM_HelpKeyWidth)[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $Text)[/]"
+}
+
+# "  term        <markup>" for column/field explanations (term in accent).
+# An empty term is the continuation line of the term above it.
+function script:Get-PSMMHelpTerm {
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Term,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Markup
+    )
+    $pad = ' ' * [Math]::Max(1, $script:PSMM_HelpKeyWidth - $Term.Length)
+    if (-not $Term) { return "  $(' ' * $script:PSMM_HelpKeyWidth)$Markup" }
+    "  [$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Term)[/]$pad$Markup"
+}
+
+function script:Get-PSMMHelpText1 {
+    param([AllowEmptyString()][string]$Text)
+    if (-not $Text) { return '' }
+    "[$script:PSMM_ColMute]$(ConvertTo-PSMMSafe $Text)[/]"
+}
 
 function script:Get-PSMMHelpSection {
     param([Parameter(Mandatory)][string]$Topic)
+    $mid = [char]0x00B7
     switch ($Topic) {
         'grid' { @(
-            'MAIN SCREEN (module grid)'
-            '-------------------------'
-            'Every module your config files declare, one row each.'
+            (Get-PSMMHelpHead 'MAIN SCREEN (module grid)')
+            (Get-PSMMHelpText1 'Every module your config files declare, one row each.')
             ''
-            '  state    ' + [char]0x25CF + ' loaded (this session) · ' + [char]0x25D0 + ' installed (on disk) ·'
-            '           ' + [char]0x25CB + ' missing · ' + [char]0x25CC + ' unmanaged (in no config file - m shows them)'
-            '  startup  what happens at shell start: load / install (background) / off'
-            '  gallery  what the gallery may do: if-missing / check-only / latest'
-            '  version  loaded (or newest installed). ' + [char]0x21E1 + ' = update available (after'
-            '           a k check); the cursor row names the target. pin = pinned.'
-            '  scope    user (CurrentUser) / all (AllUsers) / mixed. "all ro" means'
-            '           the session is not elevated, so AllUsers copies are read-only.'
-            '  ' + [char]0x26A0 + '        after the name: the entry has validation issues (g c details)'
+            (Get-PSMMHelpTerm 'state' ("[$script:PSMM_ColOk]$([char]0x25CF) loaded[/][$script:PSMM_ColMute] (this session) $mid [/][$script:PSMM_ColWarn]$([char]0x25D0) installed[/][$script:PSMM_ColMute] (on disk)[/]"))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColErr]$([char]0x25CB) missing[/][$script:PSMM_ColMute] $mid [/][$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/][$script:PSMM_ColMute] (in no config file - m shows them)[/]"))
+            (Get-PSMMHelpTerm 'startup' (Get-PSMMHelpText1 'what happens at shell start: load / install (background) / off'))
+            (Get-PSMMHelpTerm 'upkeep' (Get-PSMMHelpText1 'how psmm keeps it on disk: if-missing / check-only / latest'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 '+pre means prerelease versions are allowed for that entry'))
+            (Get-PSMMHelpTerm 'version' (Get-PSMMHelpText1 'loaded (or newest installed), prerelease label and all:'))
+            (Get-PSMMHelpTerm '' ("$(Get-PSMMVersionMarkup -Version '0.1.0' -Prerelease 'beta8')[$script:PSMM_ColMute] is not [/]$(Get-PSMMVersionMarkup -Version '0.1.0')"))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColWarn]$([char]0x21E1)[/][$script:PSMM_ColMute] = update available (after a k check); the cursor row[/]"))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'names the target. pin = pinned to a version.'))
+            (Get-PSMMHelpTerm 'scope' (Get-PSMMHelpText1 'user (CurrentUser) / all (AllUsers) / mixed. "all ro" means'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'the session is not elevated, so AllUsers copies are read-only.'))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColErr]$([char]0x26A0)[/][$script:PSMM_ColMute] after the name: the entry has validation issues (g c details)[/]"))
             ''
-            'The muted sentence under the table explains the cursor row in full'
-            'words. The last hint row is the same on every screen: g goto,'
-            '/ filter, ? help, ^q quit.'
+            (Get-PSMMHelpText1 'The muted sentence under the table explains the cursor row in full')
+            (Get-PSMMHelpText1 'words. The last hint row is the same on every screen: g goto,')
+            (Get-PSMMHelpText1 '/ filter, ? help, ^q quit.')
             ''
-            '  space    select/deselect row (bulk actions target the selection,'
-            '           or just the cursor row when nothing is selected)'
-            '  enter    open the module action menu (right-arrow does the same;'
-            '           left-arrow backs out of any menu)'
-            '  ^l load    ^u unload    (^ means ctrl)'
-            '  i        install the targeted modules that are missing (background)'
-            '  u        update the targeted installed modules (background) -'
-            '           install and update are always separate keys'
-            '  k        check the gallery for updates (background)'
-            '  a        add a new entry     r    reload everything from disk'
-            '  m        show/hide installed-but-unmanaged modules'
+            (Get-PSMMHelpRow 'space' 'select/deselect row (bulk actions target the selection,')
+            (Get-PSMMHelpCont 'or just the cursor row when nothing is selected)')
+            (Get-PSMMHelpRow 'enter' 'open the module action menu')
+            (Get-PSMMHelpRow 'left/right' 'back out / open the row - the same pair on every screen')
+            (Get-PSMMHelpRow '^l' 'load into this session')
+            (Get-PSMMHelpRow '^u' 'unload from this session   (^ means ctrl)')
+            (Get-PSMMHelpRow 'i' 'install the targeted modules that are missing (background)')
+            (Get-PSMMHelpRow 'u' 'update the targeted installed modules (background) -')
+            (Get-PSMMHelpCont 'install and update are always separate keys')
+            (Get-PSMMHelpRow 'k' 'check the gallery for updates (background)')
+            (Get-PSMMHelpRow 'a' 'add a new entry')
+            (Get-PSMMHelpRow 'r' 'reload everything from disk')
+            (Get-PSMMHelpRow 'm' 'show/hide installed-but-unmanaged modules')
         ) }
         'module' { @(
-            'MODULE MENU'
-            '-----------'
-            'Facts and actions for one module, grouped by what they touch:'
-            'session (this pwsh), gallery (disk/network), entry (the config'
-            'file line), connection (Connect-* modules). Only actions that'
-            'make sense for the row are offered.'
+            (Get-PSMMHelpHead 'MODULE MENU')
+            (Get-PSMMHelpText1 'Facts and actions for one module, grouped by what they touch:')
+            (Get-PSMMHelpText1 'session (this pwsh), upkeep (install/update/clean), entry (the config')
+            (Get-PSMMHelpText1 'file line), files (the folders on disk), connection (Connect-*')
+            (Get-PSMMHelpText1 'modules). Only actions that make sense for the row are offered.')
             ''
-            '  ^l / ^u  load / unload in this session (^ means ctrl)'
-            '  i / u    install (when missing) / update (when installed) -'
-            '           foreground, with progress; always separate keys'
-            '  b        browse the module''s commands with full help'
-            '  v        pin the entry to a version: exact "1.2.3" or a NuGet range'
-            '           like "[1.0,2.0)". Pinned modules are never nagged to update.'
-            '  x        remove all but the newest installed version'
-            '  s        check connection status (Connect-* modules: Graph, Az, EXO,'
-            '           PnP, Teams)   o  disconnect the active session'
-            '  a        (unmanaged modules) add to a config file'
-            '  e/d/m    edit fields / delete entry / move entry to another file'
+            (Get-PSMMHelpText1 'The facts panel answers "which copy is being used, and from where?":')
+            (Get-PSMMHelpTerm 'path' (Get-PSMMHelpText1 'the folder the newest installed version lives in'))
+            (Get-PSMMHelpTerm 'location' (Get-PSMMHelpText1 'the search-path root above it, its search order, and'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'whether that root is OneDrive-backed'))
+            (Get-PSMMHelpTerm 'versions' (Get-PSMMHelpText1 'every installed version with its scope (x cleans up)'))
+            (Get-PSMMHelpTerm 'cloud' (Get-PSMMHelpText1 'files still cloud-only - downloaded before the next load'))
+            ''
+            (Get-PSMMHelpRow '^l' 'load into this session')
+            (Get-PSMMHelpRow '^u' 'unload from this session   (^ means ctrl)')
+            (Get-PSMMHelpRow 'i' 'install (when missing) - foreground, with progress')
+            (Get-PSMMHelpRow 'u' 'update (when installed) - always a separate key')
+            (Get-PSMMHelpRow 'b' "browse the module's commands with full help")
+            (Get-PSMMHelpRow 'v' 'pin the entry to a version: pick from the versions on disk')
+            (Get-PSMMHelpCont 'and in the gallery, or type a NuGet range like "[1.0,2.0)".')
+            (Get-PSMMHelpCont 'Pinned modules are never nagged to update.')
+            (Get-PSMMHelpRow 'w' 'allow / disallow prerelease versions for this entry')
+            (Get-PSMMHelpRow 'x' 'remove all but the newest installed version')
+            (Get-PSMMHelpRow 'p' 'move the module folder to another module location')
+            (Get-PSMMHelpRow 's' 'check connection status (Connect-* modules: Graph, Az, EXO,')
+            (Get-PSMMHelpCont 'PnP, Teams)')
+            (Get-PSMMHelpRow 'o' 'disconnect the active session')
+            (Get-PSMMHelpRow 'a' '(unmanaged modules) add to a config file')
+            (Get-PSMMHelpRow 'e' 'edit the entry fields')
+            (Get-PSMMHelpRow 'd' 'delete the entry')
+            (Get-PSMMHelpRow 'm' 'move the entry to another config file')
+            (Get-PSMMHelpRow 'left/right' 'back out / browse commands')
         ) }
         'commands' { @(
-            'COMMAND BROWSER'
-            '---------------'
-            'All commands the module exports. / filters (same as everywhere);'
-            'enter opens tabbed help: Overview | Parameters | Examples,'
-            'left/right switches tab, up/down scrolls, c copies the tab you'
-            'are viewing to the clipboard.'
-            'Tip: help is much richer once the module is imported.'
+            (Get-PSMMHelpHead 'COMMAND BROWSER')
+            (Get-PSMMHelpText1 'All commands the module exports.')
+            ''
+            (Get-PSMMHelpRow '/' 'filter (the same everywhere)')
+            (Get-PSMMHelpRow 'enter' 'open tabbed help: Overview | Parameters | Examples')
+            (Get-PSMMHelpRow 'left/right' 'back out / open - and, inside the help, switch tab')
+            (Get-PSMMHelpRow 'up/dn' 'scroll')
+            (Get-PSMMHelpRow 'c' 'copy the tab you are viewing to the clipboard')
+            ''
+            (Get-PSMMHelpText1 'Tip: help is much richer once the module is imported.')
         ) }
         'files' { @(
-            'CONFIG FILES'
-            '------------'
-            'Every config source psmm found, in load order. space toggles a whole'
-            'file on/off (saved immediately - a applies the load/unload changes to'
-            'the running session). n creates a new config, blank or from a scenario'
-            'template. m moves a file and keeps it discoverable (Includes updated).'
+            (Get-PSMMHelpHead 'CONFIG FILES')
+            (Get-PSMMHelpText1 'Every config source psmm found, in load order.')
             ''
-            'A disabled file''s entries are kept in the file untouched - disabling'
-            'is how you park a whole module set ("work", "lab", ...).'
+            (Get-PSMMHelpRow 'space' 'toggle a whole file on/off (saved immediately)')
+            (Get-PSMMHelpRow 'a' 'apply the load/unload changes to the running session')
+            (Get-PSMMHelpRow 'n' 'create a new config, blank or from a scenario template')
+            (Get-PSMMHelpRow 'm' 'move a file and keep it discoverable (Includes updated)')
+            (Get-PSMMHelpRow 'left' 'back out')
+            ''
+            (Get-PSMMHelpText1 "A disabled file's entries are kept in the file untouched - disabling")
+            (Get-PSMMHelpText1 'is how you park a whole module set ("work", "lab", ...).')
         ) }
         'paths' { @(
-            'MODULE LOCATIONS'
-            '----------------'
-            'Every folder PowerShell searches for modules ($env:PSModulePath), in'
-            'search order. The FIRST entry is the CurrentUser location, which'
-            'PowerShell derives from your Documents folder - when OneDrive backs'
-            'up Documents (a common org policy), your modules silently live in'
-            'OneDrive, and "Files On-Demand" can make them cloud-only'
-            'placeholders that stall or fail module loading.'
+            (Get-PSMMHelpHead 'MODULE LOCATIONS')
+            (Get-PSMMHelpText1 'Every folder PowerShell searches for modules, in search order.')
+            (Get-PSMMHelpText1 'The FIRST entry is the CurrentUser location, which PowerShell')
+            (Get-PSMMHelpText1 'derives from your Documents folder - when OneDrive backs up')
+            (Get-PSMMHelpText1 'Documents (a common org policy), your modules silently live in')
+            (Get-PSMMHelpText1 'OneDrive, and "Files On-Demand" can make them cloud-only')
+            (Get-PSMMHelpText1 'placeholders that stall or fail module loading.')
             ''
-            '  d        scan the highlighted path and download (hydrate) every'
-            '           cloud-only file, with progress'
-            '  k        keep on this device: pin the folder so OneDrive keeps all'
-            '           files local from now on (downloads in the background)'
-            '  s        set the primary (CurrentUser) module location - creates the'
-            '           folder if needed (suggests one in your user profile,'
-            '           outside OneDrive) and writes the documented PSModulePath'
-            '           override to your user powershell.config.json. Takes effect'
-            '           in this session immediately and in every new pwsh session.'
-            '           Caveat: Install-Module/Install-PSResource still install to'
-            '           the default Documents location.'
-            '  r        remove that override again'
+            (Get-PSMMHelpRow 'd' 'download (hydrate) every cloud-only file under the')
+            (Get-PSMMHelpCont 'highlighted path - asks how many to fetch at once first')
+            (Get-PSMMHelpRow 'k' 'keep on this device: pin the folder so OneDrive keeps all')
+            (Get-PSMMHelpCont 'files local from now on (downloads in the background)')
+            (Get-PSMMHelpRow 'n' 'add a module location (creates the folder when needed) and')
+            (Get-PSMMHelpCont 'optionally persist it for new sessions')
+            (Get-PSMMHelpRow 'm' 'move every module folder from here to another location -')
+            (Get-PSMMHelpCont 'gated behind typing "really move"; loaded modules and name')
+            (Get-PSMMHelpCont 'collisions are skipped, never forced')
+            (Get-PSMMHelpRow 's' 'set the primary (CurrentUser) module location - creates the')
+            (Get-PSMMHelpCont 'folder if needed and writes the documented PSModulePath')
+            (Get-PSMMHelpCont 'override to your user powershell.config.json. Caveat:')
+            (Get-PSMMHelpCont 'Install-PSResource still installs to the Documents default.')
+            (Get-PSMMHelpRow 'r' 'remove that override again')
+            (Get-PSMMHelpRow 'left/right' 'back out / show what a location holds')
             ''
-            'psmm also checks for cloud-only files before loading a module (with'
-            'a prompt in the module menu / apply, silently with a status line in'
-            'grid bulk loads).'
+            (Get-PSMMHelpText1 'psmm also checks for cloud-only files before loading a module (with')
+            (Get-PSMMHelpText1 'a prompt in the module menu / apply, silently with a status line in')
+            (Get-PSMMHelpText1 'grid bulk loads).')
         ) }
         'gallery' { @(
-            'GALLERY SEARCH'
-            '--------------'
-            'Searches the PowerShell Gallery (read-only). Wildcards work: Az.*,'
-            'Microsoft.Graph*. enter adds the highlighted module to one of your'
-            'config files - pick install policy and mode, done. / starts a new'
-            'search.'
+            (Get-PSMMHelpHead 'GALLERY SEARCH')
+            (Get-PSMMHelpText1 'Searches the PowerShell Gallery (read-only). Wildcards work:')
+            (Get-PSMMHelpText1 'Az.*, Microsoft.Graph*.')
+            ''
+            (Get-PSMMHelpRow 'enter' 'add the highlighted module to one of your config files -')
+            (Get-PSMMHelpCont 'pick install policy and mode, done')
+            (Get-PSMMHelpRow '/' 'start a new search')
+            (Get-PSMMHelpRow 'left/right' 'back out / add')
         ) }
         'cleanup' { @(
-            'VERSION CLEANUP'
-            '---------------'
-            'Update-Module and Update-PSResource never delete old versions - they'
-            'accumulate on disk forever. This screen lists every module with more'
-            'than one installed version; enter prunes one module to its newest'
-            'version, ctrl+a prunes all. Without elevation, AllUsers copies are'
-            'skipped automatically.'
+            (Get-PSMMHelpHead 'VERSION CLEANUP')
+            (Get-PSMMHelpText1 'Update-Module and Update-PSResource never delete old versions -')
+            (Get-PSMMHelpText1 'they accumulate on disk forever. This screen lists every module')
+            (Get-PSMMHelpText1 'with more than one installed version.')
+            ''
+            (Get-PSMMHelpRow 'enter' 'prune one module to its newest version')
+            (Get-PSMMHelpRow '^a' 'prune all of them   (^ means ctrl)')
+            (Get-PSMMHelpRow 'r' 'rescan')
+            (Get-PSMMHelpRow 'left/right' 'back out / prune the row')
+            ''
+            (Get-PSMMHelpText1 'Without elevation, AllUsers copies are skipped automatically.')
         ) }
         'tasks' { @(
-            'BACKGROUND TASKS'
-            '----------------'
-            'Everything psmm runs in the background lands here: install batches'
-            '(i), update batches (u), update checks (k), the unmanaged-module'
-            'scan, and Update-Help (start it with u on this screen). enter shows'
-            'a task''s full output. The grid keeps working while tasks run; a'
-            'one-line overlay shows progress.'
+            (Get-PSMMHelpHead 'BACKGROUND TASKS')
+            (Get-PSMMHelpText1 'Everything psmm runs in the background lands here: install batches')
+            (Get-PSMMHelpText1 '(i), update batches (u), update checks (k), the unmanaged-module')
+            (Get-PSMMHelpText1 'scan, and Update-Help.')
+            ''
+            (Get-PSMMHelpRow 'enter' "show a task's full output")
+            (Get-PSMMHelpRow 'u' 'start a background Update-Help')
+            (Get-PSMMHelpRow 'c' 'clear finished tasks')
+            (Get-PSMMHelpRow 'left/right' 'back out / open the output')
+            ''
+            (Get-PSMMHelpText1 'The grid keeps working while tasks run; a one-line overlay shows')
+            (Get-PSMMHelpText1 'progress.')
         ) }
         default { @() }
     }
@@ -143,7 +235,8 @@ function script:Get-PSMMHelpKeysLines {
         (Get-PSMMHint -NoLegend -Pairs @('up/dn=move', 'pgup/pgdn=page'))
         (Get-PSMMHint -NoLegend -Pairs @('home/end=top / bottom'))
         (Get-PSMMHint -NoLegend -Pairs @('/=filter (enter keeps, esc clears)'))
-        (Get-PSMMHint -NoLegend -Pairs @("$([char]0x2192)=drill in", "$([char]0x2190)=back out"))
+        # spelled out, never as arrow glyphs - one notation everywhere (gh#7)
+        (Get-PSMMHint -NoLegend -Pairs @('left/right=back out / drill in'))
         ''
         "[$script:PSMM_ColAccent]go places[/]"
         (Get-PSMMHint -NoLegend -Pairs @('g=goto: h g f p t c x ?'))
@@ -181,74 +274,85 @@ function script:Get-PSMMHelpKeysLines {
     @($rows)
 }
 
-# config tab: discovery order, file format, rules (plain text, escaped).
+# config tab: discovery order, file format, rules. The JSON sample is
+# syntax-highlighted (gh#9) - it is the densest block of text in the whole UI.
 function script:Get-PSMMHelpConfigLines {
-    $raw = [System.Collections.Generic.List[string]]::new()
-    $raw.Add('WHERE PSMM LOOKS (in load order)')
-    $raw.Add('--------------------------------')
-    $raw.Add('  1. inline JSON in $PSMM_InlineJson       (set in $PROFILE; read-only)')
-    $raw.Add("  2. MAIN config:    $(Get-PSMMMainConfigPath)")
-    $raw.Add('  3. files listed in the MAIN config''s "Includes" (one level, main only)')
+    $out = [System.Collections.Generic.List[string]]::new()
+    foreach ($l in (Get-PSMMHelpHead 'WHERE PSMM LOOKS (in load order)')) { $out.Add($l) }
+    $out.Add((Get-PSMMHelpText1 '  1. inline JSON in $PSMM_InlineJson       (set in $PROFILE; read-only)'))
+    $out.Add((Get-PSMMHelpText1 "  2. MAIN config:    $(Get-PSMMMainConfigPath)"))
+    $out.Add((Get-PSMMHelpText1 '  3. files listed in the MAIN config''s "Includes" (one level, main only)'))
     $profileCfg = Get-PSMMProfileConfigPath
-    if ($profileCfg) { $raw.Add("  4. profile-dir:    $profileCfg") }
-    $raw.Add('  5. legacy globs in $PSMM_JsonPath (default: psmodules.d next to $PROFILE)')
-    $raw.Add('')
-    $raw.Add('FILE FORMAT (psmm-config.json)')
-    $raw.Add('------------------------------')
-    $raw.Add('  {')
-    $raw.Add('    "Enabled": true,          // false = file parsed but nothing actioned')
-    $raw.Add('    "Includes": ["C:\\path\\more.json"],   // MAIN config only')
-    $raw.Add('    "Modules": [')
-    $raw.Add('      {')
-    $raw.Add('        "Name": "ImportExcel",           // required: gallery name')
-    $raw.Add('        "FriendlyName": "Import Excel",  // optional display name')
-    $raw.Add('        "Description": "what/why",       // optional')
-    $raw.Add('        "Install": "IfMissing",          // CheckOnly | IfMissing | Latest')
-    $raw.Add('        "Mode": "Load",                  // Load | InstallOnly | Ignore')
-    $raw.Add('        "Version": "1.2.3"               // optional pin (or "[1.0,2.0)")')
-    $raw.Add('      }')
-    $raw.Add('    ]')
-    $raw.Add('  }')
-    $raw.Add('')
-    $raw.Add('  The UI shows Mode as the startup column (load / install / off) and')
-    $raw.Add('  Install as the gallery column (if-missing / check-only / latest).')
-    $raw.Add('')
-    $raw.Add('RULES')
-    $raw.Add('-----')
-    $raw.Add('  - Only the MAIN config may include other files (one level deep, so')
-    $raw.Add('    circular references are impossible). Includes anywhere else are')
-    $raw.Add('    ignored with a warning.')
-    $raw.Add('  - Same module in several files: the MAIN config wins (warning);')
-    $raw.Add('    otherwise the first-loaded file wins (error-style warning).')
-    $raw.Add('  - "Enabled": false switches a whole file off without losing entries.')
-    @($raw | ForEach-Object { ConvertTo-PSMMSafe $_ })
+    if ($profileCfg) { $out.Add((Get-PSMMHelpText1 "  4. profile-dir:    $profileCfg")) }
+    $out.Add((Get-PSMMHelpText1 '  5. legacy globs in $PSMM_JsonPath (default: psmodules.d next to $PROFILE)'))
+    $out.Add('')
+    foreach ($l in (Get-PSMMHelpHead 'FILE FORMAT (psmm-config.json)')) { $out.Add($l) }
+    $json = @(
+        '  {'
+        '    "Enabled": true,          // false = file parsed but nothing actioned'
+        '    "Includes": ["C:\\path\\more.json"],   // MAIN config only'
+        '    "Modules": ['
+        '      {'
+        '        "Name": "ImportExcel",           // required: gallery name'
+        '        "FriendlyName": "Import Excel",  // optional display name'
+        '        "Description": "what/why",       // optional'
+        '        "Install": "IfMissing",          // CheckOnly | IfMissing | Latest'
+        '        "Mode": "Load",                  // Load | InstallOnly | Ignore'
+        '        "Version": "1.2.3",              // optional pin (or "[1.0,2.0)")'
+        '        "Prerelease": true               // optional: allow prerelease versions'
+        '      }'
+        '    ]'
+        '  }'
+    )
+    foreach ($l in (Format-PSMMCode -Text $json -Language json)) { $out.Add($l) }
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  The UI shows Mode as the startup column (load / install / off) and'))
+    $out.Add((Get-PSMMHelpText1 '  Install as the upkeep column (if-missing / check-only / latest);'))
+    $out.Add((Get-PSMMHelpText1 '  Prerelease shows there too, as "+pre".'))
+    $out.Add('')
+    foreach ($l in (Get-PSMMHelpHead 'RULES')) { $out.Add($l) }
+    $out.Add((Get-PSMMHelpText1 '  - Only the MAIN config may include other files (one level deep, so'))
+    $out.Add((Get-PSMMHelpText1 '    circular references are impossible). Includes anywhere else are'))
+    $out.Add((Get-PSMMHelpText1 '    ignored with a warning.'))
+    $out.Add((Get-PSMMHelpText1 '  - Same module in several files: the MAIN config wins (warning);'))
+    $out.Add((Get-PSMMHelpText1 '    otherwise the first-loaded file wins (error-style warning).'))
+    $out.Add((Get-PSMMHelpText1 '  - "Enabled": false switches a whole file off without losing entries.'))
+    @($out)
 }
 
-# startup tab: the $PROFILE bootstrap and its knobs (plain text, escaped).
+# startup tab: the $PROFILE bootstrap and its knobs. The code is highlighted
+# (gh#9); the prose around it is not.
 function script:Get-PSMMHelpStartupLines {
-    $raw = @(
-        '$PROFILE BOOTSTRAP'
-        '------------------'
-        '  Import-Module psmm; Invoke-PSMMStartup'
-        ''
-        '  Knobs (set before Import-Module): $PSMM_StartupReport = $false,'
-        '  $PSMM_BackgroundStartup = $false, $PSMM_UpdateCheck = $false,'
-        '  $PSMM_InlineJson, $PSMM_JsonPath,'
-        '  $PSMM_Theme = ''glacier'' (default) | ''ember'' | ''moss''.'
-        ''
-        '  Install and Mode are independent: Mode decides load / install-only /'
-        '  ignore (and foreground vs background at startup); Install decides the'
-        '  disk/gallery policy (never install / install when missing / update).'
-        ''
-        '  Mode = Load         imported into this session, in the foreground.'
-        '  Mode = InstallOnly  disk/gallery work only - deferred to a background'
-        '                      job so your prompt appears sooner.'
-        '  Mode = Ignore       parsed but not actioned.'
-        ''
-        '  Each imported module''s import time is measured and reported, so you'
-        '  always know which module is slowing your shell down.'
+    $out = [System.Collections.Generic.List[string]]::new()
+    foreach ($l in (Get-PSMMHelpHead '$PROFILE BOOTSTRAP')) { $out.Add($l) }
+    foreach ($l in (Format-PSMMCode -Text @('  Import-Module psmm; Invoke-PSMMStartup'))) { $out.Add($l) }
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  Knobs, set before Import-Module:'))
+    $knobs = @(
+        '  $PSMM_StartupReport = $false      # no per-module report at startup'
+        '  $PSMM_BackgroundStartup = $false  # run InstallOnly work inline'
+        '  $PSMM_UpdateCheck = $false        # no self-update check'
+        '  $PSMM_InlineJson = ''{ ... }''      # config in the profile itself'
+        '  $PSMM_JsonPath = ''~/psmodules.d/*.json'''
+        '  $PSMM_Theme = ''glacier''           # glacier (default) | ember | moss'
     )
-    @($raw | ForEach-Object { ConvertTo-PSMMSafe $_ })
+    foreach ($l in (Format-PSMMCode -Text $knobs)) { $out.Add($l) }
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  Install and Mode are independent: Mode decides load / install-only /'))
+    $out.Add((Get-PSMMHelpText1 '  ignore (and foreground vs background at startup); Install decides the'))
+    $out.Add((Get-PSMMHelpText1 '  disk/gallery policy (never install / install when missing / update).'))
+    $out.Add('')
+    $out.Add((Get-PSMMHelpTerm '  Load' (Get-PSMMHelpText1 'imported into this session, in the foreground.')))
+    $out.Add((Get-PSMMHelpTerm '  InstallOnly' (Get-PSMMHelpText1 'disk/gallery work only - deferred to a')))
+    $out.Add((Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'background job so your prompt appears sooner.')))
+    $out.Add((Get-PSMMHelpTerm '  Ignore' (Get-PSMMHelpText1 'parsed but not actioned.')))
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  Modules are imported into YOUR session (Import-Module -Global), so'))
+    $out.Add((Get-PSMMHelpText1 '  their commands work at the prompt and Get-Module lists them.'))
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  Each imported module''s import time is measured and reported, so you'))
+    $out.Add((Get-PSMMHelpText1 '  always know which module is slowing your shell down.'))
+    @($out)
 }
 
 # about tab: version, engine, self-update detail (the header bar shows only
@@ -256,33 +360,41 @@ function script:Get-PSMMHelpStartupLines {
 function script:Get-PSMMHelpAboutLines {
     $ui = $script:PSMM_UI
     $lines = [System.Collections.Generic.List[string]]::new()
-    $lines.Add('psmm - PS Session Module Manager')
+    foreach ($l in (Get-PSMMHelpHead 'psmm - PS Session Module Manager')) { $lines.Add($l) }
     $ver = if ($ui -and $ui.Version) { "v$($ui.Version)" } else { '' }
     $eng = if ($ui -and $ui.Engine) { "$($ui.Engine)" } else { '' }
-    $lines.Add((ConvertTo-PSMMSafe ("$ver $([char]0x00B7) install engine $eng$(if ($ui -and $ui.Elevated) { " $([char]0x00B7) elevated" })").Trim()))
-    $lines.Add((ConvertTo-PSMMSafe 'github.com/PBNZ/psmm'))
+    $lines.Add((Get-PSMMHelpText1 ("$ver $([char]0x00B7) install engine $eng$(if ($ui -and $ui.Elevated) { " $([char]0x00B7) elevated" })").Trim()))
+    # a real terminal hyperlink - ctrl+click it (gh#10)
+    $lines.Add((Get-PSMMLinkMarkup -Url 'https://github.com/PBNZ/psmm' -Text 'github.com/PBNZ/psmm'))
     $lines.Add('')
     if ($ui -and $ui.SelfUpdate) {
         $u = $ui.SelfUpdate
         $lines.Add("[$script:PSMM_ColWarn]$([char]0x21E1) psmm v$($u.Latest) is available (you have v$($u.Current))[/]")
-        $lines.Add("[$script:PSMM_ColMute]update:[/] [$script:PSMM_ColInfo]$(ConvertTo-PSMMSafe $u.Command)[/][$script:PSMM_ColMute], then restart pwsh[/]")
+        $lines.Add((Get-PSMMHelpText1 'update with:'))
+        foreach ($l in (Format-PSMMCode -Text @("  $($u.Command)"))) { $lines.Add($l) }
+        $lines.Add((Get-PSMMHelpText1 'then restart pwsh.'))
     } else {
-        $lines.Add((ConvertTo-PSMMSafe 'psmm checks the gallery for its own updates once a day (cached,'))
-        $lines.Add((ConvertTo-PSMMSafe 'never in the profile hot path); the header bar flags one with ' + [char]0x21E1 + ','))
-        $lines.Add((ConvertTo-PSMMSafe 'and this tab then shows the exact update command.'))
+        $lines.Add((Get-PSMMHelpText1 'psmm checks the gallery for its own updates once a day (cached,'))
+        # the string must be built BEFORE the call: passed as bare arguments,
+        # 'a' + $glyph + ',' binds as five positional args and a non-advanced
+        # function silently drops the surplus - the glyph vanished
+        $lines.Add((Get-PSMMHelpText1 ('never in the profile hot path); the header bar flags one with ' + [char]0x21E1 + ',')))
+        $lines.Add((Get-PSMMHelpText1 'and this tab then shows the exact update command.'))
     }
     $lines.Add('')
-    $lines.Add((ConvertTo-PSMMSafe 'While psmm is in prerelease, beta-to-beta updates need a forced'))
-    $lines.Add((ConvertTo-PSMMSafe 'reinstall: Install-PSResource psmm -Prerelease -Reinstall, then'))
-    $lines.Add((ConvertTo-PSMMSafe 'restart pwsh. u on psmm''s own grid row handles this correctly.'))
+    $lines.Add((Get-PSMMHelpText1 'While psmm is in prerelease, beta-to-beta updates need a forced'))
+    $lines.Add((Get-PSMMHelpText1 'reinstall:'))
+    foreach ($l in (Format-PSMMCode -Text @('  Install-PSResource psmm -Prerelease -Reinstall'))) { $lines.Add($l) }
+    $lines.Add((Get-PSMMHelpText1 'then restart pwsh. u on psmm''s own grid row handles this correctly.'))
     @($lines)
 }
 
-# The five tabs for a topic. Values are arrays of markup lines.
+# The five tabs for a topic. Values are arrays of MARKUP lines - including
+# 'this screen', which used to be escaped plain text (gh#8).
 function script:Get-PSMMHelpTabs {
     param([string]$Topic = 'grid')
     [ordered]@{
-        'this screen' = @(Get-PSMMHelpSection -Topic $Topic | ForEach-Object { ConvertTo-PSMMSafe $_ })
+        'this screen' = @(Get-PSMMHelpSection -Topic $Topic)
         'keys'        = @(Get-PSMMHelpKeysLines)
         'config'      = @(Get-PSMMHelpConfigLines)
         'startup'     = @(Get-PSMMHelpStartupLines)
@@ -318,7 +430,7 @@ function script:Build-PSMMHelpView {
     $lines = @($Tabs[$names[$State.Tab]])
     if ($State.Filter) {
         $needle = $State.Filter
-        $lines = @($lines | Where-Object { [Spectre.Console.Markup]::Remove($_) -like "*$needle*" })
+        $lines = @($lines | Where-Object { Test-PSMMFilterMatch -Text ([Spectre.Console.Markup]::Remove($_)) -Filter $needle })
     }
     $win = Get-PSMMWinSize
     $page = [Math]::Max(5, $win.Height - 9)

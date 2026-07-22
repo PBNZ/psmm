@@ -68,29 +68,90 @@ function Get-PSMMModuleCloudOnlyFile {
     @(foreach ($b in $bases) { Get-PSMMCloudOnlyFile -Path $b })
 }
 
+# How many placeholders psmm will recall at once (gh#14).
+#
+# Hydration is one blocking read per file, each waiting on a OneDrive round
+# trip, so the work is latency-bound and overlapping it is a big win. The cap
+# is the machine's LOGICAL PROCESSOR COUNT: every reader costs a runspace and a
+# thread, and past one per core the extra threads only queue behind the ones
+# already waiting - the sync client, not psmm, becomes the limit. Floored at 2
+# so a single-core box still overlaps two requests; ceiling 16 keeps a 64-core
+# workstation from spawning 64 runspaces for a folder of 20 files.
+function Get-PSMMHydrationMax {
+    [CmdletBinding()] param()
+    [Math]::Max(2, [Math]::Min(16, [Environment]::ProcessorCount))
+}
+
+function Get-PSMMHydrationDefault {
+    [CmdletBinding()] param()
+    [Math]::Max(1, [Math]::Min(4, (Get-PSMMHydrationMax)))
+}
+
+# Why the max is the max, in one sentence for the UI to show. A bare number
+# tells the user nothing, and the reason differs depending on which of the two
+# bounds actually bit.
+function Get-PSMMHydrationMaxReason {
+    [CmdletBinding()] param()
+    $max = Get-PSMMHydrationMax
+    $cores = [Environment]::ProcessorCount
+    $why = 'each download holds a thread waiting on OneDrive, so extra readers just queue up behind the ones already waiting'
+    if ($max -lt $cores) {
+        return "max $max - this machine has $cores logical processors, but psmm stops at 16: $why"
+    }
+    "max $max = this machine's logical processor count: $why"
+}
+
 # Hydrate placeholders by reading them end-to-end (the documented
 # RECALL_ON_DATA_ACCESS behaviour: a read fetches the content from the cloud).
-# $OnProgress, when given, is called as &$OnProgress $index $total $file
-# before each file so callers can render progress - downloads can be slow.
+# $OnProgress, when given, is called as &$OnProgress $index $total $file so
+# callers can render progress - downloads can be slow.
+# -ThrottleLimit 1 (default) keeps the sequential path: progress is reported
+# BEFORE each read, in file order. Above 1 the reads run concurrently and
+# progress is reported as each file COMPLETES, so the order is completion
+# order, not file order.
 function Invoke-PSMMFileHydration {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()] $Files,
-        [scriptblock]$OnProgress
+        [scriptblock]$OnProgress,
+        [int]$ThrottleLimit = 1
     )
+    $all = @($Files)
+    $total = $all.Count
     $ok = 0; $failed = 0; $errors = [System.Collections.Generic.List[string]]::new()
     $i = 0
-    foreach ($f in @($Files)) {
-        $i++
-        if ($OnProgress) { & $OnProgress $i @($Files).Count $f }
+    if ($ThrottleLimit -le 1 -or $total -le 1) {
+        foreach ($f in $all) {
+            $i++
+            if ($OnProgress) { & $OnProgress $i $total $f }
+            try {
+                $fs = [System.IO.File]::OpenRead($f.FullName)
+                try { $fs.CopyTo([System.IO.Stream]::Null) } finally { $fs.Dispose() }
+                $ok++
+            } catch {
+                $failed++
+                $errors.Add("$($f.Name): $($_.Exception.Message)")
+            }
+        }
+        return [pscustomobject]@{ Ok = $ok; Failed = $failed; Errors = $errors }
+    }
+    # Parallel: ForEach-Object -Parallel streams each result as it lands, so the
+    # progress callback still runs on THIS thread (calling a caller-supplied
+    # scriptblock from a worker runspace would not be safe).
+    $limit = [Math]::Min($ThrottleLimit, (Get-PSMMHydrationMax))
+    $all | ForEach-Object -ThrottleLimit $limit -Parallel {
+        $f = $_
         try {
             $fs = [System.IO.File]::OpenRead($f.FullName)
             try { $fs.CopyTo([System.IO.Stream]::Null) } finally { $fs.Dispose() }
-            $ok++
+            [pscustomobject]@{ File = $f; Ok = $true; Error = $null }
         } catch {
-            $failed++
-            $errors.Add("$($f.Name): $($_.Exception.Message)")
+            [pscustomobject]@{ File = $f; Ok = $false; Error = $_.Exception.Message }
         }
+    } | ForEach-Object {
+        $i++
+        if ($OnProgress) { & $OnProgress $i $total $_.File }
+        if ($_.Ok) { $ok++ } else { $failed++; $errors.Add("$($_.File.Name): $($_.Error)") }
     }
     [pscustomobject]@{ Ok = $ok; Failed = $failed; Errors = $errors }
 }

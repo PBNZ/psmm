@@ -28,13 +28,23 @@ function script:Get-PSMMBorderStyle { [Spectre.Console.Style]::Parse($script:PSM
 
 # Standard table chrome (§1/§5): rounded border in the border token,
 # lowercase dim headers. Screens add rows themselves.
+# Visible width of a markup cell. [Spectre.Console.Markup]::Remove collapses
+# whitespace-ONLY strings to '' (verified against the vendored 2.6.3) - a
+# blank mark slot measured as 0 gets extra padding, its column stretches,
+# and every other row gets unstyled fill: a black hole in the cursor-row
+# background right next to the bar (live-run feedback 2026-07-20 round 5).
+function script:Get-PSMMCellWidth {
+    param([string]$Cell)
+    if ([string]::IsNullOrWhiteSpace($Cell)) { return $Cell.Length }
+    [Spectre.Console.Markup]::Remove($Cell).Length
+}
+
 # ONE list-table builder for every sub-screen, with the SAME cursor
-# treatment as the grid: the cursor row paints an edge-to-edge rowbg
-# background (padding lives inside the cells; widths computed from ALL
-# rows), the caller bolds the name cell. The ▌ bar mark is retired -
-# it read as an artifact next to the grid's bg-only cursor (live-run
-# feedback 2026-07-20: one design on all pages). The grid builds its
-# table inline for speed but uses this exact technique; the design
+# treatment as the grid (mockup 2a): full-row rowbg background + a ▌
+# accent bar in its own far-left slot + the caller's bold name cell.
+# Widths are computed from ALL rows and padding lives inside the cells,
+# so the background paints edge to edge. The grid builds its table
+# inline for speed but uses this exact technique; the design
 # consistency test holds both to it.
 function script:New-PSMMTable {
     param(
@@ -45,33 +55,43 @@ function script:New-PSMMTable {
     $widths = @(foreach ($h in $Headers) { $h.Trim().Length })
     foreach ($r in $Rows) {
         for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
-            $len = [Spectre.Console.Markup]::Remove("$($r[$ci])").Length
+            $len = Get-PSMMCellWidth "$($r[$ci])"
             if ($len -gt $widths[$ci]) { $widths[$ci] = $len }
         }
     }
-    $T = [Spectre.Console.Table]::new()
-    $T.Border = [Spectre.Console.TableBorder]::Rounded
-    $T.BorderStyle = Get-PSMMBorderStyle
-    for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
-        $h = $Headers[$ci]
-        $cell = if ($h.Trim()) { " [$script:PSMM_ColDim]$($h.ToLowerInvariant())[/] " } else { ' ' }
-        $col = [Spectre.Console.TableColumn]::new($cell)
-        $col.Width = $widths[$ci] + 2
+    # borderless grid inside a rounded panel (mockup 2a: outer frame only,
+    # no column separators, no header rule). Column 0 is the cursor-bar
+    # slot; the bar never shares a slot with content, so it can't cover
+    # anything (live-run feedback 2026-07-20 round 4).
+    $G = [Spectre.Console.Grid]::new()
+    for ($ci = 0; $ci -le $Headers.Count; $ci++) {
+        $col = [Spectre.Console.GridColumn]::new()
         $col.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
         $col.NoWrap = $true
-        [void]$T.AddColumn($col)
+        [void]$G.AddColumn($col)
     }
+    $headerCells = [string[]](@('  ') + @(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+        $h = $Headers[$ci].Trim()
+        if ($h) { " [$script:PSMM_ColDim]$($h.ToLowerInvariant())[/]" + (' ' * ([Math]::Max(0, $widths[$ci] - $h.Length) + 1)) }
+        else { ' ' * ($widths[$ci] + 2) }
+    }))
+    [void][Spectre.Console.GridExtensions]::AddRow($G, $headerCells)
     for ($ri = 0; $ri -lt $Rows.Count; $ri++) {
         $isCur = ($ri -eq $CursorRow)
-        $cells = [string[]]@(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
+        $mark = if ($isCur) { " [$script:PSMM_ColAccent]$([char]0x258C)[/]" } else { '  ' }
+        $cells = [string[]](@($mark) + @(for ($ci = 0; $ci -lt $Headers.Count; $ci++) {
             $cell = "$($Rows[$ri][$ci])"
-            $len = [Spectre.Console.Markup]::Remove($cell).Length
-            $padded = ' ' + $cell + (' ' * [Math]::Max(0, $widths[$ci] - $len)) + ' '
-            if ($isCur) { "[default on $script:PSMM_ColRowBg]$padded[/]" } else { $padded }
-        })
-        [void][Spectre.Console.TableExtensions]::AddRow($T, $cells)
+            $len = Get-PSMMCellWidth $cell
+            ' ' + $cell + (' ' * ([Math]::Max(0, $widths[$ci] - $len) + 1))
+        }))
+        if ($isCur) { $cells = [string[]]@($cells | ForEach-Object { "[default on $script:PSMM_ColRowBg]$_[/]" }) }
+        [void][Spectre.Console.GridExtensions]::AddRow($G, $cells)
     }
-    $T
+    $P = [Spectre.Console.Panel]::new($G)
+    $P.Border = [Spectre.Console.BoxBorder]::Rounded
+    $P.BorderStyle = Get-PSMMBorderStyle
+    $P.Padding = [Spectre.Console.Padding]::new(0, 0, 0, 0)
+    $P
 }
 
 # 1-based origin (@{ Top; Left }) for an overlay panel: dead centre of the
@@ -294,10 +314,20 @@ function script:Get-PSMMWinSize {
     [pscustomobject]@{ Height = $h; Width = $w }
 }
 
+# ONE key capsule (§3): reverse-video key block on the capsule background.
+# Every rendering of a key - hint rows, help tabs, prose - goes through here,
+# so the capsule is defined exactly once. Keys are always lowercase, and
+# multi-key names are spelled out ('left/right', 'up/dn', 'pgup/pgdn'), never
+# drawn as arrow glyphs: the arrows are reserved for the scroll indicator
+# (design system §9, gh#7).
+function script:Get-PSMMKeyCap {
+    param([Parameter(Mandatory)][string]$Key)
+    "[$script:PSMM_ColKey on $script:PSMM_ColCapsule] $($Key.ToLowerInvariant()) [/]"
+}
+
 # Render "key=action" pairs as one consistently-styled hint line.
-# Design system v2 (§3): every key is a capsule - reverse-video key block on
-# the capsule background, mute label, two-space separator. Keys are always
-# lowercase; '^' before a key means ctrl, and any line using a '^' chord
+# Design system v2 (§3): every key is a capsule, mute label, two-space
+# separator. '^' before a key means ctrl, and any line using a '^' chord
 # carries the dim '^ = ctrl' legend at the end of the row.
 function script:Get-PSMMHint {
     param(
@@ -308,7 +338,7 @@ function script:Get-PSMMHint {
     )
     $parts = foreach ($p in $Pairs) {
         $k, $v = $p -split '=', 2
-        "[$script:PSMM_ColKey on $script:PSMM_ColCapsule] $($k.ToLowerInvariant()) [/] [$script:PSMM_ColMute]$v[/]"
+        "$(Get-PSMMKeyCap -Key $k) [$script:PSMM_ColMute]$v[/]"
     }
     if (-not $NoLegend -and @($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
         $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
@@ -317,7 +347,9 @@ function script:Get-PSMMHint {
 }
 
 # Tier-two hint row (§3): the persistent strip - always the same keys,
-# always last, accent keys on the darker capsule with dim labels.
+# always last, accent keys on the darker capsule with dim labels. A blank
+# line above separates it from the verb rows (mockup 2a) - it is part of
+# the returned markup so every screen gets it for free.
 function script:Get-PSMMPersistentHint {
     param([string[]]$Pairs = @("g=goto$([char]0x2026)", '/=filter', '?=help', '^q=quit'))
     $parts = foreach ($p in $Pairs) {
@@ -327,7 +359,7 @@ function script:Get-PSMMPersistentHint {
     if (@($Pairs | Where-Object { ($_ -split '=', 2)[0] -match '\^' }).Count) {
         $parts = @($parts) + @("[$script:PSMM_ColDim]^ = ctrl[/]")
     }
-    $parts -join '  '
+    "`n" + ($parts -join '  ')
 }
 
 # One-line header bar (§2), every screen: brand block + breadcrumb (+ dim
@@ -375,7 +407,7 @@ function script:Get-PSMMStartupWord {
     }
 }
 
-function script:Get-PSMMGalleryWord {
+function script:Get-PSMMUpkeepWord {
     param($Install)
     switch ("$Install") {
         'IfMissing' { 'if-missing' }
@@ -386,9 +418,15 @@ function script:Get-PSMMGalleryWord {
 }
 
 # State glyph + word (§5): glyph and word travel together, never glyph alone.
+# psmm's own modules read as infrastructure (◈, dim) rather than as something
+# you asked for (gh#16) - but only once they are actually present: a MISSING
+# dependency is a real problem and must still say so.
 function script:Get-PSMMStateMarkup {
     param([Parameter(Mandatory)] $Entry)
     if ($Entry.PSObject.Properties['Unmanaged']) { return "[$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/]" }
+    if ((Test-PSMMOwnModule -Name $Entry.Name) -and ($Entry.Loaded -or $Entry.Installed)) {
+        return "[$script:PSMM_ColDim]$([char]0x25C8) psmm's own[/]"
+    }
     if ($Entry.Loaded)    { return "[$script:PSMM_ColOk]$([char]0x25CF) loaded[/]" }
     if ($Entry.Installed) { return "[$script:PSMM_ColWarn]$([char]0x25D0) installed[/]" }
     "[$script:PSMM_ColErr]$([char]0x25CB) missing[/]"

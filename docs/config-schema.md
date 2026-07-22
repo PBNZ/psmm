@@ -44,7 +44,8 @@ No file is ever loaded twice, even if reachable via two sources.
   "Description": "Read/write .xlsx without Excel",
   "Install": "IfMissing",
   "Mode": "Load",
-  "Version": "7.8.10"
+  "Version": "7.8.10",
+  "Prerelease": false
 }
 ```
 
@@ -55,7 +56,20 @@ No file is ever loaded twice, even if reachable via two sources.
 | `Description` | string | — | Free text, shown in the module details. |
 | `Install` | string | `IfMissing` | Disk/gallery policy: `CheckOnly` (never install, only report), `IfMissing` (install when absent), `Latest` (check the gallery and update at startup). |
 | `Mode` | string | `Load` | Session policy: `Load` (import into the session at startup, foreground), `InstallOnly` (disk/gallery work only, deferred to a background job), `Ignore` (parsed, visible in the UI, not actioned). |
-| `Version` | string | — | Optional pin: an exact version (`"1.2.3"`) or a NuGet range (`"[1.0,2.0)"`). Exact pins are honoured on import (`-RequiredVersion`) and install; pinned modules are never flagged "update available". Ranges require PSResourceGet (on PowerShellGet-only machines a range falls back to latest, with a warning). |
+| `Version` | string | — | Optional pin: an exact version (`"1.2.3"`), an exact prerelease (`"1.2.3-beta4"`) or a NuGet range (`"[1.0,2.0)"`). Exact pins are honoured on import (`-RequiredVersion`) and install; pinned modules are never flagged "update available". A prerelease pin implies `-Prerelease` on install and imports by its **base** version, because `-RequiredVersion` is typed `[version]` and a prerelease shares its base-version folder. Ranges require PSResourceGet (on PowerShellGet-only machines a range falls back to latest, with a warning). |
+| `Prerelease` | bool | `false` | Allow prerelease versions from the gallery for this module. Affects install, update, the update check and the version-pin picker. The UI shows it as `+pre` in the **gallery** column, and every version cell then renders its full label (`0.1.0-beta8`, not `0.1.0`). Toggle it with `w` in the module menu. |
+
+**A note on prerelease labels.** A prerelease label lives in the manifest's
+`PrivateData.PSData.Prerelease`, *not* in the `[version]` — `0.1.0-beta8` and
+`0.1.0` are both `[version]0.1.0`. psmm therefore carries the label alongside
+every version it reads and shows it everywhere a version appears. Ordering
+follows SemVer: a release outranks any prerelease of the same base version,
+and `beta8` outranks `beta2`.
+
+Independently of this setting, a module whose *installed* copy is already a
+prerelease keeps being updated along the prerelease track — a
+prerelease-label-only bump is invisible to `Update-PSResource`, so
+`Install-PSResource -Prerelease -Reinstall` is the only thing that moves it.
 
 **`Install` and `Mode` are orthogonal.** `Mode` decides load-vs-not and
 foreground-vs-background; `Install` decides the disk/gallery policy. So
@@ -85,7 +99,7 @@ Round-trips are stable — saving twice produces identical bytes.
 
 Config files written for the original profile block load unchanged (this is
 covered by tests against the real legacy shape). New optional fields —
-currently just `Version` — are additive. Unknown fields never cause errors:
+currently `Version` and `Prerelease` — are additive. Unknown fields never cause errors:
 they are ignored on load. Note that when the **UI saves** a file it writes
 only the fields it knows (same behaviour as the original block), so custom
 extra fields on a *module entry* don't survive a UI edit of that file —
