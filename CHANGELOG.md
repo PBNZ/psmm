@@ -3,7 +3,7 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [0.1.0-beta9] — unreleased
+## [0.1.0-beta9] — 2026-07-22
 
 Live-run feedback round four, and one serious bug it uncovered.
 
