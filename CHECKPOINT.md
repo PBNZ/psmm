@@ -9,12 +9,12 @@ URIs) and pushed. Maiden CI run failed on one Windows test — root cause:
 Spectre.Console force-enables ANSI when GITHUB_ACTIONS=true, overriding
 AnsiSupport.No (verified with a local probe); fixed by stripping ANSI in
 ConvertTo-PSMMTextLines + the test helper, suite verified locally under
-GITHUB_ACTIONS=true. **CI run 2: both jobs green.** Remaining for Peter:
+GITHUB_ACTIONS=true. **CI run 2: both jobs green.** Remaining for PBNZ:
 PSGallery beta1 publish (checklist E) and the section-A eyeball pass.
 
 ## Public + prerelease prep (2026-07-06)
 
-Peter confirmed the GitHub slug (PBNZ/psmm), full-history publish, and
+PBNZ confirmed the GitHub slug (PBNZ/psmm), full-history publish, and
 keeping all dev docs. Exposure audit of working tree + full git history:
 no secrets, no personal email (author is the GitHub noreply address);
 benign traces documented in RELEASE-CHECKLIST section D. Manifest now
@@ -22,10 +22,10 @@ carries `Prerelease = 'beta1'`; packaging re-validated against a temp local
 repository (`psmm.0.1.0-beta1.nupkg`, hidden without `-Prerelease`, found
 with it, fresh-process import OK). README install section rewritten for
 Gallery-prerelease + clone; checklist sections D/E/E2 now cover public
-repo, beta publishing and stable promotion. Peter's remaining steps:
+repo, beta publishing and stable promotion. PBNZ's remaining steps:
 sections A (eyeball pass), D (create repo + push + CI), E (publish beta1).
 
-## Post-build fix round 2 (2026-07-05, Peter's second live report)
+## Post-build fix round 2 (2026-07-05, PBNZ's second live report)
 
 1. **Screens never cleared (push-up bug):** `(console).Clear()` is a C#
    extension method PowerShell can't call; the empty catch made every clear a
@@ -50,7 +50,7 @@ checks green.
 
 ## Post-build fix (2026-07-05)
 
-Peter's first live run (zero-config machine) crashed the sync path and the
+PBNZ's first live run (zero-config machine) crashed the sync path and the
 `m` key: empty-array-unrolls-to-null hit Mandatory `$Entries` params. Fixed
 at the shared engine functions (commit `8b8656e`) and regression-tested.
 
@@ -62,13 +62,13 @@ restore code emitted → process exits, zero error text in the stream. That
 run flushed out one more real bug — the shared pager's Mandatory
 `[string[]]` rejected blank lines (crashed `?` help) — fixed with
 `[AllowEmptyString()]` + regression test. Suite now **91/91**, PSSA 0.
-Peter's own eyeball pass (look & feel, remaining screens) is
+PBNZ's own eyeball pass (look & feel, remaining screens) is
 RELEASE-CHECKLIST section A.
 
 ## State
 
 The build program is finished and verified. If you are a resumed session
-reading this: there is no in-progress work. The remaining steps are Peter's
+reading this: there is no in-progress work. The remaining steps are PBNZ's
 and live in `RELEASE-CHECKLIST.md` (manual UI verification in a real
 terminal → private testing → repo hosting → publish).
 

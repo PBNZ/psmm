@@ -1,4 +1,4 @@
-# RELEASE CHECKLIST — human-only steps (Peter)
+# RELEASE CHECKLIST — human-only steps (PBNZ)
 
 Everything here was deliberately **not** done by the build session (hard
 boundary: no remotes, no publishing, nothing public, no real UI eyeballing).

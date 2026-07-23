@@ -437,7 +437,7 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
     }
 
     It 'a machine with ZERO configs opens, syncs and renders without errors (regression)' {
-        # Peter's first live run: no ~/.psmm, no profile config -> empty
+        # PBNZ's first live run: no ~/.psmm, no profile config -> empty
         # entry set -> Get-PSMMAllEntries returned $null (empty-array
         # unrolling) and Sync-PSMMUIEntries crashed binding it.
         $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))

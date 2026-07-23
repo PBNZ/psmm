@@ -2,7 +2,7 @@
 
 ## 1. Private testing round
 
-Peter + a few trusted colleagues/friends install psmm, use it daily, and file
+PBNZ + a few trusted colleagues/friends install psmm, use it daily, and file
 issues; fixes land before anything goes public. Start with
 `RELEASE-CHECKLIST.md` section A (the manual UI verification list).
 
@@ -15,10 +15,10 @@ ProjectUri/LicenseUri, first CI run, `Publish-PSResource` with the API key.
 ## 3. Deferred features
 
 Each was weighed for this build and deferred for the stated reason. The ones
-marked **needs Peter's decision** should be a short joint planning session,
+marked **needs PBNZ's decision** should be a short joint planning session,
 not a solo build.
 
-### #31 — Auth redirect to a specific Edge profile *(needs Peter's decision)*
+### #31 — Auth redirect to a specific Edge profile *(needs PBNZ's decision)*
 `Connect-*` flows open the system default browser; they should open in a
 specific Edge profile instead. There is no PowerShell-level API for this:
 options are (a) temporarily flipping the default-browser/protocol handler
@@ -27,7 +27,7 @@ as a dummy protocol handler, (c) device-code flows + manually pasting into
 the right profile. All have real trade-offs on a managed machine.
 **Decide:** which mechanism is acceptable, and whether it's psmm's job at all.
 
-### #39 — Run/load a module "as admin" from a normal session *(needs Peter's decision)*
+### #39 — Run/load a module "as admin" from a normal session *(needs PBNZ's decision)*
 Elevation cannot cross process boundaries: a module can't load "as admin"
 into the current non-elevated session. The honest version is launching an
 elevated helper pwsh (UAC prompt) for specific actions (e.g. AllUsers

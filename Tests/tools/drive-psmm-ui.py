@@ -1,6 +1,6 @@
 """Drive the real psmm TUI in a ConPTY with actual keystrokes.
 
-Replays Peter's failed live session on a zero-config machine:
+Replays PBNZ's failed live session on a zero-config machine:
 open (auto-creates the main config, managing PwshSpectreConsole) ->
 background scan -> 'm' (show unmanaged) -> '?' (help) -> esc ->
 'a' (add a new entry end-to-end) -> esc quit.

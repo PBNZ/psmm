@@ -23,7 +23,7 @@ copyright is recognized.)*
 
 ## D3 — Author / identifiers
 
-- Author: `PBNZ` *(amended 2026-07-14, was `Peter Braun` - the Gallery
+- Author: `PBNZ` *(amended 2026-07-14, was the legal name - the Gallery
   Author field is a free-form string, often a handle or org name)*
 - Manifest GUID (generated once 2026-07-04, never change it):
   `ed4c75e5-4d5b-43b1-a0ed-3c46fe4bcdee`
@@ -40,7 +40,7 @@ Language features used: `??`, `?:`-free code, `[Console]::ReadKey`, ThreadJob,
 ## D5 — No remote, no push, local git only
 
 Hard boundary from the PRD. All repo hosting, remotes, pushes, CI runs, and
-publishing are Peter's post-build steps (`RELEASE-CHECKLIST.md`).
+publishing are PBNZ's post-build steps (`RELEASE-CHECKLIST.md`).
 
 ## D6 — CI matrix
 
@@ -48,7 +48,7 @@ publishing are Peter's post-build steps (`RELEASE-CHECKLIST.md`).
 `ubuntu-latest` (tags-based filter, UI excluded). Sets up the cross-platform
 story without pretending the UI is tested off-Windows.
 
-## D7 — Publish tooling (for Peter, later)
+## D7 — Publish tooling (for PBNZ, later)
 
 `Publish-PSResource` primary, `Publish-Module` fallback; exact commands in
 `RELEASE-CHECKLIST.md`. In-build packaging validation uses a temporary local
@@ -65,7 +65,7 @@ filesystem repository only.
 2. **Hand-rolled VT/ANSI renderer** — zero dependencies and full control, but
    re-implements tables, markup, wrapping, wide-char handling, prompts, and a
    live-display diff for no user-visible gain; high effort, high regression
-   risk against the look Peter wants preserved.
+   risk against the look PBNZ wants preserved.
 3. **Terminal.Gui** — full widget toolkit with a very different (boxy,
    mouse-centric) feel; would not preserve the current aesthetic and is a
    heavier dependency.
