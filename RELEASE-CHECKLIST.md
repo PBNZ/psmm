@@ -132,17 +132,27 @@ Per release (beta2, beta3, ... and eventually stable):
 Iterate by bumping only the label — burned prerelease numbers are painless
 and `0.1.0` stays reserved for stable.
 
-**Never write `beta10`.** A prerelease label containing letters is compared
-*lexically*, so `0.1.0-beta10` sorts BELOW `0.1.0-beta9`: the Gallery would
-keep serving beta9 as latest, `Update-PSResource` would refuse to move
-anyone, and psmm's own update notice would stay silent. Verified against
-both `Compare-PSMMVersion` and `NuGet.Versioning` (2026-07-23) — that wall
-is why the line went `beta9` → **`rc.1`**.
+Two rules govern the label, and they pull against each other. Both were
+learned the hard way on 2026-07-23 and are now enforced by the release
+workflow before it publishes.
 
-Keep the number in its own dot-separated identifier from here on
-(`rc.1`, `rc.2`, … `rc.10`): a purely numeric identifier is compared
-numerically, so it never rolls over wrong. Anything that appends digits
-straight onto a word (`betaN`, `rcN`) breaks again at 10.
+**1. It is compared LEXICALLY, never numerically.** `0.1.0-beta10` sorts
+BELOW `0.1.0-beta9`: the Gallery would keep serving beta9 as latest,
+`Update-PSResource` would refuse to move anyone, and psmm's own update
+notice would stay silent. That wall is why the line went `beta9` →
+**`rc01`** (`rc` > `beta`), and why the digits are **zero-padded** — fixed
+width makes lexical order match numeric order, so `rc10` > `rc09` holds.
+
+**2. Dots are illegal, however idiomatic.** The Gallery accepts only
+`a-zA-Z0-9` in a prerelease (plus a leading hyphen) and rejects anything
+else *server-side, after the entire quality gate has run* —
+`Test-ModuleManifest` passes it locally, so nothing catches it earlier. The
+SemVer-correct fix for rule 1 would be `rc.1`, with the number as its own
+numeric identifier; it is not publishable. `v0.1.0-rc.1` died here.
+
+So: keep the same prefix and the same digit width for the whole line
+(`rc01`, `rc02`, … `rc10`, … `rc99`), and only change the prefix when you
+need to step up (`beta` → `rc` → stable).
 
 ## E2. Later: promote to stable 0.1.0
 

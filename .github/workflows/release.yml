@@ -30,6 +30,37 @@ jobs:
           }
           Write-Host "Tag $tag matches the manifest."
 
+      # Both of these used to be found only by the Gallery itself, at the very
+      # last step, after the whole quality gate had already run - and one of
+      # them (ordering) would not have been found at all, it would just have
+      # published a version nobody could update to. See RELEASE-CHECKLIST.md E.
+      - name: Prerelease label must be publishable, and must outrank what is live
+        shell: pwsh
+        run: |
+          $manifest = Import-PowerShellDataFile ./psmm.psd1
+          $pre = "$($manifest.PrivateData.PSData.Prerelease)"
+          # The Gallery allows only a-zA-Z0-9 (plus a leading hyphen) - NOT the
+          # dots SemVer allows. 'rc.1' is rejected server-side; Test-ModuleManifest
+          # accepts it locally, so this is the only place it can be caught early.
+          if ($pre -and $pre -notmatch '^-?[a-zA-Z0-9]+$') {
+            throw "Prerelease '$pre' is not publishable: the Gallery allows only a-zA-Z0-9 (and a leading hyphen). Dots are out."
+          }
+          $new = "$($manifest.ModuleVersion)$(if ($pre) { "-$pre" })"
+          # A prerelease label is compared LEXICALLY, so 'beta10' < 'beta9' and
+          # publishing it would leave the Gallery serving the older build. Trust
+          # nothing about the label - compare against every version that is live.
+          . ./src/Engine/SelfUpdate.ps1        # Compare-PSMMVersion, self-contained
+          $uri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id='psmm'&semVerLevel=2.0.0"
+          $live = @(@(Invoke-RestMethod -Uri $uri -TimeoutSec 60) | Where-Object { $_ } |
+                    ForEach-Object { "$($_.properties.Version)" } | Where-Object { $_ })
+          Write-Host "$($live.Count) version(s) already on the Gallery."
+          foreach ($v in $live) {
+            if ((Compare-PSMMVersion -A $new -B $v) -le 0) {
+              throw "$new does not sort above the published $v. It would publish, but the Gallery would keep serving $v as latest and Update-PSResource would never offer it."
+            }
+          }
+          Write-Host "$new outranks all $($live.Count) published version(s)."
+
       - name: Install tooling
         shell: pwsh
         run: |

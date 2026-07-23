@@ -3,16 +3,21 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [0.1.0-rc.1] — 2026-07-23
+## [0.1.0-rc01] — 2026-07-23
 
-The label jumps from `beta9` to `rc.1` rather than `beta10`: a prerelease
-label containing letters is compared **lexically**, so `0.1.0-beta10` sorts
-*below* `0.1.0-beta9` — the Gallery would have gone on serving beta9 as the
-latest and `Update-PSResource` would have refused to move anyone. Verified
-against both psmm's own comparison and `NuGet.Versioning`, which is what
-PSGallery uses. `rc` outranks `beta`, and the trailing number is its own
-numeric identifier, so `rc.9` → `rc.10` rolls over correctly. `0.1.0` stays
-reserved for stable.
+The label steps from `beta9` to `rc01`, not `beta10`. A prerelease label is
+compared **lexically**, so `0.1.0-beta10` sorts *below* `0.1.0-beta9`: the
+Gallery would have gone on serving beta9 as the latest and
+`Update-PSResource` would have refused to move anyone. `rc` outranks `beta`,
+and the digits are zero-padded because that same rule puts `rc10` below
+`rc9`. The SemVer-idiomatic `rc.1` is not an option — the Gallery rejects a
+prerelease containing anything but `a-zA-Z0-9`, server-side, after the whole
+quality gate has already run. All three facts verified against
+`NuGet.Versioning` and the live Gallery. `0.1.0` stays reserved for stable.
+
+The release workflow now checks both rules before it publishes: the label
+has to be publishable, and the new version has to sort strictly above every
+version already on the Gallery.
 
 ### Fixed
 - **Gallery search asks the gallery the question you meant** (gh#17). Every
