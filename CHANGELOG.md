@@ -3,7 +3,16 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [Unreleased]
+## [0.1.0-rc.1] — 2026-07-23
+
+The label jumps from `beta9` to `rc.1` rather than `beta10`: a prerelease
+label containing letters is compared **lexically**, so `0.1.0-beta10` sorts
+*below* `0.1.0-beta9` — the Gallery would have gone on serving beta9 as the
+latest and `Update-PSResource` would have refused to move anyone. Verified
+against both psmm's own comparison and `NuGet.Versioning`, which is what
+PSGallery uses. `rc` outranks `beta`, and the trailing number is its own
+numeric identifier, so `rc.9` → `rc.10` rolls over correctly. `0.1.0` stays
+reserved for stable.
 
 ### Fixed
 - **Gallery search asks the gallery the question you meant** (gh#17). Every

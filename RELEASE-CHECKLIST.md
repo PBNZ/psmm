@@ -129,8 +129,20 @@ Per release (beta2, beta3, ... and eventually stable):
 3. Watch the *Release to PowerShell Gallery* workflow; its final step
    polls the Gallery until the new version is findable.
 
-Iterate betas by bumping only the label (`beta2`, `beta3`...) — burned
-prerelease numbers are painless, `0.1.0` stays reserved for stable.
+Iterate by bumping only the label — burned prerelease numbers are painless
+and `0.1.0` stays reserved for stable.
+
+**Never write `beta10`.** A prerelease label containing letters is compared
+*lexically*, so `0.1.0-beta10` sorts BELOW `0.1.0-beta9`: the Gallery would
+keep serving beta9 as latest, `Update-PSResource` would refuse to move
+anyone, and psmm's own update notice would stay silent. Verified against
+both `Compare-PSMMVersion` and `NuGet.Versioning` (2026-07-23) — that wall
+is why the line went `beta9` → **`rc.1`**.
+
+Keep the number in its own dot-separated identifier from here on
+(`rc.1`, `rc.2`, … `rc.10`): a purely numeric identifier is compared
+numerically, so it never rolls over wrong. Anything that appends digits
+straight onto a word (`betaN`, `rcN`) breaks again at 10.
 
 ## E2. Later: promote to stable 0.1.0
 
