@@ -3,6 +3,48 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+### Fixed
+- **Gallery search asks the gallery the question you meant** (gh#17). Every
+  bare term was wrapped as `*term*` and handed to `Find-PSResource -Name`,
+  which matches the module **name** only. Measured against the live gallery
+  (2026-07-23, PSResourceGet 1.2.0):
+  - `excel` returned `Search-ExcelFileWithUI` first and buried `ImportExcel`
+    (22.9M downloads) in sixth place — the website puts it first.
+  - `sharepoint` could not reach `PnP.PowerShell` at all, and `excel` could
+    not reach `GetSQL` or `PSWriteOffice`: the word is in the description,
+    never the name.
+  - `a` pulled **8828 records over the wire in 216 seconds** and then cut
+    them to an arbitrary 40, because `-First` cannot be pushed down into a
+    glob. The same search now takes **0.5 s**.
+  - `psmm` found nothing, because a module that has only ever published
+    prereleases is invisible to the default query.
+
+  A bare term now goes to the OData `Search()` endpoint the gallery website
+  itself calls — name + description + tags, the site's own relevance order,
+  limited server-side. An explicit wildcard still goes to the provider, which
+  is the only thing that can honour one, and a pattern that matches nothing
+  retries its words as a full-text search. A leading wildcard has also been
+  seen to return 0 results *and* 0 errors — the original report — and psmm no
+  longer builds one anywhere.
+- **An empty gallery screen says why it is empty.** "No results." covered
+  both "the gallery has nothing" and "the search service never answered";
+  those are different answers and now read differently. If the endpoint
+  fails, the search falls back to a name-prefix lookup and says so.
+
+### Added
+- The gallery table has a **downloads** column (`22.9M`), with the exact
+  count on the context line — the one signal that says which of forty
+  similar-looking modules people actually use. Results carry their
+  repository, named on the context line when it is not the public gallery.
+- Repositories other than the public gallery stay searchable: the endpoint
+  only knows `powershellgallery.com`, so anything else registered is asked
+  through the provider and merged in, bounded so a large internal feed cannot
+  bury the gallery's ranking.
+- A gallery result renders its prerelease label (design system §11) — it used
+  to drop it, so `0.1.0-beta9` read as `0.1.0`.
+
 ## [0.1.0-beta9] — 2026-07-22
 
 Live-run feedback round four, and one serious bug it uncovered.

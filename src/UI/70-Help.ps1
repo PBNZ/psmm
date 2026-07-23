@@ -189,8 +189,21 @@ function script:Get-PSMMHelpSection {
         ) }
         'gallery' { @(
             (Get-PSMMHelpHead 'GALLERY SEARCH')
-            (Get-PSMMHelpText1 'Searches the PowerShell Gallery (read-only). Wildcards work:')
-            (Get-PSMMHelpText1 'Az.*, Microsoft.Graph*.')
+            (Get-PSMMHelpText1 'Read-only. What you type decides how it is searched:')
+            ''
+            (Get-PSMMHelpTerm 'a word' (Get-PSMMHelpText1 'searches names, descriptions AND tags, in the'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'gallery website''s own relevance order. "excel"'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'finds ImportExcel first, and PnP.PowerShell'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'turns up under "sharepoint" - neither has the'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'word in its name.'))
+            (Get-PSMMHelpTerm '* or ?' (Get-PSMMHelpText1 'matches module NAMES only, across every'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'repository you have registered: Az.*,'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'Microsoft.Graph*. Very broad patterns like *a*'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'are slow: everything has to come over the wire'))
+            (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'before it can be filtered.'))
+            ''
+            (Get-PSMMHelpText1 'A search that comes back empty says why - "no match" and "the')
+            (Get-PSMMHelpText1 'search service did not answer" are different answers.')
             ''
             (Get-PSMMHelpRow 'enter' 'add the highlighted module to one of your config files -')
             (Get-PSMMHelpCont 'pick install policy and mode, done')

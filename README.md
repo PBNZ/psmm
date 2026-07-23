@@ -122,7 +122,10 @@ quick-tips panel over the grid — the three keys worth knowing, shown once):
   every installed version, pin a version from a list of what exists, allow
   prereleases (`w`), browse its commands, or move its folder to another
   module location (`p`)
-- gallery search adds modules straight into your config; cleanup prunes
+- gallery search works like the gallery website — a word matches names,
+  descriptions and tags in relevance order, a pattern (`Az.*`) matches names
+  across every repository you have registered — and adds modules straight
+  into your config; cleanup prunes
   stacked old module versions; `m` shows/hides installed-but-unmanaged
   modules so you can adopt them into a config
 - module locations: see `$env:PSModulePath`, get warned when your

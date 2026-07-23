@@ -28,8 +28,11 @@ BeforeAll {
     # Render any psmm view to plain text through an injected console.
     # NB: the scriptblock is re-created inside the module so it binds to module
     # scope (a passed-in scriptblock stays bound to the test file's scope).
-    function Get-RenderedText([scriptblock]$BuildInModule) {
-        InModuleScope psmm -Parameters @{ buildText = $BuildInModule.ToString() } {
+    # -Width renders at a console width other than the default 120. Screens
+    # that budget their columns also have to be told, via a Get-PSMMWinSize
+    # mock in the calling test - the real one reads the host, not this console.
+    function Get-RenderedText([scriptblock]$BuildInModule, [int]$Width = 120) {
+        InModuleScope psmm -Parameters @{ buildText = $BuildInModule.ToString(); width = $Width } {
             $build = [scriptblock]::Create($buildText)
             $sw = [System.IO.StringWriter]::new()
             $settings = [Spectre.Console.AnsiConsoleSettings]::new()
@@ -37,7 +40,7 @@ BeforeAll {
             $settings.Interactive = [Spectre.Console.InteractionSupport]::No
             $settings.Ansi = [Spectre.Console.AnsiSupport]::No
             $console = [Spectre.Console.AnsiConsole]::Create($settings)
-            $console.Profile.Width = 120
+            $console.Profile.Width = $width
             Set-PSMMConsole -Console $console
             try {
                 $r = & $build
@@ -1068,8 +1071,85 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $results = @([pscustomobject]@{ Name = 'ImportExcel'; Version = '7.8.9'; Description = 'Excel without Excel'; Author = 'dfinke' })
             Build-PSMMGalleryView -State $st -Results $results -Query 'excel'
         }
-        $text | Should -Match 'version\s+by\s+description'
+        $text | Should -Match 'version\s+by\s+downloads\s+description'
         $text | Should -Match 'dfinke'
+    }
+
+    # gh#17: the full-text search reports a download count, which is the one
+    # signal that says which of 40 similar-looking modules people actually use
+    It 'the gallery shows the download count, shortened, and the exact one on the cursor row' {
+        $text = Get-RenderedText {
+            $st = New-PSMMListState
+            $results = @([pscustomobject]@{
+                    Name = 'ImportExcel'; Version = '7.8.10'; Prerelease = ''; Description = 'Excel without Excel'
+                    Author = 'dfinke'; Downloads = [long]22940663; Repository = 'PSGallery'
+                })
+            Build-PSMMGalleryView -State $st -Results $results -Query 'excel'
+        }
+        $text | Should -Match '22\.9M'                       # the column
+        $text | Should -Match '22,940,663 downloads'         # the context line
+        $text | Should -Not -Match 'from PSGallery'          # only worth saying when it is NOT
+    }
+
+    It 'the gallery names a result''s repository when it is not the public gallery' {
+        $text = Get-RenderedText {
+            $st = New-PSMMListState
+            $results = @([pscustomobject]@{
+                    Name = 'Contoso.Tools'; Version = '2.1.0'; Prerelease = ''; Description = 'internal'
+                    Author = 'Contoso'; Downloads = [long]0; Repository = 'Internal'
+                })
+            Build-PSMMGalleryView -State $st -Results $results -Query 'contoso'
+        }
+        $text | Should -Match 'from Internal'
+    }
+
+    # the column caps used to be constants, so the widest real row on the
+    # gallery (Microsoft.Online.SharePoint.PowerShell at 16.0.27424.12000)
+    # pushed the table past the window and Spectre reflowed the cells into
+    # each other - unreadable. Every width the screen can be drawn at, from
+    # the Test-PSMMWinTooSmall floor of 60 up, must fit.
+    It 'the gallery table fits every window width instead of reflowing' {
+        $worstCase = @(
+            [pscustomobject]@{ Name = 'Microsoft.Online.SharePoint.PowerShell'; Version = '16.0.27424.12000'
+                Prerelease = ''; Description = 'Microsoft SharePoint Online Services Module for Windows PowerShell'
+                Author = 'Microsoft Corporation'; Downloads = [long]14729717; Repository = 'PSGallery' }
+            [pscustomobject]@{ Name = 'PnP.PowerShell'; Version = '3.3.0'; Prerelease = 'nightly.20260101'
+                Description = 'Microsoft 365 Patterns and Practices PowerShell Cmdlets'
+                Author = 'Microsoft 365 Patterns and Practices'; Downloads = [long]2147483647; Repository = 'PSGallery' }
+        )
+        foreach ($w in 60, 72, 80, 99, 100, 120, 160, 240) {
+            # The real Get-PSMMWinSize reads the host, not the injected console,
+            # so the layout maths has to be told the width too. The size is
+            # baked into the mock body as a literal: a mock body cannot close
+            # over a variable from one InModuleScope call and still see it when
+            # Get-RenderedText enters the module again.
+            InModuleScope psmm -Parameters @{ width = $w } {
+                param($width)
+                Mock Get-PSMMWinSize ([scriptblock]::Create("[pscustomobject]@{ Height = 30; Width = $width }"))
+            }
+            $text = Get-RenderedText -Width $w -BuildInModule ([scriptblock]::Create(@"
+                `$results = ConvertFrom-Json '$((ConvertTo-Json $worstCase -Compress) -replace "'", "''")'
+                Build-PSMMGalleryView -State (New-PSMMListState) -Results @(`$results) -Query 'sharepoint'
+"@))
+            # Spectre never overruns the window - it REFLOWS, so an over-budget
+            # table shows up as extra lines, not as long ones. Inside the panel
+            # there must be exactly one header line and one line per result.
+            $bodyLines = @($text -split "`r?`n" | Where-Object { $_ -match ([char]0x2502) }).Count
+            $bodyLines | Should -Be ($worstCase.Count + 1) -Because "at $w columns the gallery table must not reflow (got $bodyLines lines for $($worstCase.Count) results)"
+        }
+    }
+
+    # design system §11: a prerelease result must not render as its base version
+    It 'the gallery shows a prerelease label on the version' {
+        $text = Get-RenderedText {
+            $st = New-PSMMListState
+            $results = @([pscustomobject]@{
+                    Name = 'psmm'; Version = '0.1.0'; Prerelease = 'beta9'; Description = 'session module manager'
+                    Author = 'PBNZ'; Downloads = [long]0; Repository = 'PSGallery'
+                })
+            Build-PSMMGalleryView -State $st -Results $results -Query 'psmm'
+        }
+        $text | Should -Match '0\.1\.0-beta9'
     }
 
     It 'the module menu facts panel shows the author when known (live-run fix)' {
