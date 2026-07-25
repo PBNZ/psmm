@@ -279,7 +279,10 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             @($tabs.get_Keys()) | Should -Be @('this screen', 'keys', 'config', 'startup', 'about')
             @($tabs['this screen']).Count | Should -BeGreaterThan 3 -Because "topic '$topic' should describe its screen"
             $flat = (InModuleScope psmm -Parameters @{ t = $topic } { Get-PSMMHelpText -Topic $t }) -join "`n"
-            $flat | Should -Match 'Install and Mode are independent'
+            # the startup tab must state the rule the whole release turns on:
+            # the import is the only foreground action (gh#19)
+            $flat | Should -Match 'Mode decides load-vs-not'
+            $flat | Should -Match 'ONLY thing that happens before your prompt'
             $flat | Should -Match 'psmm-config\.json'
         }
         # per-screen sections actually differ

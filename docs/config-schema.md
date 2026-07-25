@@ -54,8 +54,8 @@ No file is ever loaded twice, even if reachable via two sources.
 | `Name` | string | **required** | The module's PowerShell Gallery name. |
 | `FriendlyName` | string | = `Name` | Display name in the report and UI. |
 | `Description` | string | — | Free text, shown in the module details. |
-| `Install` | string | `IfMissing` | Disk/gallery policy: `CheckOnly` (never install, only report), `IfMissing` (install when absent), `Latest` (check the gallery and update at startup). |
-| `Mode` | string | `Load` | Session policy: `Load` (import into the session at startup, foreground), `InstallOnly` (disk/gallery work only, deferred to a background job), `Ignore` (parsed, visible in the UI, not actioned). |
+| `Install` | string | `IfMissing` | Disk/gallery policy: `CheckOnly` (never install, only report), `IfMissing` (install when absent), `Latest` (keep it at the newest eligible version). All three do their work in the background. |
+| `Mode` | string | `Load` | Session policy: `Load` (import into the session at startup), `InstallOnly` (disk/gallery work only, never imported), `Ignore` (parsed, visible in the UI, not actioned — and no gallery lookup of any kind). |
 | `Version` | string | — | Optional pin: an exact version (`"1.2.3"`), an exact prerelease (`"1.2.3-beta4"`) or a NuGet range (`"[1.0,2.0)"`). Exact pins are honoured on import (`-RequiredVersion`) and install; pinned modules are never flagged "update available". A prerelease pin implies `-Prerelease` on install and imports by its **base** version, because `-RequiredVersion` is typed `[version]` and a prerelease shares its base-version folder. Ranges require PSResourceGet (on PowerShellGet-only machines a range falls back to latest, with a warning). |
 | `Prerelease` | bool | `false` | Allow prerelease versions from the gallery for this module. Affects install, update, the update check and the version-pin picker. The UI shows it as `+pre` in the **gallery** column, and every version cell then renders its full label (`0.1.0-beta8`, not `0.1.0`). Toggle it with `w` in the module menu. |
 
@@ -71,10 +71,37 @@ prerelease keeps being updated along the prerelease track — a
 prerelease-label-only bump is invisible to `Update-PSResource`, so
 `Install-PSResource -Prerelease -Reinstall` is the only thing that moves it.
 
-**`Install` and `Mode` are orthogonal.** `Mode` decides load-vs-not and
-foreground-vs-background; `Install` decides the disk/gallery policy. So
-`CheckOnly` + `Load` imports synchronously but never installs, and
-`Latest` + `InstallOnly` updates in the background without ever importing.
+## `Install` × `Mode`: what actually happens at shell start
+
+`Mode` decides load-vs-not; `Install` decides the disk/gallery policy.
+**Neither decides scheduling** — that follows from the pair:
+
+> The import is the only thing that happens in the foreground. Every install,
+> update and gallery lookup runs in a background job, in all nine cells.
+> Nothing at shell start waits on the network.
+
+A module that has to be *installed* at shell start is therefore reported as
+**available next session** — psmm will not import it behind a prompt you are
+already typing into.
+
+| `Mode` | `Install` | At shell start |
+|---|---|---|
+| `Load` | `CheckOnly` | imports what is on disk; never installs; if absent, says `missing — not loaded` |
+| `Load` | `IfMissing` | imports what is on disk; if absent, installs in the background for next session |
+| `Load` | `Latest` | imports what is on disk, then updates in the background. The update never swaps a module already loaded — restart to pick it up |
+| `InstallOnly` | `CheckOnly` | nothing installed, nothing imported; presence is reported. *"Watch only."* |
+| `InstallOnly` | `IfMissing` | installs in the background when absent; never imported |
+| `InstallOnly` | `Latest` | keeps the newest eligible version on disk; never imported |
+| `Ignore` | any | nothing at all, and no gallery lookup. The `Install` value is preserved when the file is saved, and the UI notes that it has no effect |
+
+**Pins change what `Latest` means.** An exact pin names one version, so
+`Latest` degrades to `IfMissing` — it installs the pin once and never
+re-downloads it. A *range* pin makes `Latest` mean *newest inside the range*,
+and the update check is measured against the range too, so the `⇡` flag
+clears when you take the update.
+
+`Mode` is a declaration about **startup**, not a restriction: the UI always
+lets you install, update or load any row explicitly, whatever its `Mode`.
 
 Invalid `Install`/`Mode`/`Version` values never break a file: the entry
 degrades to the default with an issue flag (`!` column; details under `c`).

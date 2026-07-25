@@ -65,7 +65,8 @@ jobs:
         shell: pwsh
         run: |
           Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository
-          Install-PSResource -Name Pester -Scope CurrentUser -TrustRepository
+          # pinned to 5.x for the reason documented in ci.yml
+          Install-PSResource -Name Pester -Version "[5.0,6.0)" -Scope CurrentUser -TrustRepository
           Install-PSResource -Name PwshSpectreConsole -Scope CurrentUser -TrustRepository
 
       - name: PSScriptAnalyzer

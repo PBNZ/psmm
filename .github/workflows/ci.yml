@@ -17,7 +17,12 @@ jobs:
         shell: pwsh
         run: |
           Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository
-          Install-PSResource -Name Pester -Scope CurrentUser -TrustRepository
+          # Pinned to 5.x: the suite is written against Pester 5
+          # (#Requires ModuleVersion 5.0), and unpinned now resolves to
+          # Pester 6.0.1, which fails to load on the pwsh 7.4.x the Linux
+          # runners ship - Update-TypeData rejects its type converter.
+          # Reproduced in mcr.microsoft.com/powershell:latest (pwsh 7.4.2).
+          Install-PSResource -Name Pester -Version "[5.0,6.0)" -Scope CurrentUser -TrustRepository
           Install-PSResource -Name PwshSpectreConsole -Scope CurrentUser -TrustRepository
 
       - name: PSScriptAnalyzer
@@ -44,7 +49,8 @@ jobs:
 
       - name: Install tooling
         shell: pwsh
-        run: Install-PSResource -Name Pester -Scope CurrentUser -TrustRepository
+        # pinned for the same reason as the Windows job above
+        run: Install-PSResource -Name Pester -Version "[5.0,6.0)" -Scope CurrentUser -TrustRepository
 
       - name: Pester (engine only - platform-neutral core)
         shell: pwsh
