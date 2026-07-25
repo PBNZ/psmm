@@ -29,32 +29,76 @@ start*, bought for nothing visible. That reads to me as the opposite of what
 having the deferred job populate it. The field is already on the plan, so
 it is a small change — but it is a new feature, not a bug fix, so I left it.
 
-### 1.2 `files > apply` — I went slightly past "fix `$managed`"
+### 1.2 `files > apply` — RULED: it never unloads *(settled 2026-07-26)*
 
-#22 said fix `$managed`. Doing only that would have made the unload sweep
-**dead code**: `$managed` and `$active` would both come from `Get-PSMMEntry`,
-so nothing could ever be managed-but-not-active.
+**Your ruling: "The module is already loaded. It should not be unloaded by
+psmm."** Applied, and taken to its general form: apply only ever *adds*.
+Editing config changes what happens at the next shell start; unloading is
+`^u`, never a side effect of an edit. Apply now names anything still loaded
+that the config no longer asks for, so the state is visible rather than
+silently divergent.
 
-What I shipped instead: apply unloads a module iff **psmm imported it this
-session** and the config no longer asks for it to be imported, and never if a
-disabled file names it. That protects modules you loaded by hand with `^l`
-too, which the original criterion did not.
+The session-import tracking I had added for the previous criterion is deleted
+along with it rather than left sitting there unused.
 
-Consequence, which is new behaviour: switching an entry from `Load` to
-`Ignore` and pressing apply now **does** unload it. Previously nothing
-happened, because `Get-PSMMEntry` never filtered on `Mode` (the asymmetry
-#22 called out). I think this is the feature working as intended, but it is
-a change, so: your call.
+### 1.3 System modules — RULED: marked, not hidden *(settled 2026-07-26)*
 
-### 1.3 The unmanaged list gets much shorter on your machine
+**Your ruling: they must stay in the unmanaged view so psmm can browse their
+commands and help.** Applied. They are listed again and render as `system` in
+the scope column.
 
-`m` used to show **81** modules here; it now shows **7**. The difference is
-the platform's own modules (`$PSHOME/Modules`, System32) which #27 said were
-being wrongly offered for adoption — you cannot install pwsh's own
-`Microsoft.PowerShell.*` from the gallery.
+One thing worth knowing about how it is implemented, because it is not
+obvious: the mark is a **separate property, not a third `Scope` value**. Both
+version-cleanup paths guard with `-eq 'AllUsers'` / `-ne 'AllUsers'` string
+tests, and an unrecognised third value falls **open** through them — an
+unelevated session would have started trying to uninstall copies under
+`$PSHOME`. Finding that also closed a hole that was already there:
+`Get-PSMMDuplicateVersion` has no platform filter, so platform copies already
+reached both cleanup screens labelled `AllUsers`, and an **elevated** session
+could have uninstalled a module the shell itself depends on. Now refused at
+any elevation.
 
-It is a big visible change from one line of policy, so it is worth an eyeball
-before you agree with it. `Test-PSMMPlatformModulePath` is the whole of it.
+### 1.3a Two defects your screenshots exposed — both root-caused and fixed
+
+Neither was introduced by rc02; both were reproduced against `main` first.
+
+**The module screen said "not installed" while describing the module in
+full.** Pressing `m` (show/hide unmanaged) rebuilds the entry list, and a
+rebuild mints fresh blank objects whose disk fields are only filled by the
+full disk sweep — which a toggle skips, for speed. So after one `m` press
+**every** module in the grid read "missing", not just PwshSpectreConsole. The
+manifest block kept working because it reads memory, not disk, which is
+exactly why the screen contradicted itself. Disk and gallery facts now
+survive a rebuild. Before/after on your config: `m` → `Installed=False` /
+`○ missing`, versus `2.6.3` / `◈ psmm's own`.
+
+*"session: not imported" on that same screen is correct, not a bug* — psmm
+imports its UI engine into its own module scope, never `-Global`, so your
+prompt genuinely cannot see it (`D-OWN-MODULES`).
+
+**The blinking cursor.** You remembered a past fix, and the archaeology is
+worth a sentence: cursor hiding did arrive in 0.1.0-beta7, but it only ever
+covered alt-screen entry and text input. Spectre's live display shows the
+cursor again every time it exits, and the module menu has read keys outside a
+live display since the very first UI commit — so that screen has blinked
+since the beginning and nothing regressed. Fixed at the mechanism (re-assert
+on live exit, on every repaint, and before every key psmm waits for) rather
+than per-screen, plus a test that fails if a new key-wait forgets, and a
+real-terminal check in the ConPTY harness that I verified fails without the
+fix.
+
+### 1.3b Your own modules were being filed as `AllUsers`
+
+Your `$HOME` is `C:\Users\<user>` but your Documents — and so your CurrentUser
+module folder — is `E:\Users\<user>\Documents`. The user-vs-machine test was a
+bare `$HOME` prefix comparison, so **every module you have installed** was
+reported machine-wide: shown as read-only in the grid, and skipped by version
+cleanup as "session is not elevated". Cleanup was effectively dead on your
+machine. It now also tests the Documents-derived root, which psmm already
+computed for its OneDrive diagnostics.
+
+This is the "related, worth fixing at the same time" note on #27, and it is
+probably the highest-impact fix in the round for you specifically.
 
 ### 1.4 I edited the CI workflows to pin Pester to 5.x
 

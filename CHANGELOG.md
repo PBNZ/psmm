@@ -68,15 +68,43 @@ inline, network and all.
   A range pin also renders a pin marker now, instead of showing a bare
   update arrow with nothing to explain it.
 - **`files > apply` unloaded a loaded module whose config file was
-  disabled** (gh#22). `docs/config-schema.md` promises a disabled file is
-  parsed and shown but never actioned; the unload sweep was built from the
-  pre-filter entry set, which includes disabled files. gh#16 papered over
-  the psmm-own case with an allow-list, leaving every user module exposed.
-  Apply now unloads only what psmm itself imported this session, minus
-  anything a disabled file names — so a module you loaded by hand with `^l`
-  is safe too. The other half of the same asymmetry is fixed as well:
-  switching an entry from `Load` to `Ignore` and applying now *does* unload
-  it, which it previously did not.
+  disabled** (gh#22). **`files > apply` now never unloads anything.** A
+  module that is already loaded is not psmm's to remove, whatever the config
+  now says — unloading is an explicit action (`^u`), never a side effect of
+  editing config. That is the same principle as the install side, applied
+  symmetrically: psmm does not reach into a running session and add things
+  behind you, and it does not take them away either. Apply still imports
+  what the config newly asks for, and now names anything still loaded that
+  the config no longer wants, rather than diverging silently.
+- **Pressing `m` reported every module as "missing"** — including, visibly,
+  psmm's own running UI engine, which the module screen would describe in
+  full (author, project, 51 commands) while insisting it was not installed.
+  Show/hide-unmanaged rebuilds the entry list, and a rebuild mints fresh
+  blank objects whose disk fields are only filled by the full disk sweep —
+  which is skipped on a toggle, for speed. What psmm knows about disk and
+  the gallery now survives a rebuild.
+- **Modules were misfiled as `AllUsers` when Documents is on another
+  drive.** The user-vs-machine test compared against `$HOME`, but on Windows
+  the CurrentUser module location follows the **Documents** known folder,
+  which can live anywhere — with Documents redirected to `E:\`, every one of
+  your own modules was reported machine-wide. The grid marked them read-only
+  and version cleanup refused to touch them ("session is not elevated"), so
+  cleanup silently stopped working for exactly the modules it exists to
+  clean up.
+- **The terminal cursor blinked over the module menu.** Spectre's live
+  display hides the cursor when it starts and shows it again when it exits,
+  and psmm hid it only once, at startup. Screens that render without a live
+  display — the module menu, the tasks empty state — therefore blinked a
+  cursor over the frame. Contrary to first appearances this was not a
+  regression: cursor hiding arrived in 0.1.0-beta7 and never covered these
+  screens. psmm now re-asserts it whenever a live display exits, on every
+  full-screen repaint, and before every key it waits for, with a test that
+  fails if a new key-wait forgets.
+- **Version cleanup could have removed a module that ships with
+  PowerShell.** Platform copies classify as `AllUsers`, so the
+  not-elevated guard skipped them by luck; an **elevated** session would
+  have gone ahead and uninstalled something the shell itself depends on.
+  Now refused at any elevation.
 - **The background job disagreed with the foreground path** (gh#25). Its
   `Update-PSResource` call omitted `-Prerelease` and `-Scope`, and it had no
   equivalent of the installed-prerelease track, so a module already on a
@@ -93,10 +121,11 @@ inline, network and all.
 - **The unmanaged-module scan was implemented twice, and the tested copy was
   not the running one** (gh#27). The background job re-implemented the whole
   pipeline with its own inlined scope classifier. One implementation now,
-  used by both paths. It also stops offering `$PSHOME` and Windows'
-  `System32` modules for adoption — you cannot install pwsh's own
-  `Microsoft.PowerShell.*` modules from the gallery, so listing them as
-  "AllUsers" only made them look adoptable.
+  used by both paths. Modules that ship with PowerShell (`$PSHOME`, Windows'
+  `System32` store) are also **marked as `system`** in the scope column
+  instead of being reported as ordinary machine-wide installs — they stay
+  listed, so you can still browse their commands and read their help through
+  psmm, which is most of what you would want them there for.
 
 ### Added
 - **Background tasks can be cancelled** — `x` on the tasks screen. There was

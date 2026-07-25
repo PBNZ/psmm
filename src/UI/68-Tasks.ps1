@@ -162,6 +162,7 @@ function script:Show-PSMMTasks {
             Write-PSMMLine "[$script:PSMM_ColAccent]Background tasks[/]"
             Write-PSMMLine "[$script:PSMM_ColMute]No tasks yet. u starts a background Update-Help; installs/updates/scans appear here too.[/]"
             Write-PSMMLine (Get-PSMMHint -Pairs @('u=run update-help', 'esc=back'))
+            Hide-PSMMCursor      # this branch renders without a live display
             $k = [Console]::ReadKey($true)
             if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
             if ($k.KeyChar -eq 'g') {

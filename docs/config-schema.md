@@ -30,7 +30,7 @@ No file is ever loaded twice, even if reachable via two sources.
 
 | Field | Type | Default | Meaning |
 |-------|------|---------|---------|
-| `Enabled` | bool | `true` | `false` = the file is parsed (and shown in the UI) but **nothing in it is actioned**. This is the "switch a module set on/off" feature. A disabled file's entries are preserved on save — never silently dropped. |
+| `Enabled` | bool | `true` | `false` = the file is parsed (and shown in the UI) but **nothing in it is actioned**. This is the "switch a module set on/off" feature — it takes effect at the next shell start; nothing already loaded is unloaded. A disabled file's entries are preserved on save — never silently dropped. |
 | `Includes` | string[] | `[]` | Absolute paths of further config files. **Honoured only in the main config**; anywhere else it is ignored with a warning. |
 | `_legend` | object | — | Self-documenting help, kept verbatim across saves. |
 | `Modules` | array | required | The module entries (below). |
@@ -102,6 +102,13 @@ clears when you take the update.
 
 `Mode` is a declaration about **startup**, not a restriction: the UI always
 lets you install, update or load any row explicitly, whatever its `Mode`.
+
+**Config changes never unload anything.** Editing a file — disabling it,
+switching an entry to `Ignore`, deleting an entry — changes what happens at
+the *next* shell start. `files > apply` brings newly-declared modules into
+the running session, but a module that is already loaded stays loaded:
+removing one can break anything already holding its commands or types, so it
+is an explicit action (`^u` on the row), never a side effect of an edit.
 
 Invalid `Install`/`Mode`/`Version` values never break a file: the entry
 degrades to the default with an issue flag (`!` column; details under `c`).

@@ -47,6 +47,10 @@ function script:Read-PSMMKeyResize {
 function script:Wait-PSMMKey {
     param([string]$Message = 'press any key to continue')
     Write-PSMMLine (Get-PSMMHint -Pairs @("any key=$Message", '^q=quit'))
+    # psmm never waits for a key with a visible cursor. This is the widest net
+    # for that rule - Wait-PSMMKey has ~36 call sites, several of them right
+    # after a Spectre prompt, which leaves the cursor SHOWN when it returns.
+    Hide-PSMMCursor
     $k = [Console]::ReadKey($true)
     if (Test-PSMMHardQuitKey $k) {
         $script:PSMM_UI.HardQuit = $true
@@ -127,6 +131,7 @@ function script:Read-PSMMNumber {
             $panel.BorderStyle = [Spectre.Console.Style]::Parse($script:PSMM_ColAccent)
             $ctx.UpdateTarget($panel)
             $ctx.Refresh()
+            Hide-PSMMCursor      # already hidden inside a live display; kept so the rule has no exceptions
             $k = [Console]::ReadKey($true)
             if (Test-PSMMHardQuitKey $k) { $script:PSMM_UI.HardQuit = $true; $state.Cancelled = $true; return }
             switch ($k.Key) {

@@ -827,6 +827,37 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
+    It 'psmm never waits for a key with a visible cursor' {
+        # Spectre's LiveDisplay writes ESC[?25h when it exits - verified from
+        # the real assembly - so the cursor is SHOWN again every time a live
+        # screen hands back, and Spectre's selection prompt leaves it shown
+        # too. Any [Console]::ReadKey that is not immediately preceded by a
+        # re-hide will therefore blink over the frame, which is what the
+        # module menu did from the original UI commit until 0.1.0-rc02.
+        #
+        # Exempt: Read-PSMMKeyResize (only ever runs INSIDE a live display,
+        # which has already hidden it) and Read-PSMMText (deliberately shows
+        # the cursor while you type, and re-hides it in its own finally).
+        $root = Join-Path $PSScriptRoot '..' 'src' 'UI'
+        $exempt = @('Read-PSMMKeyResize', 'Read-PSMMText')
+        $offenders = [System.Collections.Generic.List[string]]::new()
+        foreach ($f in (Get-ChildItem -LiteralPath $root -Filter *.ps1)) {
+            $lines = @(Get-Content -LiteralPath $f.FullName)
+            $fn = ''
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+                if ($lines[$i] -match '^\s*function\s+(script:)?([\w-]+)') { $fn = $Matches[2] }
+                if ($lines[$i] -notmatch '\[Console\]::ReadKey') { continue }
+                if ($fn -in $exempt) { continue }
+                # the re-hide must be on one of the few lines directly above
+                $window = $lines[([Math]::Max(0, $i - 3))..$i] -join "`n"
+                if ($window -notmatch 'Hide-PSMMCursor') {
+                    $offenders.Add("$($f.Name):$($i + 1)  (in $fn)  $($lines[$i].Trim())")
+                }
+            }
+        }
+        $offenders | Should -BeNullOrEmpty -Because "each of these blocks on a key with the cursor possibly visible:`n$($offenders -join "`n")"
+    }
+
     It 'the content box of a frame excludes the padded header bar from the width (live-run fix 2)' {
         InModuleScope psmm {
             $size = Get-PSMMContentSize -Renderable (Build-PSMMGrid)

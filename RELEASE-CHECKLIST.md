@@ -52,12 +52,20 @@ psmm
 - [ ] `g t` tasks: `x` cancels a running task and it reads **cancelled**, not
       failed. `u` runs `Update-Help`; if it genuinely fails it now reports
       **failed** rather than done.
-- [ ] `g f` files: disable a file that holds a module you have loaded, then
-      `a` (apply). The module **stays loaded**. Then re-enable it, switch the
-      entry to `Mode: Ignore`, apply again — now it **is** unloaded.
-- [ ] `m` (unmanaged) no longer lists the modules that ship with PowerShell
-      (`Microsoft.PowerShell.*`, `PSReadLine`, System32 modules). The list
-      should be the handful you actually installed.
+- [ ] `m` (unmanaged) still lists the modules that ship with PowerShell, but
+      their scope column reads **`system`** rather than `all`. Drill into one
+      and `b` still browses its commands and help.
+- [ ] Press `m`, then drill into any row: it still shows its version and
+      **does not** claim to be missing. (Toggling used to blank the disk
+      state of every module in the grid.)
+- [ ] Your own modules show scope **`user`**, not `all ro` — check one you
+      installed yourself. Then `x` on a module with duplicate versions
+      actually offers to remove them instead of "not elevated".
+- [ ] No blinking cursor anywhere: drill into a module (`enter`), open the
+      tasks screen with no tasks (`g t`), and pause on any "press any key"
+      prompt.
+- [ ] `g f` files: disable a file holding a loaded module, `a` (apply) — it
+      stays loaded, and apply says so.
 - [ ] The row under the cursor shows a `⚠` notice line when an entry sets
       `Install` while `Mode` is `Ignore`.
 

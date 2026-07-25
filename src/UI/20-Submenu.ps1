@@ -295,6 +295,7 @@ function script:Show-PSMMModuleMenu {
         Write-PSMMRenderable (Build-PSMMModuleMenuView -Entry $Entry -Auth $auth -StatusMarkup $status -Manifest $manifest)
         $status = ''
 
+        Hide-PSMMCursor      # this screen renders without a live display
         $k = [Console]::ReadKey($true)
         if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
         if ($k.KeyChar -eq 'g') {
