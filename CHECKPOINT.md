@@ -40,10 +40,20 @@ outside `Plan.ps1` starts branching on the config vocabulary again.
    the previous commit, both worktrees on the *same* filesystem, and discard
    the first run. `NOTES.md` now says so.
 
-**Open questions for PBNZ** are in
-[`docs/rc02-handoff.md`](docs/rc02-handoff.md) — read that before merging.
-The live pass is `RELEASE-CHECKLIST.md` section A, rewritten for this
-release; its A1 block is the rc02-specific list.
+**Nothing is blocked on a decision.** Every judgement call was ruled on by
+PBNZ on 2026-07-26 and the record is in
+[`docs/rc02-handoff.md`](docs/rc02-handoff.md) §1. Two of those rulings
+changed shipped behaviour and are worth knowing before touching this code:
+`files > apply` **never unloads** anything, and platform modules are
+**marked `system`, not hidden**. The one deliberate departure from the plan's
+ratified matrix — no update check at startup — is recorded as an amendment
+inside `docs/rust-ui-plan.md` §4 itself, so the matrix cannot be misread as
+unimplemented. The Pester pin has an expiry: issue
+[#30](https://github.com/PBNZ/psmm/issues/30).
+
+What remains is PBNZ's: the live pass (`RELEASE-CHECKLIST.md` section A,
+rewritten for this release — **A1** is the rc02-specific list), then the PR
+and the tag.
 
 Everything below this section is history from the original build.
 

@@ -9,25 +9,27 @@ page is only the things **you** should rule on.
 
 ---
 
-## 1. Judgement calls I made — please confirm or overturn
+## 1. Judgement calls — all ruled on (2026-07-26)
 
-### 1.1 No update check runs at startup *(the one deliberate deviation)*
+Every call below is settled; nothing here is waiting on a decision. Kept as
+the record of what was decided and why.
+
+### 1.1 No update check at startup — RULED: ship without it *(settled 2026-07-26)*
 
 `docs/rust-ui-plan.md` §4 says a background, report-only update check runs at
-startup for cells 1–6. **I did not implement that half.**
+startup for cells 1–6. rc02 does not do that half, deliberately: at profile
+time there is no UI to show a result to and no cache to put one in, so it
+would be one gallery round trip *per module, per shell start*, bought for
+nothing visible.
 
-The plan object carries `Check` and the *interactive* check consumes it — so
-exact pins and `Mode: Ignore` entries are no longer queried, which they both
-were before. But the startup job performs no gallery check.
+The half that IS done: the plan object carries `Check`, and the *interactive*
+check consumes it — which is what stops exact pins and `Mode: Ignore` entries
+being queried, as both were before.
 
-**Why:** at profile time there is no UI to show a result to and no cache to
-put one in, so it would be one gallery round trip *per module, per shell
-start*, bought for nothing visible. That reads to me as the opposite of what
-#19 is about.
-
-**Overturn it by:** adding a result cache (like the self-update one) and
-having the deferred job populate it. The field is already on the plan, so
-it is a small change — but it is a new feature, not a bug fix, so I left it.
+**Ruled: ship rc02 without it.** Recorded as an amendment against §4 of the
+plan so the next session does not read the matrix as unimplemented. If it is
+ever wanted, the shape is the self-update check's — background, at most
+daily, cached to disk, surfaced next time the TUI opens.
 
 ### 1.2 `files > apply` — RULED: it never unloads *(settled 2026-07-26)*
 
@@ -100,17 +102,18 @@ computed for its OneDrive diagnostics.
 This is the "related, worth fixing at the same time" note on #27, and it is
 probably the highest-impact fix in the round for you specifically.
 
-### 1.4 I edited the CI workflows to pin Pester to 5.x
+### 1.4 CI pins Pester to 5.x — RULED: keep it, with an expiry *(settled 2026-07-26)*
 
 Unpinned `Install-PSResource -Name Pester` now resolves to **6.0.1**, which
 **fails to load on pwsh 7.4.x** — `Update-TypeData` rejects its type
-converter. Reproduced in `mcr.microsoft.com/powershell:latest` (pwsh 7.4.2),
-which is what the Linux runners are close to.
-
+converter. Reproduced in `mcr.microsoft.com/powershell:latest` (pwsh 7.4.2).
 The suite is written against Pester 5 (`#Requires ModuleVersion 5.0`), so the
-pin is correct regardless — but this would otherwise have turned your PR red
-for a reason that has nothing to do with the code, and I would rather you
-knew that than discovered it.
+pin is correct on its own terms, not just as a workaround.
+
+**Ruled: keep the pin, and track the migration decision** —
+[#30](https://github.com/PBNZ/psmm/issues/30), so it has a review date rather
+than quietly ossifying. Not blocking: 343/343 Windows, 209/209 Linux under
+5.x.
 
 ### 1.5 Two small UI additions inside a keymap that is supposed to be frozen
 
@@ -177,10 +180,12 @@ python Tests/tools/drive-psmm-ui.py
 
 ---
 
-## 5. Suggested order tomorrow
+## 5. What is left
 
-1. Read §1 above and overturn anything you disagree with.
-2. `pwsh -NoProfile -File Tests\tools\try-psmm-branch.ps1` — the branch
+1. `pwsh -NoProfile -File Tests\tools\try-psmm-branch.ps1` — the branch
    against a sandboxed copy of your real config.
-3. `RELEASE-CHECKLIST.md` section **A1**, then the rest of A if you want it.
-4. Open the PR, let CI run, tag `v0.1.0-rc02`.
+2. `RELEASE-CHECKLIST.md` section **A1** (the rc02-specific list), then the
+   rest of A if you want it.
+3. Open the PR, let CI run, tag `v0.1.0-rc02`.
+
+Nothing is blocked on a decision.
