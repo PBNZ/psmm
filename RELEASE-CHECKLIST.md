@@ -1,4 +1,4 @@
-# RELEASE CHECKLIST — human-only steps (PBNZ)
+﻿# RELEASE CHECKLIST — human-only steps (PBNZ)
 
 Everything here was deliberately **not** done by the build session (hard
 boundary: no remotes, no publishing, nothing public, no real UI eyeballing).
@@ -6,64 +6,100 @@ Work top to bottom.
 
 ## A. Manual verification in a real terminal (before sharing with testers)
 
-> **Stale as of 2026-07-26.** The key references below predate the `g` goto
-> layer that shipped in 0.1.0-beta6 — `g` here means the gallery, `t` tasks,
-> `f` files, and `I`/`O`/`B`/`A`/`Ctrl+P` no longer mean what they say. The
-> list is still directionally useful; the bindings are not. It is rewritten
-> against the new keymap before rc03 ships (`docs/rust-ui-plan.md` §5, §11).
+Rewritten 2026-07-26 against the **current** keymap (the `g` goto layer, as
+shipped in 0.1.0-beta6) and rc02's behaviour. The previous version described
+pre-`g`-layer bindings and was marked stale; `I`/`O`/`B`/`A`/`Ctrl+P` and
+bare `g`/`t`/`f`/`p` no longer mean what it said.
 
-The agent verified the engine, data model, exports, packaging and headless
-frame rendering with tests — but nobody has *watched* the UI run. In a real
-Windows Terminal:
+`Tests/tools/drive-psmm-ui.py` now replays most of the navigation below with
+real keystrokes in a real ConPTY and passes end to end, so the boxes here are
+for the things a machine cannot judge — **does it look right, and does it
+behave right against your own configs.**
+
+Safest way to drive the working tree without touching your real config:
+
+```powershell
+pwsh -NoProfile -File Tests\tools\try-psmm-branch.ps1     # your config, copied to a sandbox
+```
+
+Or against the real thing:
 
 ```powershell
 $repo = '<path to your psmm clone>'
 Import-Module $repo\psmm.psd1
-Invoke-PSMMStartup    # against your real configs — check the report + timings
+Invoke-PSMMStartup    # against your real configs - check the report + timings
 psmm
 ```
 
-- [ ] **Re-check after the 2026-07-05 fixes** (use a FRESH shell — the
-      previously-imported broken module lingers in old sessions): on a
-      machine with no configs `psmm` now **auto-creates**
-      `~/.psmm/psmm-config.json` managing PwshSpectreConsole (InstallOnly),
-      the unmanaged notice shows once, `m` reveals the unmanaged modules,
-      esc quits clean. *(Machine-verified with real keystrokes via
-      `Tests/tools/drive-psmm-ui.py` — this line is your confirmation pass.)*
-- [ ] Sub-screens (`a` add, apply, cleanup, version pin...) repaint a CLEAN
-      page — nothing appends below the grid / pushes content up (2026-07-05
-      Clear() fix).
-- [ ] Scrolling a long list (e.g. `m` with many unmanaged rows) never
-      changes the table width (2026-07-05 width-jitter fix); a one-entry
-      grid still shows ≥5 table rows.
-- [ ] `a` with no writable config offers to create one instead of the old
-      dead-end message.
-- [ ] Startup report prints per-module lines with import times; background
-      task line appears for InstallOnly modules; warnings legible.
-- [ ] `psmm` opens in the **alternate screen**; on quit (esc / Ctrl+Q) your
-      previous terminal content is exactly restored (#4).
-- [ ] Grid: arrows/PgUp/PgDn/Home/End, space select, `/` filter (type, enter
-      keeps, esc clears), position indicator, resize redraws (#11/#12).
-- [ ] Right-arrow drills into a module; left-arrow backs out (#24).
-- [ ] Ctrl+L / Ctrl+U load/unload with visible per-module progress (#5);
-      Ctrl+P starts a background install and the grid stays usable (#25).
-- [ ] `u` update check runs in background; `^` markers appear; a pinned
-      module never shows `^`.
-- [ ] `m` reveals unmanaged modules once the scan lands; Enter → A adds one
-      to a config (#26/#27).
-- [ ] Module menu: B command browser (`/` works, esc resets filter — #19–21),
-      Enter on a command → tabs render, including on a small window (#10).
-- [ ] `I`/`O` connection status + disconnect on a Connect-* module you use
-      (Graph or EXO is the easiest test) (#32).
-- [ ] `x` version cleanup lists duplicates; non-elevated session skips
-      AllUsers copies with a notice (#28).
-- [ ] `g` gallery search finds and adds a module (#38); `t` tasks screen;
-      `u` there starts background Update-Help (#35).
-- [ ] `f` files: space toggles Enabled + saves, `a` applies to session,
-      `n` creates from a scenario template (#29), `m` moves a file and fixes
-      Includes.
-- [ ] `?` shows real, per-screen help everywhere (#13).
-- [ ] Ctrl+Q hard-quits from every screen.
+### A1. rc02 behaviour (new — check these first)
+
+- [ ] **Nothing at shell start waits on the network.** With a `Latest` entry
+      in your config, the prompt appears immediately; the update happens
+      afterwards. Previously this was a gallery round trip before the prompt.
+- [ ] The startup report shows a **`missing`** row (warn-coloured `○`) for a
+      `Load` module that is not installed, and says which it is: `not loaded,
+      check-only`, or `installing in the background, available next session`.
+- [ ] A module installed by that background job is **not** imported into the
+      running session — it is there next time you open a shell.
+- [ ] A module pinned to an exact version does **not** re-download on every
+      shell start (watch the background task line across two or three shell
+      starts).
+- [ ] Pressing `u` on an exactly pinned row says there is nothing to update
+      rather than silently reinstalling.
+- [ ] A **range**-pinned entry (`"Version": "[1.0,2.0)"`) shows a `pin≈`
+      marker, and if it is flagged for update, taking the update clears the
+      flag.
+- [ ] `g t` tasks: `x` cancels a running task and it reads **cancelled**, not
+      failed. `u` runs `Update-Help`; if it genuinely fails it now reports
+      **failed** rather than done.
+- [ ] `g f` files: disable a file that holds a module you have loaded, then
+      `a` (apply). The module **stays loaded**. Then re-enable it, switch the
+      entry to `Mode: Ignore`, apply again — now it **is** unloaded.
+- [ ] `m` (unmanaged) no longer lists the modules that ship with PowerShell
+      (`Microsoft.PowerShell.*`, `PSReadLine`, System32 modules). The list
+      should be the handful you actually installed.
+- [ ] The row under the cursor shows a `⚠` notice line when an entry sets
+      `Install` while `Mode` is `Ignore`.
+
+### A2. Frame, navigation and restoration
+
+- [ ] `psmm` opens in the **alternate screen**; on quit (`esc` / `^q` / `^x`)
+      your previous terminal content is exactly restored.
+- [ ] First run ever floats the **welcome overlay** (three tips); any key
+      closes it and it never returns.
+- [ ] Grid: arrows / PgUp / PgDn / Home / End, `space` selects, `/` filters
+      (type, `enter` keeps, `esc` clears), position indicator is right, and
+      **resizing the window redraws** cleanly.
+- [ ] Scrolling a long list (`m` with many rows) never changes the table
+      width; a one-entry grid still shows ≥5 table rows.
+- [ ] `right`/`enter` drills into a module; `left` backs out — the same pair
+      on every screen.
+- [ ] The `g` goto layer works from **every** screen: `g h` home · `g g`
+      gallery · `g f` files · `g p` paths · `g t` tasks · `g c` conflicts ·
+      `g x` cleanup · `g ?` the key reference.
+- [ ] `?` shows real, per-screen help everywhere, with all five tabs.
+- [ ] `^q` and `^x` both hard-quit from every screen.
+- [ ] Sub-screens (`a` add, apply, cleanup, version pin…) repaint a **clean**
+      page — nothing appends below the grid or pushes content up.
+
+### A3. Actions
+
+- [ ] `^l` / `^u` load and unload with visible per-module progress.
+- [ ] `i` starts a background install and the grid **stays usable**; `k`
+      runs the update check in the background and `⇡` markers appear.
+- [ ] `a` with no writable config offers to create one rather than dead-ending.
+- [ ] Module menu: `b` command browser (`/` works, `esc` resets the filter),
+      `enter` on a command renders its tabs, including on a small window.
+- [ ] Module menu: `v` pins a version from the list of what exists; `w`
+      toggles prereleases; `x` prunes duplicate versions (a non-elevated
+      session skips AllUsers copies with a notice); `p` moves its folder.
+- [ ] Connection status and disconnect on a `Connect-*` module you actually
+      use (Graph or EXO is the easiest test).
+- [ ] `g g` gallery search finds and adds a module.
+- [ ] `g f` files: `space` toggles Enabled and saves, `n` creates from a
+      scenario template, `m` moves a file and fixes `Includes`.
+- [ ] `g p` paths: your OneDrive warning is accurate, cloud-only download
+      and keep-on-device behave.
 
 ## B. Profile bootstrap (your machines)
 

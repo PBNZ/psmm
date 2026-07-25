@@ -1,23 +1,49 @@
 # CHECKPOINT — resume pointer
 
-**Last updated:** 2026-07-26 — **0.1.0-rc01 on the Gallery; the Rust UI
-programme is planned and rc02 is the next release.**
+**Last updated:** 2026-07-26 — **rc02 is written, gated and committed on
+`fix/rc02-engine-correctness`. It needs PBNZ's live pass, then a PR and a
+tag.**
 
-## Now (2026-07-26)
+## Now (2026-07-26, later)
 
-A planning session re-derived the `Mode`x`Install` behaviour and the keymap
-from source, ruled on the open questions, and produced
-[`docs/rust-ui-plan.md`](docs/rust-ui-plan.md). `DECISIONS.md` `D-RUST-UI`
-records the programme-level decision; `docs/PRD-psmm-rust-ui.md` is the
-requirements input.
+All eleven issues [#19-#29](https://github.com/PBNZ/psmm/issues) are fixed on
+branch **`fix/rc02-engine-correctness`** (4 commits, no PR opened — that was
+deliberate). `docs/rust-ui-plan.md` §3 is the spec that was implemented; §4
+is the matrix that shipped.
 
-**If you are a resumed session, the in-progress work is rc02** — the
-PowerShell correctness release, issues
-[#19-#29](https://github.com/PBNZ/psmm/issues). Start with **#29**: the
-`Mode`x`Install` matrix is implemented four times in four places that
-disagree, and most of the other issues are consequences of that. The plan's
-§3 has the shape of the fix; §3.4 has the tests it must ship with. No code
-has been written yet.
+The keystone was **#29**: `Mode`x`Install` was implemented four times.
+`src/Engine/Plan.ps1` is now the only place it is decided —
+`Get-PSMMEntryPlan` returns a plan object, every caller executes it, and
+`Get-PSMMJobPrelude` ships the real engine functions into ThreadJob bodies so
+they stop re-deriving policy. A static guard test fails the build if any file
+outside `Plan.ps1` starts branching on the config vocabulary again.
+
+**Verified** (all against real command output):
+
+- Pester **334/334** on Windows (was 283 — 51 new).
+- Engine tests **204/204 on Linux**, in Docker (`mcr.microsoft.com/powershell`,
+  pwsh 7.4.2) — the same filter CI's Linux job uses.
+- PSScriptAnalyzer **0 errors / 0 warnings**.
+- The **ConPTY keystroke harness passes end to end** — see below, it did not
+  before.
+- Startup timing A/B vs rc01 under identical conditions:
+  `Invoke-PSMMStartup` 101 → **98 ms**, `Import-Module` 184 → **190 ms**.
+
+**Two things a resumed session should know:**
+
+1. `Tests/tools/drive-psmm-ui.py` had been **silently broken since beta8** —
+   four separate rots, each making every later step unreachable, so there was
+   effectively no real-terminal check at all. It is repaired and extended.
+   Run it after any UI change: `python Tests/tools/drive-psmm-ui.py`.
+2. The `118 ms + 48 ms` startup split in `NOTES.md` **does not reproduce** on
+   current machines — rc01 itself measures 184/101 here. Compare A/B against
+   the previous commit, both worktrees on the *same* filesystem, and discard
+   the first run. `NOTES.md` now says so.
+
+**Open questions for PBNZ** are in
+[`docs/rc02-handoff.md`](docs/rc02-handoff.md) — read that before merging.
+The live pass is `RELEASE-CHECKLIST.md` section A, rewritten for this
+release; its A1 block is the rc02-specific list.
 
 Everything below this section is history from the original build.
 

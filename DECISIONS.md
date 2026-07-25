@@ -314,3 +314,60 @@ is downloaded by every user - which is what forces D-6.
 **D-PROTO**, **D-KEYMAP**, **D-CONFIG-PATH**, **D-STATE**, **D-LAYOUT**, and
 the formal **D-UI-RUST** superseding note on `D-TUI` - are written at rc03
 entry, against working code rather than a plan.
+
+## D-PLAN — one policy function; scheduling is derived, not declared (2026-07-26)
+
+**Decision:** `Get-PSMMEntryPlan` (`src/Engine/Plan.ps1`) is the only place
+the `Mode` × `Install` matrix is decided. It returns a plan object — import /
+install / check / schedule / reason / notices — and every caller *executes*
+that plan: the startup loader for scheduling, `Invoke-PSMMPlanAction` for the
+disk/gallery half, the grid for its context sentence, and the job payload so
+ThreadJob bodies stop re-deriving policy.
+
+Scheduling follows from the pair rather than being chosen by either: **the
+import is the only foreground action; every disk or gallery operation is
+background, in all nine cells.**
+
+**Why:** the matrix was written out four times — `Invoke-PSMMStartup`, the
+actuator, the deferred job body and the grid's install task — and the four
+disagreed. Six of the eight rc02 defects were consequences of that single
+fact, not independent bugs: the foreground gallery round trip (gh#19), the
+pinned force-reinstall (gh#20), the dropped `-Prerelease` (gh#21), the job's
+missing `-Prerelease`/`-Scope` (gh#25). Fixing them one at a time would have
+left the fifth copy free to drift next.
+
+**Why the duplicates existed, and why they no longer have to.** Module
+functions are invisible inside a `Start-ThreadJob` runspace, which is a real
+constraint — both job bodies said so in comments. Re-deriving policy to
+satisfy it was the mistake. `Get-PSMMJobPrelude` emits the real functions as
+source text for the job to dot-source, so the constraint is met without a
+second implementation. A static guard test (`Engine.Plan.Tests.ps1`) fails
+the build if any file outside `Plan.ps1` compares `Mode`/`Install` against
+the config vocabulary again. The guard is **case-sensitive on purpose**:
+config words are PascalCase (`'Latest'`), plan verbs are lowercase
+(`'latest'`), and that casing is exactly the line between deciding and
+executing.
+
+**The behavioural cost, accepted and announced (R5).** A module that has to
+be installed at shell start is now installed in the background and reported
+as available *next* session, rather than being imported behind a prompt the
+user is already typing into (Q-2). Anyone relying on `Latest` applying before
+the prompt gets it after. The alternative — keeping the foreground install —
+is what made a cold `Az` or `Microsoft.Graph` install a multi-minute
+unresponsive shell.
+
+**Where the shipped code deviates from the plan's §4, deliberately.** §4 says
+a report-only update check runs in the background at startup for cells 1-6.
+The plan object carries `Check`, and the *interactive* check consumes it — so
+exact pins and `Ignore` entries are no longer queried, which they both were.
+But the startup job performs no gallery check: at profile time there is no UI
+to show a result to and no cache to put one in, so it would be N gallery
+round trips per shell start bought for nothing. Reinstate it when there is a
+consumer; the field is already there.
+
+**Verified while deciding:** a `Register-EngineEvent -Action` scriptblock
+cannot see its defining module's `$script:` variables — they read as `$null`,
+and `-MessageData` did not survive either — so the session-exit disposal
+handler reaches module scope through `& (Get-Module psmm) { … }` instead.
+Written the obvious way, it would have disposed nothing while looking
+correct.
