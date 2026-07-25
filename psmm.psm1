@@ -16,6 +16,7 @@ $psmmEngineFiles = @(
     'src/Engine/Discovery.ps1'
     'src/Engine/Save.ps1'
     'src/Engine/Install.ps1'
+    'src/Engine/Plan.ps1'
     'src/Engine/State.ps1'
     'src/Engine/Conflict.ps1'
     'src/Engine/Startup.ps1'
@@ -37,6 +38,11 @@ foreach ($f in $psmmEngineFiles + $psmmPublicFiles) {
 }
 
 Set-Alias -Name psmm -Value Show-PSModuleManager
+
+# Second disposal layer (gh#28). PowerShell.Exiting - registered lazily by
+# Start-PSMMTask - does not fire on `Remove-Module psmm`, and this does. It is
+# a single property assignment, so import stays as cheap as it was.
+$MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = { $null = Clear-PSMMJob }
 
 Export-ModuleMember `
     -Function 'Show-PSModuleManager', 'Invoke-PSMMStartup', 'Get-PSMMConfigPath' `

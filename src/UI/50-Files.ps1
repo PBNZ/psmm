@@ -113,13 +113,39 @@ function script:Invoke-PSMMApply {
     $ui = $script:PSMM_UI
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Apply config changes[/]"
+    # "should this be imported now?" is the policy function's answer, not a
+    # re-reading of Mode (gh#29) - so apply and shell start can never disagree.
     $activeEntries = @(Get-PSMMEntry)
-    $active = @{}; foreach ($e in $activeEntries) { if ($e.Name) { $active[$e.Name] = $e } }
-    $managed = @{}; foreach ($e in (Get-PSMMAllEntries)) { if ($e.Name) { $managed[$e.Name] = $true } }
+    $shouldLoad = @{}
+    $active = @{}
+    foreach ($e in $activeEntries) {
+        if (-not $e.Name) { continue }
+        $active[$e.Name] = $e
+        if ((Get-PSMMEntryPlan -Entry $e).Import) { $shouldLoad[$e.Name] = $e }
+    }
+
+    # Who may be unloaded (gh#22). The old answer was "anything named in any
+    # config file", taken from Get-PSMMAllEntries - the PRE-FILTER set, which
+    # includes entries from DISABLED files. So disabling a file that held a
+    # loaded module and pressing apply unloaded it, contradicting the promise
+    # in docs/config-schema.md that a disabled file is never actioned. gh#16
+    # papered over the psmm-own case with an allow-list; every user module was
+    # still exposed.
+    #
+    # The honest answer is what psmm actually did, not what the config says:
+    # only a module psmm IMPORTED in this session is psmm's to remove. That
+    # also protects a module you loaded by hand with ^l.
+    $unloadable = @{}
+    foreach ($n in (Get-PSMMImportedName)) { if ($n) { $unloadable[$n] = $true } }
+    # ...minus anything a disabled file names: "parsed, shown, never actioned"
+    # cuts both ways, so disabling a file leaves your session exactly as it is.
+    foreach ($e in (Get-PSMMAllEntries)) {
+        if ($e.Name -and -not $e.FileEnabled) { $null = $unloadable.Remove($e.Name) }
+    }
     # cloud-only check up front, one confirm for the whole batch (per-module
     # prompts would be noise): cancelling skips the apply entirely
     foreach ($e in $activeEntries) {
-        if ($e.Mode -eq 'Load' -and -not (Get-Module -Name $e.Name)) {
+        if ($shouldLoad.ContainsKey($e.Name) -and -not (Get-Module -Name $e.Name)) {
             if (-not (Confirm-PSMMCloudHydration -ModuleName $e.Name)) {
                 Write-PSMMLine "[$script:PSMM_ColMute]apply cancelled (cloud-only files not downloaded)[/]"
                 $null = Wait-PSMMKey
@@ -129,18 +155,17 @@ function script:Invoke-PSMMApply {
     }
     $did = 0
     foreach ($e in $activeEntries) {
-        if ($e.Mode -eq 'Load' -and -not (Get-Module -Name $e.Name)) {
+        if ($shouldLoad.ContainsKey($e.Name) -and -not (Get-Module -Name $e.Name)) {
             Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $e.Name)...[/]"
             try { Import-PSMMModuleTimed -Entry $e; $did++ }
             catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
         }
     }
     foreach ($m in @(Get-Module)) {
-        if (-not ($managed.ContainsKey($m.Name) -and -not $active.ContainsKey($m.Name))) { continue }
-        # $managed includes entries from DISABLED files, so disabling the file
-        # that holds psmm's seeded UI-dependency entry (or your own psmm entry)
-        # used to make apply unload psmm's engine - or psmm itself - out from
-        # under the running manager. Verified before fixing (gh#16).
+        if (-not ($unloadable.ContainsKey($m.Name) -and -not $active.ContainsKey($m.Name))) { continue }
+        # belt and braces: psmm never unloads itself or its own UI engine, which
+        # would pull the rug out from under the screen you are looking at
+        # (gh#16). The $unloadable set above already excludes them in practice.
         if (Test-PSMMOwnModule -Name $m.Name) {
             Write-PSMMLine "[$script:PSMM_ColMute]keeping $(ConvertTo-PSMMSafe $m.Name) - psmm's own, never unloaded[/]"
             continue

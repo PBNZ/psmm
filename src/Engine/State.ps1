@@ -168,8 +168,17 @@ function Get-PSMMDuplicateVersion {
 
 # Installed modules NOT named in any config file (unmanaged-module feature).
 # Returns one object per module name, newest version, with scope.
+#
 # psmm's own modules are excluded: offering the user psmm's UI engine as
-# something to "adopt into a config" is noise, not a feature (gh#16).
+# something to "adopt into a config" is noise, not a feature (gh#16). So are
+# the platform's own modules - you cannot install pwsh's copy of
+# Microsoft.PowerShell.Utility from the gallery, so it is not adoptable
+# either, and calling it "AllUsers" only made it look like it was (gh#27).
+#
+# This is the ONLY implementation. The background scan used to carry a second
+# copy with its own inlined scope classifier, which meant the tested code was
+# not the running code; the job now dot-sources this function instead
+# (see Start-PSMMUnmanagedScan / Get-PSMMJobPrelude).
 function Get-PSMMUnmanagedModule {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string[]]$ManagedNames)
@@ -180,6 +189,7 @@ function Get-PSMMUnmanagedModule {
         Where-Object { -not $managed.Contains($_.Name) } |
         ForEach-Object {
             $newest = @($_.Group | Sort-Object Version -Descending)[0]
+            if (Test-PSMMPlatformModulePath -Path "$($newest.ModuleBase)") { return }
             [pscustomobject]@{
                 Name        = $_.Name
                 Version     = $newest.Version

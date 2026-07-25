@@ -262,7 +262,8 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             $tasks = @([pscustomobject]@{
                 Id = 1; Label = 'update check (5 modules)'; Kind = 'updatecheck'; Data = $null
                 Job = $null; StartedAt = [datetime]'2026-07-04 10:00:00'
-                Output = @('a', 'b'); Done = $true; Failed = $false; Seen = $true
+                Output = @('a', 'b'); LineCount = 2; Dropped = 0
+                Done = $true; Failed = $false; Cancelled = $false; Seen = $true
             })
             Build-PSMMTasksView -State $st -Tasks $tasks
         }

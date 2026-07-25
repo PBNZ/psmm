@@ -28,6 +28,33 @@ function Get-PSMMScopeForPath {
     if ($Path.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) { 'CurrentUser' } else { 'AllUsers' }
 }
 
+# Is this module base one of the PLATFORM's own module directories?
+# $PSHOME/Modules on every platform, plus Windows PowerShell's System32 store.
+#
+# These are not adoptable into a psmm config — you cannot install the
+# Microsoft.PowerShell.* modules pwsh ships with from the gallery — so the
+# unmanaged-module scan must not offer them (gh#27). Roots are read from
+# $PSHOME / $env:SystemRoot at call time, never hard-coded.
+#
+# Deliberately NOT folded into Get-PSMMScopeForPath as a third scope value:
+# that function feeds install-scope and elevation decisions, and "shipped with
+# the platform" is not a scope anything can be installed to.
+function Test-PSMMPlatformModulePath {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $roots = [System.Collections.Generic.List[string]]::new()
+    if ($PSHOME) { $roots.Add((Join-Path $PSHOME 'Modules')) }
+    if ($env:SystemRoot) {
+        $roots.Add((Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules'))
+        $roots.Add((Join-Path $env:SystemRoot 'SysWOW64\WindowsPowerShell\v1.0\Modules'))
+    }
+    foreach ($r in $roots) {
+        if ($Path.StartsWith($r, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    $false
+}
+
 # The prerelease label of one module copy ('' when it is a stable release).
 # It lives in the manifest's PSData, never in the [version] - 0.1.0-beta8 and
 # 0.1.0 share the same [version] 0.1.0 (gh#6).
@@ -49,6 +76,37 @@ function Get-PSMMVersionDisplay {
     if ($null -eq $Version -or "$Version" -eq '') { return '' }
     if ([string]::IsNullOrWhiteSpace($Prerelease)) { return "$Version" }
     "$Version-$($Prerelease.TrimStart('-'))"
+}
+
+# "2.5" and "2.5.0" name the same release; [version] disagrees, because the
+# segments you leave out are -1 rather than 0. Pad to four parts so matching a
+# pin is never defeated by how many segments the user happened to type.
+function Get-PSMMNormalVersion {
+    [CmdletBinding()]
+    param($Version)
+    try {
+        $v = [version]"$Version"
+        '{0}.{1}.{2}.{3}' -f $v.Major, [Math]::Max(0, $v.Minor), [Math]::Max(0, $v.Build), [Math]::Max(0, $v.Revision)
+    } catch { "$Version" }
+}
+
+# Is this EXACT version pin (base version + prerelease label) already on disk?
+# A RANGE pin always answers $false — "newest inside the range" is a moving
+# target, so an update against it is genuinely meaningful (gh#20, gh#23).
+function Test-PSMMVersionInstalled {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Version
+    )
+    if ($Version -notmatch '^(?<base>\d+(\.\d+){1,3})(-(?<label>[A-Za-z0-9][A-Za-z0-9.-]*))?$') { return $false }
+    $want  = Get-PSMMNormalVersion -Version $Matches['base']
+    $label = "$($Matches['label'])"
+    foreach ($m in @(Get-Module -ListAvailable -Name $Name -ErrorAction SilentlyContinue)) {
+        if ((Get-PSMMNormalVersion -Version "$($m.Version)") -ne $want) { continue }
+        if ((Get-PSMMPrereleaseLabel -ModuleInfo $m) -eq $label) { return $true }
+    }
+    $false
 }
 
 # Is the newest installed copy of a module a prerelease?
@@ -77,6 +135,13 @@ function Install-PSMMModule {
         [switch]$Prerelease,
         [ValidateSet('CurrentUser', 'AllUsers')][string]$Scope = 'CurrentUser'
     )
+    # gh#20, second line of defence. The policy function already degrades
+    # Latest to IfMissing for an exact pin, so nothing psmm schedules asks for
+    # this any more — but Install-PSMMModule is callable directly (the module
+    # menu's u), and "update to the version you already have" must never mean
+    # "download it again". The pin IS the answer; if it is on disk, we are done.
+    if ($Update -and $Version -and (Test-PSMMVersionInstalled -Name $Name -Version $Version)) { return }
+
     if (Get-Command Install-PSResource -ErrorAction SilentlyContinue) {
         # a pin that names a prerelease implies -Prerelease, whatever the
         # entry's policy says: you cannot install 1.2.3-beta4 without it
@@ -126,30 +191,23 @@ function Uninstall-PSMMModuleVersion {
     }
 }
 
-# One entry's startup action, honouring the orthogonal Mode x Install matrix.
-# Mode decides load-vs-not; Install decides disk/gallery policy.
-function Invoke-PSMMEntryAction {
+# The modules psmm has imported IN THIS SESSION — the honest answer to "did
+# psmm put this here?", which is what `files > apply` needs before it unloads
+# anything (gh#22). Config membership is not that answer: a module can be in
+# a config and have been imported by hand, or be in a DISABLED file, which
+# `docs/config-schema.md` promises is never actioned in either direction.
+function Get-PSMMImportedName {
+    [CmdletBinding()] param()
+    if ($script:PSMM_Imported) { @($script:PSMM_Imported) } else { @() }
+}
+
+function Add-PSMMImportedName {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $Entry)
-    $name = $Entry.Name
-    if ($Entry.Mode -eq 'Ignore') { return 'ignored' }
-    $installed = [bool](Get-Module -ListAvailable -Name $name)
-    $note = ''
-    $pre = [bool]$Entry.AllowPrerelease
-    switch ($Entry.Install) {
-        'CheckOnly' { if (-not $installed) { return 'not installed (check-only)' }; $note = 'present' }
-        'IfMissing' {
-            if (-not $installed) { Install-PSMMModule -Name $name -Version $Entry.Version -Prerelease:$pre; $note = 'installed' }
-            else { $note = 'present' }
-        }
-        'Latest' { Install-PSMMModule -Name $name -Update -Version $Entry.Version -Prerelease:$pre; $note = 'latest' }
+    param([Parameter(Mandatory)][string]$Name)
+    if (-not $script:PSMM_Imported) {
+        $script:PSMM_Imported = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     }
-    if ($Entry.Mode -eq 'InstallOnly') { return "$note (not loaded)" }
-    if (-not (Get-Module -Name $name)) {
-        Import-PSMMModuleTimed -Entry $Entry
-        return "$note + loaded"
-    }
-    return "$note + already loaded"
+    $null = $script:PSMM_Imported.Add($Name)
 }
 
 # Import one entry's module, honouring an exact pin and recording how long the
@@ -181,6 +239,9 @@ function Import-PSMMModuleTimed {
         } else {
             Import-Module -Name $Entry.Name -Global -ErrorAction Stop
         }
+        # record it only on success: apply may unload what psmm imported, and
+        # a failed import must never make a user's own module a candidate
+        Add-PSMMImportedName -Name $Entry.Name
     } finally {
         $sw.Stop()
         $Entry.ImportMs = [int]$sw.Elapsed.TotalMilliseconds

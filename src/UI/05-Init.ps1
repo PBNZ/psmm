@@ -147,21 +147,18 @@ function script:Start-PSMMUnmanagedScan {
     # psmm's own modules are excluded like managed ones: they are infrastructure,
     # not something to adopt into a config (gh#16)
     $managed = @(@((Get-PSMMAllEntries).Name | Where-Object { $_ }) + @(Get-PSMMOwnModuleName))
-    $null = Start-PSMMTask -Label 'scan: unmanaged modules' -Kind 'unmanagedscan' -ArgumentList (, $managed) -ScriptBlock {
-        param($managedNames)
-        $managedSet = [System.Collections.Generic.HashSet[string]]::new(
-            [string[]]$managedNames, [System.StringComparer]::OrdinalIgnoreCase)
-        Get-Module -ListAvailable -ErrorAction SilentlyContinue |
-            Group-Object Name |
-            Where-Object { -not $managedSet.Contains($_.Name) } |
-            ForEach-Object {
-                $newest = @($_.Group | Sort-Object Version -Descending)[0]
-                [pscustomobject]@{
-                    Name        = $_.Name
-                    Version     = $newest.Version
-                    Scope       = if ($newest.ModuleBase.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) { 'CurrentUser' } else { 'AllUsers' }
-                    Description = $newest.Description
-                }
-            }
+    # The job runs the ENGINE's Get-PSMMUnmanagedModule, dot-sourced in as
+    # source text. It used to re-implement the scan with its own inlined scope
+    # classifier, so the tested code was not the running code (gh#27).
+    $payload = [pscustomobject]@{
+        Managed = $managed
+        Prelude = (Get-PSMMJobPrelude -FunctionName @(
+                'Get-PSMMUIDependencyName', 'Get-PSMMOwnModuleName', 'Get-PSMMScopeForPath',
+                'Test-PSMMPlatformModulePath', 'Get-PSMMUnmanagedModule'))
+    }
+    $null = Start-PSMMTask -Label 'scan: unmanaged modules' -Kind 'unmanagedscan' -ArgumentList (, $payload) -ScriptBlock {
+        param($payload)
+        . ([scriptblock]::Create($payload.Prelude))
+        Get-PSMMUnmanagedModule -ManagedNames $payload.Managed
     }
 }

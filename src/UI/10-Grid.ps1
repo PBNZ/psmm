@@ -73,7 +73,10 @@ function script:Build-PSMMGrid {
         $verPlain = if ($e.LoadedVersion) { Get-PSMMVersionText -Version $e.LoadedVersion -Prerelease $e.LoadedPrerelease }
                     else { Get-PSMMVersionText -Version $e.InstalledVersion -Prerelease $e.InstalledPrerelease }
         if (-not $verPlain) { $verPlain = '-' }
-        $pin = if ($e.PinnedExact) { " [$script:PSMM_ColDim]pin[/]" } else { '' }
+        # a RANGE pin is a pin too - it used to render nothing, so a range-pinned
+        # row showed an update arrow and no indication of why (gh#23)
+        $pinTxt = if ($e.PinnedExact) { 'pin' } elseif ($e.Version) { "pin$([char]0x2248)" } else { '' }
+        $pin = if ($pinTxt) { " [$script:PSMM_ColDim]$pinTxt[/]" } else { '' }
         # '⇡', not '^': the design system reserves '^' for the ctrl legend
         $ver = $verBase
         if ($e.UpdateAvailable) {
@@ -81,7 +84,7 @@ function script:Build-PSMMGrid {
             $ver = if ($isCur -and $e.LatestVersion) { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1) $(ConvertTo-PSMMSafe $latestTxt)[/]" }
                    else { "$verBase [$script:PSMM_ColWarn]$([char]0x21E1)[/]" }
             if ($e.LatestVersion) {
-                $wide = $verPlain.Length + 3 + $latestTxt.Length + $(if ($pin) { 4 } else { 0 })
+                $wide = $verPlain.Length + 3 + $latestTxt.Length + $(if ($pinTxt) { $pinTxt.Length + 1 } else { 0 })
                 if ($wide -gt $verGhost) { $verGhost = $wide }
             }
         }
@@ -205,7 +208,12 @@ function script:Build-PSMMGrid {
     $items.Add([Spectre.Console.Markup]::new($head))
     # context sentence for the cursor row (§5): the verbose explanation the
     # plain-word columns don't have to carry
-    if ($n) { $items.Add([Spectre.Console.Markup]::new((Get-PSMMContextMarkup -Entry $entries[$ui.View[$ui.Cursor]]))) }
+    if ($n) {
+        $cur = $entries[$ui.View[$ui.Cursor]]
+        $items.Add([Spectre.Console.Markup]::new((Get-PSMMContextMarkup -Entry $cur)))
+        $notice = Get-PSMMNoticeMarkup -Entry $cur
+        if ($notice) { $items.Add([Spectre.Console.Markup]::new($notice)) }
+    }
     foreach ($hr in $hintRows) { $items.Add([Spectre.Console.Markup]::new($hr)) }
 
     # deferred-startup job status (from Invoke-PSMMStartup)
@@ -255,27 +263,11 @@ function script:Get-PSMMContextMarkup {
         } else { '' }
         return "[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Entry.Name)[/] [$script:PSMM_ColMute]$([char]0x2014) psmm's own $([char]0x00B7) $what $([char]0x00B7) v$(ConvertTo-PSMMSafe $ver) on disk$(ConvertTo-PSMMSafe $upd)[/]"
     }
+    # The startup clause comes straight from the policy function - the grid
+    # does not get its own opinion about what a cell means (gh#29). Notices
+    # are the cross-field lint the '!' column never had (plan §4, cells 7-9).
     $startup = if ($isUnmanaged) { 'installed but not in any config file' }
-               else {
-                   switch ("$($Entry.Mode)") {
-                       'Load' {
-                           switch ("$($Entry.Install)") {
-                               'Latest'    { 'imports at shell start, updating to latest first' }
-                               'CheckOnly' { 'imports at shell start, never auto-installed' }
-                               default     { 'imports at shell start, installing first when missing' }
-                           }
-                       }
-                       'InstallOnly' {
-                           switch ("$($Entry.Install)") {
-                               'Latest'    { 'background-updates to latest at shell start' }
-                               'CheckOnly' { 'checked at shell start, never installed' }
-                               default     { 'background-installs at shell start when missing' }
-                           }
-                       }
-                       'Ignore' { 'off - nothing happens at shell start' }
-                       default  { 'no startup action' }
-                   }
-               }
+               else { (Get-PSMMEntryPlan -Entry $Entry).Reason }
     $session = if ($Entry.Loaded) { "imported this session (v$(Get-PSMMVersionText -Version $Entry.LoadedVersion -Prerelease $Entry.LoadedPrerelease))" }
                else { 'not imported this session' }
     $disk = if ($Entry.Installed) {
@@ -290,17 +282,30 @@ function script:Get-PSMMContextMarkup {
     "[$script:PSMM_ColAccent]$(ConvertTo-PSMMSafe $Entry.Name)[/] [$script:PSMM_ColMute]$([char]0x2014) $startup $([char]0x00B7) $session $([char]0x00B7) $(ConvertTo-PSMMSafe $disk)[/]"
 }
 
+# Cross-field lint for the cursor row ('' when the entry is coherent). Its own
+# line rather than a tail on the context sentence: a warning that has to be
+# read past the end of a muted sentence is one nobody reads (plan §4, V8).
+function script:Get-PSMMNoticeMarkup {
+    param([Parameter(Mandatory)] $Entry)
+    if ($Entry.PSObject.Properties['Unmanaged']) { return '' }
+    $notices = @((Get-PSMMEntryPlan -Entry $Entry).Notices)
+    if (-not $notices.Count) { return '' }
+    $sep = " $([char]0x00B7) "
+    "[$script:PSMM_ColWarn]$([char]0x26A0) $(ConvertTo-PSMMSafe ($notices -join $sep))[/]"
+}
+
 # Markup line for the deferred startup job ('' when idle/no job).
 function script:Get-PSMMStartupJobMarkup {
     $j = Get-PSMMStartupJob
     if (-not $j) { return '' }
     $total = Get-PSMMStartupJobTotal
+    # cached, incrementally harvested - not two more Receive-Job -Keep reads of
+    # the whole buffer on every 500 ms frame (gh#24)
+    $out = @(Get-PSMMStartupJobOutput)
     if ($j.State -in 'NotStarted', 'Running') {
-        $done = 0; try { $done = @(Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue).Count } catch { }
-        return "[$script:PSMM_ColMute]background startup: $done/$total module task(s) done...[/]"
+        return "[$script:PSMM_ColMute]background startup: $($out.Count)/$total module task(s) done...[/]"
     }
     if ($j.State -eq 'Completed') {
-        $out = @(); try { $out = @(Receive-Job -Job $j -Keep -ErrorAction SilentlyContinue) } catch { }
         $fails = @($out | Where-Object { "$_" -like 'FAILED *' } | ForEach-Object { if ("$_" -match '^FAILED\s+([^:]+)') { $Matches[1] } })
         if ($fails.Count) { return "[$script:PSMM_ColWarn]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (i on the row retries)[/]" }
         return "[$script:PSMM_ColOk]background startup: all $total module task(s) ok[/]"
@@ -390,35 +395,28 @@ function script:Start-PSMMInstallTask {
                      else { "[$script:PSMM_ColWarn]nothing to install - every targeted module is already installed (u updates)[/]" }
         return
     }
-    $mods = @(foreach ($t in $targets) {
-        $e = $ui.Entries[$t]
-        [pscustomobject]@{ Name = $e.Name; Update = [bool]$Update; Version = $e.Version; Prerelease = [bool]$e.AllowPrerelease }
-    })
-    $names = @($mods.Name)
-    $null = Start-PSMMTask -Label "${verb}: $($names -join ', ')" -Kind 'install' -Data $names -ArgumentList (, $mods) -ScriptBlock {
-        param($mods)
-        foreach ($m in $mods) {
-            try {
-                $psrg = [bool](Get-Command Install-PSResource -ErrorAction SilentlyContinue)
-                if ($psrg) {
-                    # prerelease label of the newest installed copy: a
-                    # label-only bump needs Install -Prerelease -Reinstall,
-                    # Update-PSResource cannot see it (same logic as
-                    # Install-PSMMModule; module functions are out of reach
-                    # in this thread job)
-                    $pre = $null
-                    $newest = @(Get-Module -ListAvailable -Name $m.Name -ErrorAction SilentlyContinue | Sort-Object Version -Descending) | Select-Object -First 1
-                    if ($newest) { try { $pre = $newest.PrivateData.PSData.Prerelease } catch { } }
-                    $wantPre = [bool]$m.Prerelease   # the entry's opt-in (gh#6)
-                    if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -Prerelease:$wantPre -TrustRepository -Reinstall:$m.Update -ErrorAction Stop }
-                    elseif ($m.Update -and $newest -and ($wantPre -or $pre)) { Install-PSResource -Name $m.Name -Prerelease -Reinstall -Scope CurrentUser -TrustRepository -ErrorAction Stop }
-                    elseif ($m.Update -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue) -and $newest) { Update-PSResource -Name $m.Name -Prerelease:$wantPre -ErrorAction Stop }
-                    else { Install-PSResource -Name $m.Name -Scope CurrentUser -Prerelease:$wantPre -TrustRepository -ErrorAction Stop }
-                } else {
-                    Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -AllowPrerelease:([bool]$m.Prerelease) -ErrorAction Stop
-                }
-                "ok $($m.Name)"
-            } catch { "FAILED $($m.Name): $($_.Exception.Message)" }
+    # Explicit intent, same policy function as startup (gh#29). This job body
+    # used to carry a fourth hand-written copy of the install logic; it now
+    # dot-sources the real engine functions and executes the plan.
+    $intent = if ($Update) { 'Update' } else { 'Install' }
+    $plans = @(foreach ($t in $targets) { Get-PSMMEntryPlan -Entry $ui.Entries[$t] -Intent $intent })
+    $names = @($plans.Name)
+    # an exact pin has nothing to update TO - say so rather than silently
+    # reinstalling the version already on disk (gh#20)
+    if ($Update) {
+        $pinned = @($plans | Where-Object { $_.PinnedExact })
+        if ($pinned.Count -eq $plans.Count) {
+            $ui.Status = "[$script:PSMM_ColWarn]nothing to update - $($names -join ', ') $(if ($names.Count -eq 1) { 'is' } else { 'are' }) pinned to an exact version (v changes the pin)[/]"
+            return
+        }
+    }
+    $payload = [pscustomobject]@{ Plans = $plans; Prelude = (Get-PSMMJobPrelude) }
+    $null = Start-PSMMTask -Label "${verb}: $($names -join ', ')" -Kind 'install' -Data $names -ArgumentList (, $payload) -ScriptBlock {
+        param($payload)
+        . ([scriptblock]::Create($payload.Prelude))
+        foreach ($p in $payload.Plans) {
+            try { $null = Invoke-PSMMPlanAction -Plan $p; "ok $($p.Name)" }
+            catch { "FAILED $($p.Name): $($_.Exception.Message)" }
         }
     }
     $ui.Sel.Clear()
@@ -429,10 +427,21 @@ function script:Start-PSMMInstallTask {
 # never blocks the grid and never runs automatically.
 function script:Start-PSMMUpdateCheckTask {
     $ui = $script:PSMM_UI
-    $installed = @($ui.Entries | Where-Object { $_.Installed -and -not $_.PSObject.Properties['Unmanaged'] })
-    if (-not $installed.Count) { $ui.Status = "[$script:PSMM_ColWarn]no installed modules to check[/]"; return }
+    # WHICH rows are eligible is the policy function's call (gh#29): an exact
+    # pin is never flagged, and Mode=Ignore does no gallery I/O of any kind -
+    # so neither is queried here either, which they both used to be.
+    $installed = @($ui.Entries | Where-Object {
+        $_.Installed -and -not $_.PSObject.Properties['Unmanaged'] -and (Get-PSMMEntryPlan -Entry $_).Check
+    })
+    if (-not $installed.Count) { $ui.Status = "[$script:PSMM_ColWarn]no installed modules to check (exact pins and ignored modules are never checked)[/]"; return }
     $payload = @($installed | ForEach-Object {
-        [pscustomobject]@{ Name = $_.Name; Installed = "$($_.InstalledVersion)"; Prerelease = [bool]$_.AllowPrerelease }
+        $p = Get-PSMMEntryPlan -Entry $_
+        [pscustomobject]@{
+            Name = $_.Name; Installed = "$($_.InstalledVersion)"; Prerelease = [bool]$_.AllowPrerelease
+            # a range pin narrows "latest" to "newest inside the range", so the
+            # flag it raises is one that pressing u can actually clear (gh#23)
+            Range = if ($p.PinnedRange) { $p.Version } else { $null }
+        }
     })
     $null = Start-PSMMTask -Label "update check ($($payload.Count) modules)" -Kind 'updatecheck' -ArgumentList (, $payload) -ScriptBlock {
         param($mods)
@@ -440,7 +449,12 @@ function script:Start-PSMMUpdateCheckTask {
         foreach ($m in $mods) {
             try {
                 $pre = [bool]$m.Prerelease
-                $hits = if ($psrg) { @(Find-PSResource -Name $m.Name -Prerelease:$pre -ErrorAction Stop) }
+                # Find-Module has no range parameter: on a PowerShellGet-only
+                # machine a range-pinned module is left unchecked rather than
+                # measured against the wrong number
+                if ($m.Range -and -not $psrg) { continue }
+                $hits = if ($m.Range) { @(Find-PSResource -Name $m.Name -Version $m.Range -Prerelease:$pre -ErrorAction Stop) }
+                        elseif ($psrg) { @(Find-PSResource -Name $m.Name -Prerelease:$pre -ErrorAction Stop) }
                         else { @(Find-Module -Name $m.Name -AllowPrerelease:$pre -ErrorAction Stop) }
                 # newest by base version; the label is reported alongside so the
                 # UI can order 0.1.0-beta2 / 0.1.0-beta8 / 0.1.0 properly
