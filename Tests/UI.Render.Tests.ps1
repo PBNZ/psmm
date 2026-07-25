@@ -572,6 +572,84 @@ Describe 'psmm''s own modules read as infrastructure' -Tag UI -Skip:(-not $Spect
     }
 }
 
+Describe 'files > apply only unloads what psmm loaded (gh#22)' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    BeforeEach {
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path (Join-Path $root 'main')
+        $global:PSMM_MainConfigPath    = Join-Path $root 'main\psmm-config.json'
+        $global:PSMM_ProfileConfigPath = Join-Path $root 'profile\psmm-config.json'
+        $global:PSMM_JsonPath          = @(Join-Path $root 'legacy\*.json')
+        # a DISABLED file holding an ordinary user module - the exact shape of
+        # the failure gh#16's psmm-own allow-list never covered
+        @{
+            Enabled = $false
+            Modules = @(@{ Name = 'UserMod'; Install = 'IfMissing'; Mode = 'Load' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+    }
+
+    AfterEach {
+        Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'leaves a loaded user module alone when its config file is disabled' {
+        InModuleScope psmm {
+            # psmm imported it earlier, while the file was still enabled
+            Add-PSMMImportedName -Name 'UserMod'
+            Mock Get-Module { @([pscustomobject]@{ Name = 'UserMod' }) } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            Should -Invoke Remove-Module -Times 0 -Exactly -Because 'a disabled file is parsed and shown, never actioned - in either direction'
+        }
+    }
+
+    It 'does unload a module psmm loaded that an ENABLED config no longer loads' {
+        # the feature still works: flip the file back on, switch the entry to
+        # Ignore, and apply removes what psmm put there
+        @{
+            Modules = @(@{ Name = 'UserMod'; Install = 'IfMissing'; Mode = 'Ignore' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+        InModuleScope psmm {
+            Add-PSMMImportedName -Name 'UserMod'
+            Mock Get-Module { @([pscustomobject]@{ Name = 'UserMod' }) } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            Should -Invoke Remove-Module -Times 1 -Exactly -ParameterFilter { $Name -eq 'UserMod' }
+        }
+    }
+
+    It 'never unloads a module psmm did not import, however the config changes' {
+        @{
+            Modules = @(@{ Name = 'HandLoaded'; Install = 'IfMissing'; Mode = 'Ignore' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+        InModuleScope psmm {
+            # deliberately NOT registered as psmm-imported: the user ran ^l
+            Mock Get-Module { @([pscustomobject]@{ Name = 'HandLoaded' }) } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            Should -Invoke Remove-Module -Times 0 -Exactly
+        }
+    }
+}
+
 Describe 'Destructive actions are gated' -Tag UI -Skip:(-not $SpectreAvailable) {
 
     It 'the typed confirmation accepts only the phrase - not y, not enter, not esc' {

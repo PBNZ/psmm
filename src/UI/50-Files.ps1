@@ -117,10 +117,8 @@ function script:Invoke-PSMMApply {
     # re-reading of Mode (gh#29) - so apply and shell start can never disagree.
     $activeEntries = @(Get-PSMMEntry)
     $shouldLoad = @{}
-    $active = @{}
     foreach ($e in $activeEntries) {
         if (-not $e.Name) { continue }
-        $active[$e.Name] = $e
         if ((Get-PSMMEntryPlan -Entry $e).Import) { $shouldLoad[$e.Name] = $e }
     }
 
@@ -161,8 +159,12 @@ function script:Invoke-PSMMApply {
             catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
         }
     }
+    # Unload what psmm imported and the config no longer asks it to import.
+    # Keyed on $shouldLoad, not "named by some config": switching an entry from
+    # Load to Ignore is a change apply should apply, and used to do nothing
+    # because Get-PSMMEntry never filtered on Mode (the gh#22 asymmetry).
     foreach ($m in @(Get-Module)) {
-        if (-not ($unloadable.ContainsKey($m.Name) -and -not $active.ContainsKey($m.Name))) { continue }
+        if (-not ($unloadable.ContainsKey($m.Name) -and -not $shouldLoad.ContainsKey($m.Name))) { continue }
         # belt and braces: psmm never unloads itself or its own UI engine, which
         # would pull the rug out from under the screen you are looking at
         # (gh#16). The $unloadable set above already excludes them in practice.

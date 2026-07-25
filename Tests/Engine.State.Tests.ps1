@@ -98,6 +98,70 @@ Describe 'Get-PSMMUnmanagedModule' -Tag Engine {
         @($un).Name | Should -Be @('Rogue')
         $un[0].Version | Should -Be ([version]'3.1')
     }
+
+    It 'never offers the platform''s own modules for adoption (gh#27)' {
+        # $PSHOME/Modules and the System32 store are not installable from the
+        # gallery, so calling them "AllUsers" only made them look adoptable.
+        $un = InModuleScope psmm {
+            Mock Get-Module {
+                @(
+                    [pscustomobject]@{ Name = 'Shipped'; Version = [version]'7.0'; ModuleBase = (Join-Path $PSHOME 'Modules\Shipped\7.0'); Description = '' }
+                    [pscustomobject]@{ Name = 'Yours'; Version = [version]'1.0'; ModuleBase = (Join-Path $HOME 'Documents\PowerShell\Modules\Yours\1.0'); Description = '' }
+                )
+            } -ParameterFilter { $ListAvailable }
+            Get-PSMMUnmanagedModule -ManagedNames @('NothingIsManaged')
+        }
+        @($un).Name | Should -Be @('Yours')
+    }
+
+    It 'is the ONE implementation - the background scan dot-sources it (gh#27)' {
+        # The scan used to be written twice, with the job carrying its own
+        # inlined scope classifier, so the tested code was not the running
+        # code. The job now receives these definitions as source text.
+        $probe = InModuleScope psmm {
+            $prelude = Get-PSMMJobPrelude -FunctionName @(
+                'Get-PSMMUIDependencyName', 'Get-PSMMOwnModuleName', 'Get-PSMMScopeForPath',
+                'Test-PSMMPlatformModulePath', 'Get-PSMMUnmanagedModule')
+            $job = Start-ThreadJob -Name 'psmm-task-scan-probe' -ScriptBlock {
+                . ([scriptblock]::Create($using:prelude))
+                "resolved=$([bool](Get-Command Get-PSMMUnmanagedModule -ErrorAction SilentlyContinue))"
+                # and it runs: Pester is installed here and is not managed
+                "found=$([bool](@(Get-PSMMUnmanagedModule -ManagedNames @('Nothing')) | Where-Object Name -eq 'Pester'))"
+            }
+            $o = @($job | Wait-Job | Receive-Job)
+            Remove-Job $job -Force
+            $o -join ' '
+        }
+        $probe | Should -Match 'resolved=True'
+        $probe | Should -Match 'found=True'
+    }
+}
+
+Describe 'Test-PSMMPlatformModulePath' -Tag Engine {
+
+    It 'recognises $PSHOME/Modules and leaves ordinary AllUsers paths alone' {
+        InModuleScope psmm {
+            Test-PSMMPlatformModulePath -Path (Join-Path $PSHOME 'Modules\Foo\1.0') | Should -BeTrue
+            Test-PSMMPlatformModulePath -Path 'C:\Program Files\PowerShell\Modules\Foo\1.0' | Should -BeFalse
+            Test-PSMMPlatformModulePath -Path (Join-Path $HOME 'Documents\PowerShell\Modules\Foo\1.0') | Should -BeFalse
+            Test-PSMMPlatformModulePath -Path '' | Should -BeFalse
+        }
+    }
+
+    It 'recognises the Windows PowerShell System32 store when there is one' -Skip:(-not $env:SystemRoot) {
+        InModuleScope psmm {
+            $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules\Foo'
+            Test-PSMMPlatformModulePath -Path $p | Should -BeTrue
+        }
+    }
+
+    It 'does not change the install SCOPE classifier (they answer different questions)' {
+        InModuleScope psmm {
+            # "shipped with the platform" is not a scope anything installs to,
+            # so Get-PSMMScopeForPath keeps its two honest answers
+            Get-PSMMScopeForPath -Path (Join-Path $PSHOME 'Modules\Foo\1.0') | Should -Be 'AllUsers'
+        }
+    }
 }
 
 Describe 'Get-PSMMInstallEngine' -Tag Engine {
