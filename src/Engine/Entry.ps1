@@ -81,6 +81,7 @@ function Resolve-PSMMEntry {
         InstalledPrerelease = ''     # label of the newest installed copy ('' = stable)
         InstalledVersions  = @()     # every installed version (duplicate-cleanup feature)
         InstallScope       = $null   # CurrentUser | AllUsers | mixed | $null (unknown)
+        IsSystem           = $false  # ships with PowerShell ($PSHOME / System32) - see Test-PSMMPlatformModulePath
         Loaded             = $false
         LoadedVersion      = $null
         LoadedPrerelease   = ''

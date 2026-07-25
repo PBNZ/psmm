@@ -19,13 +19,45 @@ function Test-PSMMElevated {
     [System.Environment]::UserName -eq 'root'
 }
 
-# Classify a module base path into an install scope.
-# Heuristic: anything under $HOME is CurrentUser, everything else AllUsers —
-# holds for the standard PSModulePath layout on Windows, Linux and macOS.
+# The roots that count as CurrentUser.
+#
+# $HOME alone is NOT enough, and getting this wrong is expensive. On Windows
+# the CurrentUser module location is derived from the **Documents known
+# folder**, which can live on another drive entirely — a redirected or
+# relocated Documents puts every one of your own modules outside $HOME. On
+# such a machine a bare $HOME prefix test reports them all as AllUsers, so the
+# grid marks them read-only and version cleanup refuses to touch them
+# ("session is not elevated") — the feature silently stops working for exactly
+# the modules it exists to clean up. Verified on a real machine where
+# $HOME = C:\Users\<user> and Documents = E:\Users\<user>\Documents.
+#
+# Cached: this runs once per installed version during a full scan, and the
+# Documents known folder cannot move inside a live session.
+function Get-PSMMUserModuleRoot {
+    [CmdletBinding()] param()
+    if ($null -ne $script:PSMM_UserRoots) { return $script:PSMM_UserRoots }
+    $roots = [System.Collections.Generic.List[string]]::new()
+    if ($HOME) { $roots.Add("$HOME") }
+    # Documents-derived default (Windows). Unix keeps its user modules under
+    # ~/.local/share/powershell/Modules, which $HOME already covers.
+    $docs = $null
+    try { $docs = Get-PSMMUserDefaultModulePath } catch { }
+    if ($docs) { $roots.Add("$docs") }
+    $script:PSMM_UserRoots = @($roots | Where-Object { $_ } | Select-Object -Unique)
+    $script:PSMM_UserRoots
+}
+
+# Classify a module base path into an install scope: the scope you would have
+# to install to in order to replace it. Two values only — 'System' is NOT one
+# of them, because "shipped with PowerShell" is not somewhere anything can be
+# installed; see Test-PSMMPlatformModulePath for that question.
 function Get-PSMMScopeForPath {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
-    if ($Path.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) { 'CurrentUser' } else { 'AllUsers' }
+    foreach ($root in (Get-PSMMUserModuleRoot)) {
+        if ($Path.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) { return 'CurrentUser' }
+    }
+    'AllUsers'
 }
 
 # Is this module base one of the PLATFORM's own module directories?
@@ -191,25 +223,6 @@ function Uninstall-PSMMModuleVersion {
     }
 }
 
-# The modules psmm has imported IN THIS SESSION — the honest answer to "did
-# psmm put this here?", which is what `files > apply` needs before it unloads
-# anything (gh#22). Config membership is not that answer: a module can be in
-# a config and have been imported by hand, or be in a DISABLED file, which
-# `docs/config-schema.md` promises is never actioned in either direction.
-function Get-PSMMImportedName {
-    [CmdletBinding()] param()
-    if ($script:PSMM_Imported) { @($script:PSMM_Imported) } else { @() }
-}
-
-function Add-PSMMImportedName {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Name)
-    if (-not $script:PSMM_Imported) {
-        $script:PSMM_Imported = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    }
-    $null = $script:PSMM_Imported.Add($Name)
-}
-
 # Import one entry's module, honouring an exact pin and recording how long the
 # import took (ImportMs — surfaced in the startup report and the UI, because
 # "which module makes my shell slow?" is the question everyone asks).
@@ -239,9 +252,6 @@ function Import-PSMMModuleTimed {
         } else {
             Import-Module -Name $Entry.Name -Global -ErrorAction Stop
         }
-        # record it only on success: apply may unload what psmm imported, and
-        # a failed import must never make a user's own module a candidate
-        Add-PSMMImportedName -Name $Entry.Name
     } finally {
         $sw.Stop()
         $Entry.ImportMs = [int]$sw.Elapsed.TotalMilliseconds

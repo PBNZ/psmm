@@ -407,11 +407,16 @@ function script:Invoke-PSMMVersionCleanup {
     $ui = $script:PSMM_UI
     $obsolete = @($Entry.InstalledVersions | Sort-Object { [version]"$($_.Version)" } -Descending | Select-Object -Skip 1)
     if (-not $obsolete.Count) { return "[$script:PSMM_ColMute]nothing to clean[/]" }
-    $blocked = @($obsolete | Where-Object { $_.Scope -eq 'AllUsers' -and -not $ui.Elevated })
-    $doable  = @($obsolete | Where-Object { $_.Scope -ne 'AllUsers' -or $ui.Elevated })
+    # a platform copy is never removable, at any elevation (gh#27) - it
+    # classifies as 'AllUsers', so the elevation test alone let an ELEVATED
+    # session through to uninstalling something $PSHOME ships
+    $system  = @($obsolete | Where-Object { $_.IsSystem })
+    $blocked = @($obsolete | Where-Object { -not $_.IsSystem -and $_.Scope -eq 'AllUsers' -and -not $ui.Elevated })
+    $doable  = @($obsolete | Where-Object { -not $_.IsSystem -and ($_.Scope -ne 'AllUsers' -or $ui.Elevated) })
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old versions of $(ConvertTo-PSMMSafe $Entry.Name)[/]"
     Write-PSMMLine "keeping [$script:PSMM_ColOk]v$($Entry.InstalledVersion)[/], removing: $(($doable | ForEach-Object { "v$($_.Version)" }) -join ', ')"
+    if ($system.Count) { Write-PSMMLine "[$script:PSMM_ColMute]skipping $(@($system).Count) version(s) that ship with PowerShell - psmm never removes those[/]" }
     if ($blocked.Count) { Write-PSMMLine "[$script:PSMM_ColWarn]skipping $(@($blocked).Count) AllUsers version(s) - session is not elevated[/]" }
     if (-not $doable.Count) { $null = Wait-PSMMKey; return "[$script:PSMM_ColWarn]nothing removable without elevation[/]" }
     if (-not (Read-SpectreConfirm -Message "Remove $($doable.Count) old version(s)?" -DefaultAnswer 'n')) { return "[$script:PSMM_ColMute]cleanup cancelled[/]" }

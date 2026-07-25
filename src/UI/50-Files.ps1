@@ -107,8 +107,20 @@ function script:Show-PSMMFiles {
     }
 }
 
-# Apply config changes to the live session: import newly-active Load-mode
-# modules; unload loaded modules that are managed but no longer active.
+# Apply config changes to the live session: import modules the config now says
+# to load and that are not loaded yet. It NEVER unloads.
+#
+# gh#22 was reported as "apply unloads a loaded user module whose config file is
+# disabled". The rule PBNZ set when reviewing the fix is broader, and simpler
+# than any allow-list: **a module that is already loaded is not psmm's to
+# remove.** Unloading is an explicit user action (^u on the grid, ^u in the
+# module menu), never a side effect of editing config.
+#
+# That is the same principle as Q-2 on the install side - a background install
+# is reported, never imported behind a live prompt - applied symmetrically:
+# psmm does not reach into a running session and take things away either.
+# Removing a module can break anything already holding its types or commands,
+# and the config file is a declaration about SHELL START, not a live contract.
 function script:Invoke-PSMMApply {
     $ui = $script:PSMM_UI
     Clear-PSMMScreen
@@ -122,24 +134,6 @@ function script:Invoke-PSMMApply {
         if ((Get-PSMMEntryPlan -Entry $e).Import) { $shouldLoad[$e.Name] = $e }
     }
 
-    # Who may be unloaded (gh#22). The old answer was "anything named in any
-    # config file", taken from Get-PSMMAllEntries - the PRE-FILTER set, which
-    # includes entries from DISABLED files. So disabling a file that held a
-    # loaded module and pressing apply unloaded it, contradicting the promise
-    # in docs/config-schema.md that a disabled file is never actioned. gh#16
-    # papered over the psmm-own case with an allow-list; every user module was
-    # still exposed.
-    #
-    # The honest answer is what psmm actually did, not what the config says:
-    # only a module psmm IMPORTED in this session is psmm's to remove. That
-    # also protects a module you loaded by hand with ^l.
-    $unloadable = @{}
-    foreach ($n in (Get-PSMMImportedName)) { if ($n) { $unloadable[$n] = $true } }
-    # ...minus anything a disabled file names: "parsed, shown, never actioned"
-    # cuts both ways, so disabling a file leaves your session exactly as it is.
-    foreach ($e in (Get-PSMMAllEntries)) {
-        if ($e.Name -and -not $e.FileEnabled) { $null = $unloadable.Remove($e.Name) }
-    }
     # cloud-only check up front, one confirm for the whole batch (per-module
     # prompts would be noise): cancelling skips the apply entirely
     foreach ($e in $activeEntries) {
@@ -159,22 +153,21 @@ function script:Invoke-PSMMApply {
             catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
         }
     }
-    # Unload what psmm imported and the config no longer asks it to import.
-    # Keyed on $shouldLoad, not "named by some config": switching an entry from
-    # Load to Ignore is a change apply should apply, and used to do nothing
-    # because Get-PSMMEntry never filtered on Mode (the gh#22 asymmetry).
-    foreach ($m in @(Get-Module)) {
-        if (-not ($unloadable.ContainsKey($m.Name) -and -not $shouldLoad.ContainsKey($m.Name))) { continue }
-        # belt and braces: psmm never unloads itself or its own UI engine, which
-        # would pull the rug out from under the screen you are looking at
-        # (gh#16). The $unloadable set above already excludes them in practice.
-        if (Test-PSMMOwnModule -Name $m.Name) {
-            Write-PSMMLine "[$script:PSMM_ColMute]keeping $(ConvertTo-PSMMSafe $m.Name) - psmm's own, never unloaded[/]"
-            continue
-        }
-        Write-PSMMLine "[$script:PSMM_ColAccent]unloading $(ConvertTo-PSMMSafe $m.Name) (no longer active)...[/]"
-        try { Remove-Module -Name $m.Name -Force -ErrorAction Stop; $did++ }
-        catch { Write-PSMMLine "[$script:PSMM_ColErr]  $(ConvertTo-PSMMSafe $_.Exception.Message)[/]" }
+    # Anything loaded that the config no longer asks for STAYS loaded, and is
+    # named so the state is visible rather than silently divergent. ^u unloads
+    # it if that is what you want.
+    $stale = @(foreach ($m in @(Get-Module)) {
+        if ($shouldLoad.ContainsKey($m.Name)) { continue }
+        if (Test-PSMMOwnModule -Name $m.Name) { continue }
+        if (-not $script:PSMM_UI.Entries) { continue }
+        # only mention modules psmm has something to say about - a module the
+        # user imported by hand and never put in a config is not apply's business
+        if (@(Get-PSMMAllEntries).Name -notcontains $m.Name) { continue }
+        $m.Name
+    })
+    if ($stale.Count) {
+        Write-PSMMLine "[$script:PSMM_ColMute]still loaded, no longer set to load at startup: $(ConvertTo-PSMMSafe ($stale -join ', '))[/]"
+        Write-PSMMLine "[$script:PSMM_ColMute]psmm never unloads a module from a live session $([char]0x2014) $([char]0x005E)u does, on the row[/]"
     }
     $ui.Dirty = $true
     Write-PSMMLine "[$script:PSMM_ColOk]$did change(s) applied.[/]"

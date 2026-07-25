@@ -54,12 +54,17 @@ function script:Build-PSMMGrid {
         $ro = if (-not $isUnmanaged -and -not $e.Writable) { " [$script:PSMM_ColDim]ro[/]" } else { '' }
         $file = "[$script:PSMM_ColDim]$(ConvertTo-PSMMSafe (Get-PSMMTrunc $src 16))[/]$ro"
         $name = "$($e.Name)"
-        $scope = switch ($e.InstallScope) {
-            'CurrentUser' { "[$script:PSMM_ColDim]user[/]" }
-            'AllUsers'    { if ($ui.Elevated) { "[$script:PSMM_ColDim]all[/]" } else { "[$script:PSMM_ColDim]all ro[/]" } }
-            'mixed'       { "[$script:PSMM_ColWarn]mixed[/]" }
-            default       { "[$script:PSMM_ColDim]-[/]" }
-        }
+        # 'system' is a DISPLAY value only - InstallScope itself stays
+        # CurrentUser/AllUsers so the elevation guards keep matching (gh#27)
+        $scope = if ($e.IsSystem) { "[$script:PSMM_ColDim]system[/]" }
+                 else {
+                     switch ($e.InstallScope) {
+                         'CurrentUser' { "[$script:PSMM_ColDim]user[/]" }
+                         'AllUsers'    { if ($ui.Elevated) { "[$script:PSMM_ColDim]all[/]" } else { "[$script:PSMM_ColDim]all ro[/]" } }
+                         'mixed'       { "[$script:PSMM_ColWarn]mixed[/]" }
+                         default       { "[$script:PSMM_ColDim]-[/]" }
+                     }
+                 }
         $startupWord = Get-PSMMStartupWord $e.Mode
         $startup = if ($startupWord -in 'off', '-') { "[$script:PSMM_ColDim]$startupWord[/]" } else { $startupWord }
         $upkeepWord = Get-PSMMUpkeepWord $e.Install

@@ -107,6 +107,29 @@ function script:Initialize-PSMMUIState {
 # expensive Get-Module -ListAvailable sweep (open + explicit reload only).
 function script:Sync-PSMMUIEntries {
     [CmdletBinding()] param([switch]$FullScan)
+    # Disk facts have to SURVIVE the rebuild below.
+    #
+    # Get-PSMMEntry mints brand-new entry objects on every call, blank-slate:
+    # Installed = $false, InstalledVersion = $null, InstallScope = $null
+    # (Entry.ps1). The only thing that ever fills them is Update-PSMMAvailable,
+    # which is gated on -FullScan because it is a whole-disk sweep. So a bare
+    # Sync used to hand back a list where every managed module read as
+    # "missing" - and pressing 'm' (show/hide unmanaged) is a bare Sync, which
+    # is how psmm came to report its own running UI engine as not installed.
+    # Update-PSMMLoaded was called unconditionally, so Loaded stayed honest
+    # while everything disk-derived went blank - hence a row that was both
+    # "missing" and able to list its 51 commands.
+    #
+    # Re-reading the disk on every toggle would be correct but costs a full
+    # Get-Module -ListAvailable sweep per keypress. The facts have not changed,
+    # so carry them across instead. Keyed by source+name: the same module name
+    # can appear in several files.
+    $carry = @{}
+    if (-not $FullScan) {
+        foreach ($e in @(Get-PSMMAllEntries)) {
+            if ($e.Name -and $e.Installed) { $carry["$($e.Source)|$($e.Name)"] = $e }
+        }
+    }
     $active = Get-PSMMEntry
     $list = [System.Collections.Generic.List[object]]::new()
     foreach ($e in $active) { $list.Add($e) }
@@ -123,6 +146,7 @@ function script:Sync-PSMMUIEntries {
             $x.Installed = $true
             $x.InstalledVersion = $u.Version
             $x.InstallScope = $u.Scope
+            $x.IsSystem = [bool]$u.IsSystem
             $x.Mode = '-'
             $x.Install = '-'
             $list.Add($x)
@@ -133,7 +157,19 @@ function script:Sync-PSMMUIEntries {
     # PwshSpectreConsole module) unrolls to a scalar PSObject on return, and
     # scalar + array below throws op_Addition (gh#1)
     $all = @(Get-PSMMAllEntries)
-    if ($FullScan) { Update-PSMMAvailable -Entries ($all + @($list | Where-Object { $_.PSObject.Properties['Unmanaged'] })) }
+    if ($FullScan) {
+        Update-PSMMAvailable -Entries ($all + @($list | Where-Object { $_.PSObject.Properties['Unmanaged'] }))
+    } else {
+        # restore what the previous generation knew about disk and the gallery
+        foreach ($e in $all) {
+            $p = $carry["$($e.Source)|$($e.Name)"]
+            if (-not $p) { continue }
+            foreach ($f in 'Installed', 'InstalledVersion', 'InstalledPrerelease', 'InstalledVersions',
+                           'InstallScope', 'IsSystem', 'LatestVersion', 'LatestPrerelease', 'UpdateAvailable') {
+                $e.$f = $p.$f
+            }
+        }
+    }
     Update-PSMMLoaded -Entries $list
     Update-PSMMLoaded -Entries $all
     $script:PSMM_UI.Sel.Clear()
@@ -152,9 +188,7 @@ function script:Start-PSMMUnmanagedScan {
     # classifier, so the tested code was not the running code (gh#27).
     $payload = [pscustomobject]@{
         Managed = $managed
-        Prelude = (Get-PSMMJobPrelude -FunctionName @(
-                'Get-PSMMUIDependencyName', 'Get-PSMMOwnModuleName', 'Get-PSMMScopeForPath',
-                'Test-PSMMPlatformModulePath', 'Get-PSMMUnmanagedModule'))
+        Prelude = (Get-PSMMUnmanagedScanPrelude)
     }
     $null = Start-PSMMTask -Label 'scan: unmanaged modules' -Kind 'unmanagedscan' -ArgumentList (, $payload) -ScriptBlock {
         param($payload)

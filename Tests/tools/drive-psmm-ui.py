@@ -209,6 +209,39 @@ else:
     sys.exit(1)
 print("OK   added entry appears in the grid as a managed row")
 
+# 6a. drill into a module and check the CURSOR IS HIDDEN there.
+#     Spectre's LiveDisplay shows the cursor again when it exits, and the
+#     module menu renders without a live display, so it used to blink a
+#     cursor over the frame. The fix re-hides on every live exit and every
+#     full-screen repaint; this asserts the last cursor sequence in the
+#     stream, from the moment the menu opened, is the HIDE.
+before = len(stream())
+proc.write("\r")   # enter -> module action menu
+wait_for("browse commands", 20, "enter opened the module menu")
+time.sleep(0.4)
+tail_since_menu = stream()[before:]
+hide, show = tail_since_menu.rfind("[?25l"), tail_since_menu.rfind("[?25h")
+if hide == -1 and show == -1:
+    print("WARN no cursor sequences seen after opening the module menu")
+elif hide > show:
+    print("OK   cursor is hidden on the module menu (last sequence is ?25l)")
+else:
+    print("FAIL cursor left VISIBLE on the module menu: ?25h came after ?25l")
+    proc.terminate()
+    sys.exit(1)
+before = len(stream())
+proc.write(ESC)
+deadline = time.time() + 20
+while time.time() < deadline:
+    if GRID_MARK in stream()[before:]:
+        break
+    time.sleep(0.25)
+else:
+    print("FAIL esc did not return from the module menu to the grid")
+    proc.terminate()
+    sys.exit(1)
+print("OK   esc returned from the module menu to the grid")
+
 # 6b. 'g t' -> the tasks screen, which by now holds the finished unmanaged
 #     scan. Checks the 0.1.0-rc02 additions: the cancel verb exists, and the
 #     output column reports a line count.

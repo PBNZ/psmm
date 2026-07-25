@@ -99,9 +99,11 @@ Describe 'Get-PSMMUnmanagedModule' -Tag Engine {
         $un[0].Version | Should -Be ([version]'3.1')
     }
 
-    It 'never offers the platform''s own modules for adoption (gh#27)' {
-        # $PSHOME/Modules and the System32 store are not installable from the
-        # gallery, so calling them "AllUsers" only made them look adoptable.
+    It 'MARKS the platform''s own modules rather than hiding them (gh#27)' {
+        # They must stay listed: browsing their commands and help through psmm
+        # is a real use. What was wrong was calling them "AllUsers", which made
+        # modules that ship with PowerShell look like ordinary machine-wide
+        # installs you could adopt, update or remove.
         $un = InModuleScope psmm {
             Mock Get-Module {
                 @(
@@ -111,7 +113,22 @@ Describe 'Get-PSMMUnmanagedModule' -Tag Engine {
             } -ParameterFilter { $ListAvailable }
             Get-PSMMUnmanagedModule -ManagedNames @('NothingIsManaged')
         }
-        @($un).Name | Should -Be @('Yours')
+        @($un).Name | Should -Be @('Shipped', 'Yours')
+        @($un | Where-Object Name -eq 'Shipped').IsSystem | Should -BeTrue
+        @($un | Where-Object Name -eq 'Yours').IsSystem   | Should -BeFalse
+    }
+
+    It 'the system mark never becomes a third Scope value (it would fall through the elevation guards)' {
+        # 65-Cleanup.ps1 and 20-Submenu.ps1 both test `-eq 'AllUsers'` /
+        # `-ne 'AllUsers'` before uninstalling. An unrecognised third value
+        # falls OPEN through both, so Scope must keep exactly two answers.
+        $scopes = InModuleScope psmm {
+            Mock Get-Module {
+                @([pscustomobject]@{ Name = 'Shipped'; Version = [version]'7.0'; ModuleBase = (Join-Path $PSHOME 'Modules\Shipped\7.0'); Description = '' })
+            } -ParameterFilter { $ListAvailable }
+            @(Get-PSMMUnmanagedModule -ManagedNames @('NothingIsManaged')).Scope
+        }
+        $scopes | Should -Be 'AllUsers'
     }
 
     It 'is the ONE implementation - the background scan dot-sources it (gh#27)' {
@@ -119,9 +136,9 @@ Describe 'Get-PSMMUnmanagedModule' -Tag Engine {
         # inlined scope classifier, so the tested code was not the running
         # code. The job now receives these definitions as source text.
         $probe = InModuleScope psmm {
-            $prelude = Get-PSMMJobPrelude -FunctionName @(
-                'Get-PSMMUIDependencyName', 'Get-PSMMOwnModuleName', 'Get-PSMMScopeForPath',
-                'Test-PSMMPlatformModulePath', 'Get-PSMMUnmanagedModule')
+            # the SAME prelude the UI's scan job uses - not a copy of the list,
+            # which is how a missing transitive dependency would slip through
+            $prelude = Get-PSMMUnmanagedScanPrelude
             $job = Start-ThreadJob -Name 'psmm-task-scan-probe' -ScriptBlock {
                 . ([scriptblock]::Create($using:prelude))
                 "resolved=$([bool](Get-Command Get-PSMMUnmanagedModule -ErrorAction SilentlyContinue))"
@@ -161,6 +178,68 @@ Describe 'Test-PSMMPlatformModulePath' -Tag Engine {
             # so Get-PSMMScopeForPath keeps its two honest answers
             Get-PSMMScopeForPath -Path (Join-Path $PSHOME 'Modules\Foo\1.0') | Should -Be 'AllUsers'
         }
+    }
+}
+
+Describe 'Get-PSMMScopeForPath honours a relocated Documents folder' -Tag Engine {
+
+    # Found on a real machine: $HOME = C:\Users\<user> but Documents (and so
+    # the CurrentUser module location) = E:\Users\<user>\Documents. A bare
+    # $HOME prefix test called every one of the user's own modules AllUsers,
+    # which makes the grid mark them read-only and makes version cleanup
+    # refuse to touch them ("session is not elevated") - the feature silently
+    # stops working for exactly the modules it exists to clean up.
+
+    AfterEach { InModuleScope psmm { $script:PSMM_UserRoots = $null } }
+
+    It 'classifies modules under the Documents-derived user root as CurrentUser' {
+        InModuleScope psmm {
+            $script:PSMM_UserRoots = $null      # drop the session cache
+            Mock Get-PSMMUserDefaultModulePath { 'E:\Users\Someone\Documents\PowerShell\Modules' }
+            Get-PSMMScopeForPath -Path 'E:\Users\Someone\Documents\PowerShell\Modules\Foo\1.0' |
+                Should -Be 'CurrentUser'
+            # a genuinely machine-wide location is still AllUsers
+            Get-PSMMScopeForPath -Path 'C:\Program Files\WindowsPowerShell\Modules\Foo\1.0' |
+                Should -Be 'AllUsers'
+        }
+    }
+
+    It 'still treats $HOME as a user root (Unix keeps its modules there)' {
+        InModuleScope psmm {
+            $script:PSMM_UserRoots = $null
+            Get-PSMMScopeForPath -Path (Join-Path $HOME 'anything/Modules/Foo/1.0') | Should -Be 'CurrentUser'
+        }
+    }
+}
+
+Describe 'psmm never uninstalls a module that ships with PowerShell' -Tag Engine {
+
+    # Get-PSMMDuplicateVersion has no platform filter, so $PSHOME/System32
+    # copies DO reach both cleanup paths. They classify as 'AllUsers', so the
+    # elevation test alone let an ELEVATED session through to uninstalling
+    # something the shell itself depends on.
+
+    It 'marks obsolete platform copies so the cleanup guards can exclude them' {
+        $obsolete = InModuleScope psmm {
+            Mock Get-Module {
+                @(
+                    [pscustomobject]@{ Name = 'Dupe'; Version = [version]'2.0'; ModuleBase = (Join-Path $PSHOME 'Modules\Dupe\2.0') }
+                    [pscustomobject]@{ Name = 'Dupe'; Version = [version]'1.0'; ModuleBase = (Join-Path $PSHOME 'Modules\Dupe\1.0') }
+                )
+            } -ParameterFilter { $ListAvailable }
+            @(Get-PSMMDuplicateVersion)[0].Obsolete
+        }
+        @($obsolete).Count | Should -Be 1
+        $obsolete[0].IsSystem | Should -BeTrue
+        $obsolete[0].Scope    | Should -Be 'AllUsers' -Because 'the guards match on this string; it must not change'
+    }
+
+    It 'both cleanup paths exclude IsSystem before uninstalling' {
+        # a static check: these two expressions are the only things standing
+        # between an elevated session and Uninstall-PSResource on $PSHOME
+        $root = Join-Path $PSScriptRoot '..' 'src' 'UI'
+        (Get-Content -Raw (Join-Path $root '65-Cleanup.ps1')) | Should -Match '\$v\.IsSystem'
+        (Get-Content -Raw (Join-Path $root '20-Submenu.ps1')) | Should -Match '\$_\.IsSystem'
     }
 }
 
