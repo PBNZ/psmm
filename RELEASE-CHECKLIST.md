@@ -6,6 +6,12 @@ Work top to bottom.
 
 ## A. Manual verification in a real terminal (before sharing with testers)
 
+> **Stale as of 2026-07-26.** The key references below predate the `g` goto
+> layer that shipped in 0.1.0-beta6 — `g` here means the gallery, `t` tasks,
+> `f` files, and `I`/`O`/`B`/`A`/`Ctrl+P` no longer mean what they say. The
+> list is still directionally useful; the bindings are not. It is rewritten
+> against the new keymap before rc03 ships (`docs/rust-ui-plan.md` §5, §11).
+
 The agent verified the engine, data model, exports, packaging and headless
 frame rendering with tests — but nobody has *watched* the UI run. In a real
 Windows Terminal:

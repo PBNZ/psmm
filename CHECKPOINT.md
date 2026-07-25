@@ -1,6 +1,25 @@
 # CHECKPOINT — resume pointer
 
-**Last updated:** 2026-07-06 — **PUBLIC at github.com/PBNZ/psmm, CI green.**
+**Last updated:** 2026-07-26 — **0.1.0-rc01 on the Gallery; the Rust UI
+programme is planned and rc02 is the next release.**
+
+## Now (2026-07-26)
+
+A planning session re-derived the `Mode`x`Install` behaviour and the keymap
+from source, ruled on the open questions, and produced
+[`docs/rust-ui-plan.md`](docs/rust-ui-plan.md). `DECISIONS.md` `D-RUST-UI`
+records the programme-level decision; `docs/PRD-psmm-rust-ui.md` is the
+requirements input.
+
+**If you are a resumed session, the in-progress work is rc02** — the
+PowerShell correctness release, issues
+[#19-#29](https://github.com/PBNZ/psmm/issues). Start with **#29**: the
+`Mode`x`Install` matrix is implemented four times in four places that
+disagree, and most of the other issues are consequences of that. The plan's
+§3 has the shape of the fix; §3.4 has the tests it must ship with. No code
+has been written yet.
+
+Everything below this section is history from the original build.
 
 ## Published (2026-07-06)
 
@@ -65,12 +84,13 @@ run flushed out one more real bug — the shared pager's Mandatory
 PBNZ's own eyeball pass (look & feel, remaining screens) is
 RELEASE-CHECKLIST section A.
 
-## State
+## State at the end of the original build (2026-07-06)
 
-The build program is finished and verified. If you are a resumed session
-reading this: there is no in-progress work. The remaining steps are PBNZ's
-and live in `RELEASE-CHECKLIST.md` (manual UI verification in a real
-terminal → private testing → repo hosting → publish).
+The build program was finished and verified; there was no in-progress work,
+and the remaining steps were PBNZ's, in `RELEASE-CHECKLIST.md` (manual UI
+verification in a real terminal → private testing → repo hosting → publish).
+All of those have since happened — see **Now** at the top of this file for
+the current state.
 
 ## Verified facts (final, all against real command output)
 

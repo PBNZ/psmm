@@ -56,6 +56,10 @@ filesystem repository only.
 
 ## D-TUI — TUI technology: keep Spectre.Console (via PwshSpectreConsole), lazily loaded
 
+> **Superseded in part by `D-RUST-UI` (2026-07-26)**, which replaces the
+> technology choice and reverses the mouse-related reasoning below. The
+> alternate-screen decision in this entry still stands.
+
 **Evaluated options**
 1. **PwshSpectreConsole / Spectre.Console (current)** — the existing look and
    feel is built on it; the current code already bypasses the cmdlet wrappers
@@ -245,3 +249,68 @@ loaded. Reference equality gets both cases right.
 active", and `$managed` includes entries from disabled files - so disabling
 the file holding the seeded dependency entry made psmm target its own engine,
 and itself, for `Remove-Module` mid-session. Reproduced before fixing.
+
+> **Note (2026-07-26):** the fix was a psmm-own allow-list, not a fix to
+> `$managed`, so the same failure class is still reachable for any *user*
+> module. See issue #22. `D-RUST-UI` schedules unwinding this whole entry.
+
+## D-RUST-UI — replace the Spectre UI with a Rust binary; two releases, not a strangler (2026-07-26)
+
+**Decision:** psmm's interactive manager is rebuilt as a Rust binary
+(Ratatui / Crossterm / Tokio) driven over a line protocol by a PowerShell
+pump. The engine, the config semantics and the public API stay PowerShell.
+Full reasoning, the re-derived `Mode`x`Install` matrix, the keyboard and
+mouse models, the protocol sketch and the delivery plan are in
+[`docs/rust-ui-plan.md`](docs/rust-ui-plan.md); the requirements it answers
+are in [`docs/PRD-psmm-rust-ui.md`](docs/PRD-psmm-rust-ui.md).
+
+Six rulings, all ratified 2026-07-25/26:
+
+| # | Ruling |
+|---|---|
+| D-1 | The engine defects found during Phase 0 are fixed in PowerShell **first**, before any Rust ships. Filed as issues #19-#29 |
+| D-2 | Gallery/network I/O is **never** foreground. Import is foreground; all disk/gallery work is background, in all nine `Mode`x`Install` cells. No schema change, so `D-CONFIG` holds |
+| D-3 | The main config moves to a platform-native path - `%APPDATA%\psmm` on Windows, `$XDG_CONFIG_HOME/psmm` (else `~/.config/psmm`) elsewhere. Migration is opt-in and copies, never moves |
+| D-4 | The keyboard model is flat single-letter verbs plus the existing `g` goto layer plus mode-scoped submaps. **No prefix key.** Uppercase `L`/`U` for load/unload. The keymap is user-remappable via the preferences file, reversing the PRD's KB-R5 |
+| D-5 | **No strangler and no dual UI.** `rc02` is the PowerShell correctness work; `rc03` is the Rust UI and deletes `src/UI` in the same release. There is no `$PSMM_UI` selector, ever |
+| D-6 | `win-x64` ships inside the Gallery package; `win-arm64`, `linux-x64` and `linux-arm64` are fetched on demand against a SHA-256 pinned inside the module |
+
+**Why now.** The UI is the largest and least testable body of code in the
+repo (`D-STRUCT`); Ratatui's `TestBackend` gives frame assertions natively
+where `D-UI-ARCH` needed a bespoke `IAnsiConsole`; `ROADMAP.md` #34 is
+blocked on key handling and alternate-screen behaviour that Crossterm carries
+as a maintained cross-platform dependency; mouse support is wanted, reversing
+`D-TUI`'s objection to Terminal.Gui on that ground; and the UI dependency is
+the entire reason `D-OWN-MODULES` exists, so a Rust UI makes most of that
+machinery deletable.
+
+**Why the engine work comes first (D-1).** Phase 0 found the `Mode`x`Install`
+matrix implemented **four times**, in four places that disagree - the two
+ThreadJob bodies re-derive policy because module functions are invisible
+inside a job. Porting four disagreeing implementations would bake the
+disagreement into a protocol. One policy function returning a plan object
+comes first; the job bodies then execute decisions instead of re-deciding
+them.
+
+**Why no strangler (D-5).** Carrying both front ends means two keymaps, two
+help surfaces, divergence documentation and a selector knob with its own
+tests - ongoing drag on a solo project. The cost is real and recorded: rc03
+deletes the fallback in the act of shipping it, so the fallback is the
+**previous release** (`Install-PSResource psmm -Version 0.1.0-rc02
+-Reinstall`), and rc03's real-terminal pass is a tagging precondition rather
+than a formality.
+
+**Verified while deciding, because each would have changed the answer:**
+Crossterm 0.29 reads input from the console device, not from redirected
+stdio - Windows via `Handle::current_in_handle()` (`CONIN$` through
+`CreateFileW`, not `GetStdHandle`), Unix via `tty_fd()` falling back to
+`/dev/tty` - so a child with stdio pipes still owns the terminal, which is
+what makes the boundary viable. `CrosstermBackend::new` is generic over any
+`Write`, so rendering can target `CONOUT$` / `/dev/tty` explicitly.
+`Install-PSResource` has **no** per-RID filtering, so every RID in a package
+is downloaded by every user - which is what forces D-6.
+
+**Not decided here.** The seven implementation ADRs - **D-BOUNDARY**,
+**D-PROTO**, **D-KEYMAP**, **D-CONFIG-PATH**, **D-STATE**, **D-LAYOUT**, and
+the formal **D-UI-RUST** superseding note on `D-TUI` - are written at rc03
+entry, against working code rather than a plan.
