@@ -315,7 +315,10 @@ function script:Get-PSMMStartupJobMarkup {
         if ($fails.Count) { return "[$script:PSMM_ColWarn]background startup: $($fails.Count) of $total FAILED - $(ConvertTo-PSMMSafe ($fails -join ', ')) (i on the row retries)[/]" }
         return "[$script:PSMM_ColOk]background startup: all $total module task(s) ok[/]"
     }
-    if ($j.State -in 'Failed', 'Stopped') { return "[$script:PSMM_ColErr]background startup job failed - see t (tasks)[/]" }
+    # NB: not "see t (tasks)" - bare t is not a key, and the startup job is not
+    # in the task registry, so the tasks screen would never have shown it. Point
+    # at something that actually works: i retries the row.
+    if ($j.State -in 'Failed', 'Stopped') { return "[$script:PSMM_ColErr]background startup job failed - i on a row retries it[/]" }
     ''
 }
 

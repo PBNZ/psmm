@@ -63,10 +63,12 @@ function Get-PSMMScopeForPath {
 # Is this module base one of the PLATFORM's own module directories?
 # $PSHOME/Modules on every platform, plus Windows PowerShell's System32 store.
 #
-# These are not adoptable into a psmm config — you cannot install the
-# Microsoft.PowerShell.* modules pwsh ships with from the gallery — so the
-# unmanaged-module scan must not offer them (gh#27). Roots are read from
-# $PSHOME / $env:SystemRoot at call time, never hard-coded.
+# These modules ship WITH PowerShell, so they are not ordinary machine-wide
+# installs: you cannot replace pwsh's own Microsoft.PowerShell.* from the
+# gallery. The unmanaged view still LISTS them - browsing their commands and
+# help through psmm is a real use - but marks them `system` rather than
+# `all`, and version cleanup refuses to remove one at any elevation (gh#27).
+# Roots are read from $PSHOME / $env:SystemRoot at call time, never hard-coded.
 #
 # Deliberately NOT folded into Get-PSMMScopeForPath as a third scope value:
 # that function feeds install-scope and elevation decisions, and "shipped with

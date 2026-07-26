@@ -70,6 +70,8 @@ function script:Get-PSMMHelpSection {
             ''
             (Get-PSMMHelpTerm 'state' ("[$script:PSMM_ColOk]$([char]0x25CF) loaded[/][$script:PSMM_ColMute] (this session) $mid [/][$script:PSMM_ColWarn]$([char]0x25D0) installed[/][$script:PSMM_ColMute] (on disk)[/]"))
             (Get-PSMMHelpTerm '' ("[$script:PSMM_ColErr]$([char]0x25CB) missing[/][$script:PSMM_ColMute] $mid [/][$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/][$script:PSMM_ColMute] (in no config file - m shows them)[/]"))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColDim]$([char]0x25C8) psmm's own[/][$script:PSMM_ColMute] (psmm and its UI engine - infrastructure,[/]"))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColMute]not part of your session)[/]"))
             (Get-PSMMHelpTerm 'startup' (Get-PSMMHelpText1 'what happens at shell start: load / install (background) / off'))
             (Get-PSMMHelpTerm 'upkeep' (Get-PSMMHelpText1 'how psmm keeps it on disk: if-missing / check-only / latest'))
             (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 '+pre means prerelease versions are allowed for that entry'))
@@ -151,7 +153,9 @@ function script:Get-PSMMHelpSection {
             (Get-PSMMHelpText1 'Every config source psmm found, in load order.')
             ''
             (Get-PSMMHelpRow 'space' 'toggle a whole file on/off (saved immediately)')
-            (Get-PSMMHelpRow 'a' 'apply the load/unload changes to the running session')
+            (Get-PSMMHelpRow 'a' 'apply the config to this session - imports what is newly')
+            (Get-PSMMHelpCont 'declared. Nothing is ever unloaded: a module that is already')
+            (Get-PSMMHelpCont 'loaded stays loaded, and ^u on its row is the only way out.')
             (Get-PSMMHelpRow 'n' 'create a new config, blank or from a scenario template')
             (Get-PSMMHelpRow 'm' 'move a file and keep it discoverable (Includes updated)')
             (Get-PSMMHelpRow 'left' 'back out')
@@ -226,9 +230,10 @@ function script:Get-PSMMHelpSection {
         ) }
         'tasks' { @(
             (Get-PSMMHelpHead 'BACKGROUND TASKS')
-            (Get-PSMMHelpText1 'Everything psmm runs in the background lands here: install batches')
-            (Get-PSMMHelpText1 '(i), update batches (u), update checks (k), the unmanaged-module')
-            (Get-PSMMHelpText1 'scan, and Update-Help.')
+            (Get-PSMMHelpText1 'Work you start from the UI lands here: install batches (i), update')
+            (Get-PSMMHelpText1 'batches (u), update checks (k), the unmanaged-module scan, and')
+            (Get-PSMMHelpText1 'Update-Help. The background job psmm runs at SHELL START is separate')
+            (Get-PSMMHelpText1 'and reports on the home screen instead.')
             ''
             (Get-PSMMHelpRow 'enter' "show a task's full output")
             (Get-PSMMHelpRow 'x' 'cancel the task under the cursor')

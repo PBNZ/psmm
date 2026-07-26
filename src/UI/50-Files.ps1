@@ -80,7 +80,7 @@ function script:Show-PSMMFiles {
                             $m.Enabled = -not $m.Enabled
                             Save-PSMMFile -Path $m.Path -Entries (Get-PSMMAllEntries)
                             $script:PSMM_UI.Dirty = $true
-                            $st.Status = "[$script:PSMM_ColOk]saved ($(if ($m.Enabled) { 'enabled' } else { 'disabled' })) - 'a' applies load/unload changes[/]"
+                            $st.Status = "[$script:PSMM_ColOk]saved ($(if ($m.Enabled) { 'enabled' } else { 'disabled' })) - takes effect next shell start; 'a' imports now, nothing is unloaded[/]"
                         }
                         continue
                     }

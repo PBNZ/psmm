@@ -109,8 +109,9 @@ installed behind you and therefore ready next session.
 quick-tips panel over the grid — the three keys worth knowing, shown once):
 
 - one grid row per module: state (`●` loaded / `◐` installed / `○` missing /
-  `◌` unmanaged), what happens at **startup**, how psmm keeps it on disk
-  (**upkeep**),
+  `◌` unmanaged / `◈` psmm's own — psmm and its UI engine are infrastructure,
+  not part of your session), what happens at **startup**, how psmm keeps it
+  on disk (**upkeep**),
   version (`⇡` = update available), scope, file — plus a plain-words context
   sentence for the row under the cursor
 - `space` select · `enter` (or `right`) open the row's actions · `^l`/`^u`

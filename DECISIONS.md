@@ -253,6 +253,12 @@ and itself, for `Remove-Module` mid-session. Reproduced before fixing.
 > **Note (2026-07-26):** the fix was a psmm-own allow-list, not a fix to
 > `$managed`, so the same failure class is still reachable for any *user*
 > module. See issue #22. `D-RUST-UI` schedules unwinding this whole entry.
+>
+> **Superseded the same day, by rc02 (#22).** `files > apply` no longer
+> unloads *anything*, so there is no `$managed` set to get wrong and no
+> allow-list holding the line: a module that is already loaded is not psmm's
+> to remove, whatever the config says. The psmm-own guard survives as belt
+> and braces only. See `D-PLAN` and the 0.1.0-rc02 CHANGELOG entry.
 
 ## D-RUST-UI — replace the Spectre UI with a Rust binary; two releases, not a strangler (2026-07-26)
 

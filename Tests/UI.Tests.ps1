@@ -827,6 +827,19 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
         }
     }
 
+    It 'the module menu guards ^l with Ctrl, like every hint says' {
+        # Live drift called out in docs/rust-ui-plan.md 2.2: the submenu loaded
+        # on BARE 'l' while every hint and help row advertised '^l', so a stray
+        # keystroke imported a module into the user's session with nothing
+        # having offered to. The existing test only asserted that the STRING
+        # '^l load' renders, which the buggy code also did.
+        $src = Get-Content -Raw (Join-Path $PSScriptRoot '..' 'src' 'UI' '20-Submenu.ps1')
+        # the ConsoleKey::L branch must test $ctrl before doing anything
+        $branch = [regex]::Match($src, '\(\[ConsoleKey\]::L\)\s*\{(?<body>.{0,400})', 'Singleline')
+        $branch.Success | Should -BeTrue -Because 'the module menu must still handle L'
+        $branch.Groups['body'].Value | Should -Match '\$ctrl' -Because 'bare l must not import into the session'
+    }
+
     It 'psmm never waits for a key with a visible cursor' {
         # Spectre's LiveDisplay writes ESC[?25h when it exits - verified from
         # the real assembly - so the cursor is SHOWN again every time a live

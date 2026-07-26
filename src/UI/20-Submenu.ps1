@@ -307,6 +307,11 @@ function script:Show-PSMMModuleMenu {
         $ctrl = ($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0
         switch ($k.Key) {
             ([ConsoleKey]::L) {
+                # ^l, not bare l. Every hint and help row on this screen says
+                # ^l, and the grid guards it - but here a stray l imported the
+                # module into the user's session with nothing having offered
+                # that. (Called out as live drift in docs/rust-ui-plan.md §2.2.)
+                if (-not $ctrl) { continue }
                 Write-PSMMLine "[$script:PSMM_ColAccent]loading $(ConvertTo-PSMMSafe $Entry.Name)...[/]"
                 if (-not (Confirm-PSMMCloudHydration -ModuleName $Entry.Name)) {
                     $status = "[$script:PSMM_ColMute]load cancelled (cloud-only files not downloaded)[/]"
@@ -330,6 +335,11 @@ function script:Show-PSMMModuleMenu {
                     Update-PSMMLoaded -Entries $ui.Entries
                 } elseif (-not $Entry.Installed) {
                     $status = "[$script:PSMM_ColWarn]not installed - i installs it first[/]"
+                } elseif ($Entry.PinnedExact) {
+                    # an exact pin names ONE version, so there is nothing to
+                    # update to - say so instead of silently doing nothing
+                    # (the actuator refuses to re-download it either, gh#20)
+                    $status = "[$script:PSMM_ColWarn]pinned to $(ConvertTo-PSMMSafe $Entry.Version) - nothing to update (v changes the pin)[/]"
                 } else {
                     Clear-PSMMScreen
                     Write-PSMMLine "[$script:PSMM_ColAccent]updating $(ConvertTo-PSMMSafe $Entry.Name)... (this can take a while)[/]"
@@ -684,7 +694,7 @@ function script:Move-PSMMEntryUI {
     $meta = Get-PSMMFileMeta
     $targets = @($meta.Values | Where-Object { $_.Writable -and $_.Kind -ne 'inline' -and $_.Path -ne $Entry.Source } | Select-Object -ExpandProperty Path)
     if (-not $targets.Count) {
-        Write-PSMMLine "[$script:PSMM_ColWarn]No other writable config file to move to (create one via f -> n).[/]"
+        Write-PSMMLine "[$script:PSMM_ColWarn]No other writable config file to move to (create one via g f, then n).[/]"
         $null = Wait-PSMMKey
         return $false
     }

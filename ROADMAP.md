@@ -63,12 +63,13 @@ been exercised on Windows.
 Crossterm carries the cross-platform key/terminal burden as a maintained
 dependency, so the rewrite *advances* this rather than competing with it:
 rc03 ships `linux-x64` and `linux-arm64` alongside Windows. It does not
-finish the job on its own: rc02 stopped the unmanaged scan offering
-platform-shipped modules for adoption (`Test-PSMMPlatformModulePath`,
-issue #27), but `Get-PSMMScopeForPath` still answers only CurrentUser or
-AllUsers — the FR-3 "yours vs the system" split is rc03 work — and macOS
-remains out of scope until after rc03. Keep #34 as its own planned work,
-not a side effect.
+finish the job on its own: rc02 **marks** platform-shipped modules as
+`system` in the unmanaged view rather than calling them AllUsers
+(`Test-PSMMPlatformModulePath`, issue #27) — they stay listed and browsable
+— and refuses to remove them at any elevation. But `Get-PSMMScopeForPath`
+still answers only CurrentUser or AllUsers, so the FR-3 "yours vs the
+system" split proper is rc03 work, and macOS remains out of scope until
+after rc03. Keep #34 as its own planned work, not a side effect.
 
 ### #30 — Deep Microsoft Graph version handling
 The generic part shipped: the version-cleanup screen (x) prunes stacked old
