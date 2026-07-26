@@ -148,6 +148,46 @@ function Clear-PSMMJob {
     $n
 }
 
+# Classify what Update-Help complained about, and turn it into task output
+# lines (gh#26).
+#
+# Update-Help emits NON-terminating errors, so the job always reaches
+# 'Completed' and job state alone can never say whether it worked. Classify by
+# FullyQualifiedErrorId, never by message text: the ids are stable, the
+# messages are localised. Lines beginning 'FAILED' are what Update-PSMMTask
+# latches into the task's Failed flag.
+#
+# The four ids below were captured from live Update-Help runs, not recalled:
+#   HelpInfoUriNotFound   - the module ships no updatable help (the common case)
+#   ModuleNotFound        - the name matched nothing
+#   UpdatableHelpSystemRequiresElevation - AllUsers scope without elevation
+#   HelpCultureNotSupported - no help published for this UI culture
+# Anything else - network, proxy, a corrupt HelpInfo.xml - falls to the
+# default branch and is reported WITH its id, so an unclassified failure is
+# still visible and still fails the task rather than being swallowed.
+#
+# Lives here, as a real function, so the tests exercise THIS code. It is
+# shipped into the job by Get-PSMMJobPrelude like every other actuator.
+function Get-PSMMUpdateHelpReport {
+    [CmdletBinding()]
+    param([AllowNull()][AllowEmptyCollection()] $ErrorRecords)
+    $benign = 0
+    foreach ($e in @($ErrorRecords)) {
+        if (-not $e) { continue }
+        $id = ("$($e.FullyQualifiedErrorId)" -split ',')[0]
+        $msg = "$($e.Exception.Message)" -replace '\s+', ' '
+        switch ($id) {
+            'HelpInfoUriNotFound' { $benign++ }
+            'ModuleNotFound'      { $benign++ }
+            'UpdatableHelpSystemRequiresElevation' { "FAILED elevation required: $msg" }
+            'HelpCultureNotSupported'              { "FAILED UI culture not supported: $msg" }
+            default                                { "FAILED [$id]: $msg" }
+        }
+    }
+    if ($benign) { "note: $benign module(s) ship no updatable help - nothing to download for them" }
+    'help update finished'
+}
+
 # Dispose psmm's background jobs when the session ends (gh#28).
 #
 # Registered LAZILY - from Start-PSMMTask and Start-PSMMDeferredJob, never at
@@ -187,8 +227,7 @@ function Get-PSMMTaskFingerprint {
     $parts = foreach ($t in (Get-PSMMTask)) { "$($t.Id):$($t.Job.State):$($t.LineCount)" }
     $job = Get-PSMMStartupJob
     if ($job) {
-        Update-PSMMStartupJobOutput
-        $parts = @($parts) + "startup:$($job.State):$(@($script:PSMM_StartupOutput).Count)"
+        $parts = @($parts) + "startup:$($job.State):$(Get-PSMMStartupJobLineCount)"
     }
     $parts -join '|'
 }

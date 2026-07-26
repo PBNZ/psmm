@@ -308,7 +308,8 @@ function script:Get-PSMMStartupJobMarkup {
     # the whole buffer on every 500 ms frame (gh#24)
     $out = @(Get-PSMMStartupJobOutput)
     if ($j.State -in 'NotStarted', 'Running') {
-        return "[$script:PSMM_ColMute]background startup: $($out.Count)/$total module task(s) done...[/]"
+        # the running count, not the buffer's length - the buffer is capped
+        return "[$script:PSMM_ColMute]background startup: $(Get-PSMMStartupJobLineCount)/$total module task(s) done...[/]"
     }
     if ($j.State -eq 'Completed') {
         $fails = @($out | Where-Object { "$_" -like 'FAILED *' } | ForEach-Object { if ("$_" -match '^FAILED\s+([^:]+)') { $Matches[1] } })

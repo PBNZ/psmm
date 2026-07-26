@@ -78,31 +78,19 @@ function script:Receive-PSMMUITask {
 function script:Start-PSMMUpdateHelpTask {
     $running = @(Get-PSMMTask | Where-Object { $_.Kind -eq 'updatehelp' -and -not $_.Done })
     if ($running.Count) { $script:PSMM_UI.Status = "[$script:PSMM_ColWarn]Update-Help is already running[/]"; return }
-    $null = Start-PSMMTask -Label 'Update-Help (all modules)' -Kind 'updatehelp' -ScriptBlock {
+    # the job runs the ENGINE's classifier, dot-sourced in - not a copy of it,
+    # so the tests that exercise Get-PSMMUpdateHelpReport are testing the code
+    # that actually runs (same pattern as the install job)
+    $payload = [pscustomobject]@{ Prelude = (Get-PSMMJobPrelude -FunctionName @('Get-PSMMUpdateHelpReport')) }
+    $null = Start-PSMMTask -Label 'Update-Help (all modules)' -Kind 'updatehelp' -ArgumentList (, $payload) -ScriptBlock {
+        param($payload)
+        . ([scriptblock]::Create($payload.Prelude))
         try {
+            # -ErrorAction SilentlyContinue stays: it keeps a hundred
+            # no-updatable-help errors out of the job's error stream, and
+            # -ErrorVariable collects them just the same.
             Update-Help -Scope CurrentUser -Force -ErrorAction SilentlyContinue -ErrorVariable errs 3>$null
-            $benign = 0
-            foreach ($e in @($errs)) {
-                $id = "$($e.FullyQualifiedErrorId)" -replace ',.*$', ''
-                switch ($id) {
-                    # the module simply ships no updatable help - the common
-                    # case, and not a failure of anything
-                    'HelpInfoUriNotFound' { $benign++ }
-                    'ModuleNotFound'      { $benign++ }
-                    'UpdatableHelpSystemRequiresElevation' {
-                        "FAILED elevation required: $($e.Exception.Message -replace '\s+', ' ')"
-                    }
-                    'HelpCultureNotSupported' {
-                        "FAILED UI culture not supported: $($e.Exception.Message -replace '\s+', ' ')"
-                    }
-                    default {
-                        # network, proxy, corrupt HelpInfo.xml, anything else
-                        "FAILED [$id]: $($e.Exception.Message -replace '\s+', ' ')"
-                    }
-                }
-            }
-            if ($benign) { "note: $benign module(s) ship no updatable help - nothing to download for them" }
-            'help update finished'
+            Get-PSMMUpdateHelpReport -ErrorRecords $errs
         } catch { "FAILED: $($_.Exception.Message)" }
     }
     $script:PSMM_UI.Status = "[$script:PSMM_ColAccent]Update-Help started in the background[/]"

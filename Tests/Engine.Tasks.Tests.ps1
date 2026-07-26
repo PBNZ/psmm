@@ -200,31 +200,101 @@ Remove-Module psmm
 
 Describe 'Update-Help failure classification (gh#26)' -Tag Engine {
 
-    # The four ids below were captured from live Update-Help runs on a real
-    # machine, not recalled: ModuleNotFound, HelpInfoUriNotFound,
-    # HelpCultureNotSupported, UpdatableHelpSystemRequiresElevation.
+    # These exercise the PRODUCTION classifier, Get-PSMMUpdateHelpReport. An
+    # earlier version of this file re-implemented the switch inside its own job
+    # scriptblock, which tested a copy and would have sat green through any
+    # regression in the real one.
+    #
+    # The four ids were captured from live Update-Help runs on a real machine,
+    # not recalled:
+    #   Update-Help -Module NonExistent      -> ModuleNotFound
+    #   Update-Help -Module PwshSpectreConsole -> HelpInfoUriNotFound
+    #   Update-Help -UICulture zz-ZZ         -> HelpCultureNotSupported
+    #   Update-Help -Scope AllUsers (unelev) -> UpdatableHelpSystemRequiresElevation
 
-    It 'classifies benign no-updatable-help as a note, not a failure' {
+    BeforeAll {
+        function New-HelpError([string]$Id, [string]$Message = 'boom') {
+            [System.Management.Automation.ErrorRecord]::new(
+                [Exception]::new($Message),
+                "$Id,Microsoft.PowerShell.Commands.UpdateHelpCommand",
+                [System.Management.Automation.ErrorCategory]::InvalidOperation, $null)
+        }
+    }
+
+    It 'reports no errors at all as a plain finish' {
+        $out = InModuleScope psmm { (Get-PSMMUpdateHelpReport -ErrorRecords @()) -join "`n" }
+        $out | Should -Be 'help update finished'
+        $out | Should -Not -Match 'FAILED'
+    }
+
+    It 'treats "ships no updatable help" and "no such module" as benign notes' {
+        $out = InModuleScope psmm -Parameters @{ recs = @((New-HelpError 'HelpInfoUriNotFound'), (New-HelpError 'ModuleNotFound')) } {
+            (Get-PSMMUpdateHelpReport -ErrorRecords $recs) -join "`n"
+        }
+        $out | Should -Match 'note: 2 module\(s\) ship no updatable help'
+        $out | Should -Not -Match 'FAILED'
+    }
+
+    It 'classifies elevation and UI-culture failures by name, and fails on them' {
+        $out = InModuleScope psmm -Parameters @{ recs = @(
+                (New-HelpError 'UpdatableHelpSystemRequiresElevation' 'Access is denied.')
+                (New-HelpError 'HelpCultureNotSupported' 'The specified culture is not supported: zz-ZZ.')
+            ) } { (Get-PSMMUpdateHelpReport -ErrorRecords $recs) -join "`n" }
+        $out | Should -Match 'FAILED elevation required: Access is denied\.'
+        $out | Should -Match 'FAILED UI culture not supported:.*zz-ZZ'
+    }
+
+    It 'reports an UNKNOWN id with the id attached, rather than swallowing it' {
+        # the network/proxy class lands here - it has no dedicated branch, but
+        # it must still be visible and must still fail the task
+        $out = InModuleScope psmm -Parameters @{ recs = @((New-HelpError 'UnableToConnectToHelpUri' 'The remote name could not be resolved.')) } {
+            (Get-PSMMUpdateHelpReport -ErrorRecords $recs) -join "`n"
+        }
+        $out | Should -Match 'FAILED \[UnableToConnectToHelpUri\]'
+        $out | Should -Match 'remote name could not be resolved'
+    }
+
+    It 'flattens multi-line messages so one failure stays one line' {
+        $out = InModuleScope psmm -Parameters @{ recs = @((New-HelpError 'HelpCultureNotSupported' "line one`nline two")) } {
+            (Get-PSMMUpdateHelpReport -ErrorRecords $recs) -join "`n"
+        }
+        @($out -split "`n" | Where-Object { $_ -like 'FAILED*' }).Count | Should -Be 1
+    }
+
+    It 'a classified failure makes the TASK fail, though the job completed fine' {
         $out = InModuleScope psmm {
-            $t = Start-PSMMTask -Label 'uh-benign' -Kind 'updatehelp' -ScriptBlock {
-                $errs = @(
+            $prelude = Get-PSMMJobPrelude -FunctionName @('Get-PSMMUpdateHelpReport')
+            $t = Start-PSMMTask -Label 'uh-endtoend' -Kind 'updatehelp' -ArgumentList (, $prelude) -ScriptBlock {
+                param($defs)
+                . ([scriptblock]::Create($defs))
+                Get-PSMMUpdateHelpReport -ErrorRecords @(
                     [System.Management.Automation.ErrorRecord]::new(
-                        [Exception]::new('does not support updatable help'), 'HelpInfoUriNotFound,Microsoft.PowerShell.Commands.UpdateHelpCommand',
-                        'InvalidOperation', $null)
-                )
-                $benign = 0
-                foreach ($e in $errs) {
-                    $id = "$($e.FullyQualifiedErrorId)" -replace ',.*$', ''
-                    switch ($id) {
-                        'HelpInfoUriNotFound' { $benign++ }
-                        'ModuleNotFound'      { $benign++ }
-                        'UpdatableHelpSystemRequiresElevation' { "FAILED elevation required: $($e.Exception.Message)" }
-                        'HelpCultureNotSupported' { "FAILED UI culture not supported: $($e.Exception.Message)" }
-                        default { "FAILED [$id]: $($e.Exception.Message)" }
-                    }
-                }
-                if ($benign) { "note: $benign module(s) ship no updatable help - nothing to download for them" }
-                'help update finished'
+                        [Exception]::new('Access is denied.'),
+                        'UpdatableHelpSystemRequiresElevation,Microsoft.PowerShell.Commands.UpdateHelpCommand',
+                        [System.Management.Automation.ErrorCategory]::InvalidOperation, $null))
+            }
+            $null = $t.Job | Wait-Job
+            Update-PSMMTask
+            $r = [pscustomobject]@{ State = "$($t.Job.State)"; Failed = $t.Failed; Text = ($t.Output -join "`n") }
+            Clear-PSMMTask
+            $r
+        }
+        $out.State  | Should -Be 'Completed' -Because 'Update-Help errors are non-terminating - that is the whole trap'
+        $out.Failed | Should -BeTrue
+        $out.Text   | Should -Match 'FAILED elevation required'
+    }
+
+    It 'a benign-only run does NOT fail the task' {
+        $out = InModuleScope psmm {
+            $prelude = Get-PSMMJobPrelude -FunctionName @('Get-PSMMUpdateHelpReport')
+            $t = Start-PSMMTask -Label 'uh-benign' -Kind 'updatehelp' -ArgumentList (, $prelude) -ScriptBlock {
+                param($defs)
+                . ([scriptblock]::Create($defs))
+                Get-PSMMUpdateHelpReport -ErrorRecords @(
+                    [System.Management.Automation.ErrorRecord]::new(
+                        [Exception]::new('does not support updatable help'),
+                        'HelpInfoUriNotFound,Microsoft.PowerShell.Commands.UpdateHelpCommand',
+                        [System.Management.Automation.ErrorCategory]::InvalidOperation, $null))
             }
             $null = $t.Job | Wait-Job
             Update-PSMMTask
@@ -234,21 +304,5 @@ Describe 'Update-Help failure classification (gh#26)' -Tag Engine {
         }
         $out.Failed | Should -BeFalse
         $out.Text   | Should -Match 'ship no updatable help'
-    }
-
-    It 'a real failure id makes the task fail instead of reporting done' {
-        $out = InModuleScope psmm {
-            $t = Start-PSMMTask -Label 'uh-elevation' -Kind 'updatehelp' -ScriptBlock {
-                'FAILED elevation required: Access is denied.'
-                'help update finished'
-            }
-            $null = $t.Job | Wait-Job
-            Update-PSMMTask
-            $r = [pscustomobject]@{ State = "$($t.Job.State)"; Failed = $t.Failed }
-            Clear-PSMMTask
-            $r
-        }
-        $out.State  | Should -Be 'Completed'
-        $out.Failed | Should -BeTrue
     }
 }

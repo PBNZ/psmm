@@ -181,8 +181,16 @@ function Install-PSMMModule {
         # entry's policy says: you cannot install 1.2.3-beta4 without it
         $pre = [bool]$Prerelease -or ($Version -match '^\d+(\.\d+){1,3}-')
         if ($Version) {
-            # A pin always installs the pinned version/range, update or not.
-            Install-PSResource -Name $Name -Version $Version -Scope $Scope -Prerelease:$pre -TrustRepository -Reinstall:$Update -ErrorAction Stop
+            # A pin installs the pinned version/range - and NEVER with
+            # -Reinstall, which is gh#20 for range pins. Measured against a
+            # local feed: with -Reinstall the module folder is deleted and
+            # re-extracted even when the range is already satisfied, so
+            # `Latest` + "[1.0,2.0)" re-downloaded on every single shell start.
+            # Without it PSResourceGet skips an already-satisfied range
+            # ("Resource ... is already installed") and still installs the
+            # newest in range the moment one appears - which is exactly what
+            # `Latest` within a range is supposed to mean.
+            Install-PSResource -Name $Name -Version $Version -Scope $Scope -Prerelease:$pre -TrustRepository -ErrorAction Stop
         } elseif ($Update -and (Get-Module -ListAvailable -Name $Name) -and ($pre -or (Test-PSMMInstalledPrerelease -Name $Name))) {
             # Prerelease track: Update-PSResource is blind to a
             # prerelease-label-only bump (beta2 -> beta3 shares the base

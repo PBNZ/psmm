@@ -110,6 +110,10 @@ function Start-PSMMDeferredJob {
     param([Parameter(Mandatory)] $Plans)
     $list = @($Plans)
     $script:PSMM_JobTotal = $list.Count
+    # a new job starts a new buffer: calling Invoke-PSMMStartup twice in one
+    # session otherwise left the grid reporting cumulative counts from both
+    $script:PSMM_StartupOutput = [System.Collections.Generic.List[string]]::new()
+    $script:PSMM_StartupLineCount = 0
     # one object, so -ArgumentList cannot unroll the plan array (gh#1)
     $payload = [pscustomobject]@{ Plans = $list; Prelude = (Get-PSMMJobPrelude) }
     $script:PSMM_StartupJob = Start-ThreadJob -Name 'PSMM-Startup' -ScriptBlock {
@@ -136,7 +140,18 @@ function Update-PSMMStartupJobOutput {
     if (-not $script:PSMM_StartupOutput) { $script:PSMM_StartupOutput = [System.Collections.Generic.List[string]]::new() }
     try {
         foreach ($line in @(Receive-Job -Job $job -ErrorAction SilentlyContinue)) {
-            $script:PSMM_StartupOutput.Add("$line")
+            $s = "$line"
+            if ($s.Length -gt $script:PSMM_TaskCharCap) {
+                $s = $s.Substring(0, $script:PSMM_TaskCharCap) + " $([char]0x2026)[line truncated]"
+            }
+            $script:PSMM_StartupOutput.Add($s)
+            $script:PSMM_StartupLineCount = [int]$script:PSMM_StartupLineCount + 1
+        }
+        # bounded like the task ring buffer (gh#24): the startup job emits one
+        # line per module normally, but a provider that decides to be chatty
+        # must not be able to grow this without limit either
+        if ($script:PSMM_StartupOutput.Count -gt $script:PSMM_TaskLineCap) {
+            $script:PSMM_StartupOutput.RemoveRange(0, $script:PSMM_StartupOutput.Count - $script:PSMM_TaskLineCap)
         }
     } catch { }
 }
@@ -145,4 +160,13 @@ function Get-PSMMStartupJobOutput {
     [CmdletBinding()] param()
     Update-PSMMStartupJobOutput
     if ($script:PSMM_StartupOutput) { @($script:PSMM_StartupOutput) } else { @() }
+}
+
+# Total lines the startup job has ever produced. The buffer above is capped,
+# so its .Count is not a progress number - this is (gh#24, same lesson as
+# the task registry's LineCount).
+function Get-PSMMStartupJobLineCount {
+    [CmdletBinding()] param()
+    Update-PSMMStartupJobOutput
+    [int]$script:PSMM_StartupLineCount
 }

@@ -16,3 +16,6 @@ __pycache__/
 # editor noise
 .vscode/
 *.swp
+
+# agent/session scratch — per-clone state, never part of the module
+.claude/

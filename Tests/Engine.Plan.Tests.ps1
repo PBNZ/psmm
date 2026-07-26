@@ -69,6 +69,7 @@ Describe 'Get-PSMMEntryPlan - the nine cells' -Tag Engine {
         $p.Install  | Should -Be 'ifmissing'
         $p.Check    | Should -BeTrue
         $p.Schedule | Should -Be 'background'
+        $p.Reason   | Should -Be 'background-installs at shell start when missing'
     }
 
     It 'cell 6: InstallOnly + Latest - keeps newest on disk, never imports' {
@@ -77,19 +78,38 @@ Describe 'Get-PSMMEntryPlan - the nine cells' -Tag Engine {
         $p.Install  | Should -Be 'latest'
         $p.Check    | Should -BeTrue
         $p.Schedule | Should -Be 'background'
+        $p.Reason   | Should -Be 'background-updates to latest at shell start'
     }
 
     # ---- Mode = Ignore (cells 7-9) ----------------------------------------
+    # One It per cell, not a loop: the plan asks for nine, and a loop reports
+    # one failure for whichever value trips first rather than naming the cell.
 
-    It 'cells 7-9: Ignore + any Install - nothing, and no gallery I/O of any kind' {
-        foreach ($i in 'CheckOnly', 'IfMissing', 'Latest') {
-            $p = New-Plan @{ Name = 'M'; Mode = 'Ignore'; Install = $i }
-            $p.Import   | Should -BeFalse -Because "Ignore+$i must not import"
-            $p.Install  | Should -Be 'none' -Because "Ignore+$i must not install"
-            $p.Check    | Should -BeFalse  -Because "Ignore+$i must not reach the gallery"
-            $p.Schedule | Should -Be 'none'
-            $p.Reason   | Should -Be 'off - nothing happens at shell start'
-        }
+    It 'cell 7: Ignore + CheckOnly - nothing, and no gallery I/O of any kind' {
+        $p = New-Plan @{ Name = 'M'; Mode = 'Ignore'; Install = 'CheckOnly' }
+        $p.Import   | Should -BeFalse
+        $p.Install  | Should -Be 'none'
+        $p.Check    | Should -BeFalse
+        $p.Schedule | Should -Be 'none'
+        $p.Reason   | Should -Be 'off - nothing happens at shell start'
+    }
+
+    It 'cell 8: Ignore + IfMissing - nothing, and no gallery I/O of any kind' {
+        $p = New-Plan @{ Name = 'M'; Mode = 'Ignore'; Install = 'IfMissing' }
+        $p.Import   | Should -BeFalse
+        $p.Install  | Should -Be 'none'
+        $p.Check    | Should -BeFalse
+        $p.Schedule | Should -Be 'none'
+        $p.Reason   | Should -Be 'off - nothing happens at shell start'
+    }
+
+    It 'cell 9: Ignore + Latest - nothing, and no gallery I/O of any kind' {
+        $p = New-Plan @{ Name = 'M'; Mode = 'Ignore'; Install = 'Latest' }
+        $p.Import   | Should -BeFalse
+        $p.Install  | Should -Be 'none'
+        $p.Check    | Should -BeFalse
+        $p.Schedule | Should -Be 'none'
+        $p.Reason   | Should -Be 'off - nothing happens at shell start'
     }
 
     It 'cells 7-9: an EXPLICIT Install policy under Ignore gets the cross-field notice' {

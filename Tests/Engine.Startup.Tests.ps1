@@ -301,6 +301,29 @@ Describe 'Start-PSMMDeferredJob (real ThreadJob, mocked gallery)' -Tag Engine {
         $result.Action  | Should -Be 'ok Pester'   # present: nothing done
     }
 
+    It 'a version pin never force-reinstalls, exact or range (gh#20)' {
+        # The exact-pin case is caught earlier by Test-PSMMVersionInstalled.
+        # The RANGE case is not, and cannot be - "newest in range" is a moving
+        # target - so the actuator must simply never pass -Reinstall for a pin.
+        #
+        # Measured against a local feed before writing this: with -Reinstall
+        # the module folder is deleted and re-extracted even when the range is
+        # already satisfied (sentinel file inside it disappears), so
+        # Latest + "[1.0,2.0)" re-downloaded on EVERY shell start. Without it,
+        # PSResourceGet skips the satisfied range and still takes a newer
+        # in-range version the moment one is published.
+        InModuleScope psmm {
+            Mock Install-PSResource { }
+            Mock Get-Module { @([pscustomobject]@{ Name = 'RangeMod'; Version = [version]'1.5.0' }) } -ParameterFilter { $ListAvailable }
+            Install-PSMMModule -Name 'RangeMod' -Update -Version '[1.0,2.0)'
+            Should -Invoke Install-PSResource -Times 1 -Exactly
+            Should -Invoke Install-PSResource -Times 0 -Exactly -ParameterFilter { $Reinstall } `
+                -Because 'a range pin that is already satisfied must not be re-downloaded every shell start'
+            Should -Invoke Install-PSResource -Times 1 -Exactly -ParameterFilter { $Version -eq '[1.0,2.0)' } `
+                -Because 'the range still has to reach the provider - it is what makes Latest mean newest-in-range'
+        }
+    }
+
     It 'Latest + prerelease reaches the job with -Prerelease and -Scope intact (gh#25)' {
         # The old job body called `Update-PSResource -Name $m.Name` with
         # neither, so a prerelease-tracking module silently fell back to the

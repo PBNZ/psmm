@@ -1,7 +1,7 @@
 # rc02 handoff — what to look at before merging
 
-Branch: **`fix/rc02-engine-correctness`** (4 commits). **No PR opened** — that
-was deliberate, per the brief.
+Branch: **`fix/rc02-engine-correctness`**, open as
+[PR #31](https://github.com/PBNZ/psmm/pull/31).
 
 All eleven issues [#19–#29](https://github.com/PBNZ/psmm/issues) are fixed.
 The full rationale is in `CHANGELOG.md` and `DECISIONS.md` `D-PLAN`; this
@@ -91,12 +91,12 @@ fix.
 
 ### 1.3b Your own modules were being filed as `AllUsers`
 
-Your `$HOME` is `C:\Users\<user>` but your Documents — and so your CurrentUser
-module folder — is `E:\Users\<user>\Documents`. The user-vs-machine test was a
-bare `$HOME` prefix comparison, so **every module you have installed** was
-reported machine-wide: shown as read-only in the grid, and skipped by version
-cleanup as "session is not elevated". Cleanup was effectively dead on your
-machine. It now also tests the Documents-derived root, which psmm already
+On the maintainer's machine `$HOME` is on `C:` while Documents — and so the
+CurrentUser module folder — is on another drive entirely. The user-vs-machine
+test was a bare `$HOME` prefix comparison, so **every module installed there**
+was reported machine-wide: shown as read-only in the grid, and skipped by
+version cleanup as "session is not elevated". Cleanup was effectively dead on
+that machine. It now also tests the Documents-derived root, which psmm already
 computed for its OneDrive diagnostics.
 
 This is the "related, worth fixing at the same time" note on #27, and it is
@@ -146,13 +146,17 @@ just the rc02 behaviours. It will need the D-4 pass at rc03 as planned.
 
 ## 3. Verification actually run (not claimed)
 
+Numbers below are from the branch tip. CI has run them on GitHub's own
+runners too — that is the authority, not this table.
+
 | Check | Result |
 |---|---|
-| Pester, Windows, full suite | **334/334** (was 283 — 51 new tests) |
-| Pester, **Linux**, `-Tag Engine` (Docker, pwsh 7.4.2) | **204/204** |
+| Pester, Windows, full suite | **354/354** (was 283 — 71 new tests) |
+| Pester, **Linux**, `-Tag Engine` | **209/209** (2 Windows-only tests skipped) |
 | PSScriptAnalyzer, repo source | **0 errors / 0 warnings** |
 | ConPTY keystroke harness, real TUI | **all checks pass** |
 | Startup A/B vs rc01, same filesystem, 15 runs | `Invoke-PSMMStartup` 101 → **98 ms**; `Import-Module` 184 → **190 ms** |
+| Packaging | stages, publishes to a local repository, and a staged copy imports in a fresh process |
 
 The nine per-cell matrix tests, the "no network on the startup path" gate and
 the single-decision static guard are all in `Tests/Engine.Plan.Tests.ps1` and
