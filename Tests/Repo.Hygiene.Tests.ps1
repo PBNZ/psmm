@@ -27,13 +27,24 @@ BeforeAll {
     function Get-TrackedText {
         param([string[]]$ExcludeLike = @())
         foreach ($rel in $script:Tracked) {
-            foreach ($x in $ExcludeLike) { if ($rel -like $x) { return } }
+            # NB: a flag, not `return` - `return` inside this nested foreach
+            # would exit the whole FUNCTION at the first excluded file and
+            # silently stop scanning everything after it. It did exactly that
+            # until CI caught it, which is the failure mode this guard exists
+            # to prevent, so it is worth the comment.
+            $skip = $false
+            foreach ($x in $ExcludeLike) { if ($rel -like $x) { $skip = $true; break } }
+            if ($skip) { continue }
             $full = Join-Path $script:RepoRoot $rel
-            if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
-            # skip binaries and anything oversized
-            if ((Get-Item -LiteralPath $full).Length -gt 2MB) { continue }
+            # -Force everywhere: on Unix a leading dot makes a file HIDDEN to
+            # the PowerShell provider, so .gitignore / .github are invisible
+            # without it - and those are exactly the files worth scanning.
+            $item = $null
+            try { $item = Get-Item -LiteralPath $full -Force -ErrorAction Stop } catch { continue }
+            if ($item.PSIsContainer) { continue }
+            if ($item.Length -gt 2MB) { continue }          # binaries / oversized
             $text = $null
-            try { $text = Get-Content -LiteralPath $full -Raw -ErrorAction Stop } catch { continue }
+            try { $text = Get-Content -LiteralPath $full -Raw -Force -ErrorAction Stop } catch { continue }
             if ($null -eq $text) { continue }
             [pscustomobject]@{ Path = $rel; Text = $text }
         }
@@ -143,5 +154,21 @@ Describe 'Repository hygiene - nothing personal in tracked files' -Tag Engine, H
         @($script:Tracked).Count | Should -BeGreaterThan 20
         $script:Tracked | Should -Contain 'psmm.psd1'
         $script:Tracked | Should -Contain 'docs/rc02-handoff.md'
+    }
+
+    It 'actually reads every tracked file, including hidden ones and those after an exclusion' {
+        # Two ways this guard can go quietly blind, both of which it did:
+        #  1. `return` in the exclusion loop stopped the scan at the first
+        #     excluded file, so everything sorting after it went unchecked.
+        #  2. Without -Force, dot-files are HIDDEN to the provider on Unix, so
+        #     .gitignore and .github/** were unreadable and threw.
+        $seen = @(Get-TrackedText -ExcludeLike @('Tests/Repo.Hygiene.Tests.ps1')).Path
+        $seen | Should -Not -Contain 'Tests/Repo.Hygiene.Tests.ps1' -Because 'the exclusion must work'
+        $seen | Should -Contain '.gitignore' -Because 'dot-files are hidden on Unix without -Force'
+        $seen | Should -Contain '.github/workflows/ci.yml'
+        # sorts AFTER the excluded file in git ls-files byte order, so a
+        # truncating scan would miss it
+        $seen | Should -Contain 'psmm.psd1' -Because 'the scan must not stop at the first exclusion'
+        @($seen).Count | Should -BeGreaterThan (@($script:Tracked).Count * 0.7) -Because 'most tracked files should be readable text'
     }
 }
