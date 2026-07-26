@@ -148,6 +148,27 @@ from the current files AND from history (docs/fixture/harness were removed
 from past commits and re-added clean; commit trailers stripped). Cleared
 for full-history publish.
 
+**This is now a gate, not a memory.** `Tests/Repo.Hygiene.Tests.ps1` scans
+every git-tracked file on every run of the suite — locally and in CI — for
+home-directory paths carrying a real account name, for the account name of
+whoever is running it (read from the environment, so it protects every
+contributor and hard-codes nobody), and for personal email addresses. The
+maintainer's public handle is read from the manifest's `Author` and allowed,
+because identifying by handle is the policy.
+
+It exists because during 0.1.0-rc02 a diagnostic's raw output — a real
+account name and drive layout — was pasted into a handoff document as
+evidence and pushed to the public remote. It was caught by review, not by a
+check; the ad-hoc grep that would have caught it had been run three commits
+earlier and never repeated. The history was rewritten to remove it. **A check
+you have to remember to run is not a check** — hence the test.
+
+> Rewriting published history does not unpublish it: old commits stay
+> reachable by SHA on GitHub until garbage collection, and a PR keeps
+> referencing them. If something genuinely sensitive ever lands, rewriting is
+> the first step, not the whole remedy — rotate the secret, and ask GitHub
+> Support to purge the objects.
+
 1. Create the repo public and push:
    `gh repo create PBNZ/psmm --public --source . --push`
    (or start `--private` and flip to public after the CI run).
