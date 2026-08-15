@@ -262,7 +262,8 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             $tasks = @([pscustomobject]@{
                 Id = 1; Label = 'update check (5 modules)'; Kind = 'updatecheck'; Data = $null
                 Job = $null; StartedAt = [datetime]'2026-07-04 10:00:00'
-                Output = @('a', 'b'); Done = $true; Failed = $false; Seen = $true
+                Output = @('a', 'b'); LineCount = 2; Dropped = 0
+                Done = $true; Failed = $false; Cancelled = $false; Seen = $true
             })
             Build-PSMMTasksView -State $st -Tasks $tasks
         }
@@ -278,7 +279,10 @@ Describe 'UI rendering (headless)' -Tag UI -Skip:(-not $SpectreAvailable) {
             @($tabs.get_Keys()) | Should -Be @('this screen', 'keys', 'config', 'startup', 'about')
             @($tabs['this screen']).Count | Should -BeGreaterThan 3 -Because "topic '$topic' should describe its screen"
             $flat = (InModuleScope psmm -Parameters @{ t = $topic } { Get-PSMMHelpText -Topic $t }) -join "`n"
-            $flat | Should -Match 'Install and Mode are independent'
+            # the startup tab must state the rule the whole release turns on:
+            # the import is the only foreground action (gh#19)
+            $flat | Should -Match 'Mode decides load-vs-not'
+            $flat | Should -Match 'ONLY thing that happens before your prompt'
             $flat | Should -Match 'psmm-config\.json'
         }
         # per-screen sections actually differ
@@ -821,6 +825,50 @@ Describe 'UI v2 design system (docs/design-system-v2.md)' -Tag UI -Skip:(-not $S
             $tiny.Top | Should -Be 1  # clamp to top-left
             $tiny.Left | Should -Be 1
         }
+    }
+
+    It 'the module menu guards ^l with Ctrl, like every hint says' {
+        # Live drift called out in docs/rust-ui-plan.md 2.2: the submenu loaded
+        # on BARE 'l' while every hint and help row advertised '^l', so a stray
+        # keystroke imported a module into the user's session with nothing
+        # having offered to. The existing test only asserted that the STRING
+        # '^l load' renders, which the buggy code also did.
+        $src = Get-Content -Raw (Join-Path $PSScriptRoot '..' 'src' 'UI' '20-Submenu.ps1')
+        # the ConsoleKey::L branch must test $ctrl before doing anything
+        $branch = [regex]::Match($src, '\(\[ConsoleKey\]::L\)\s*\{(?<body>.{0,400})', 'Singleline')
+        $branch.Success | Should -BeTrue -Because 'the module menu must still handle L'
+        $branch.Groups['body'].Value | Should -Match '\$ctrl' -Because 'bare l must not import into the session'
+    }
+
+    It 'psmm never waits for a key with a visible cursor' {
+        # Spectre's LiveDisplay writes ESC[?25h when it exits - verified from
+        # the real assembly - so the cursor is SHOWN again every time a live
+        # screen hands back, and Spectre's selection prompt leaves it shown
+        # too. Any [Console]::ReadKey that is not immediately preceded by a
+        # re-hide will therefore blink over the frame, which is what the
+        # module menu did from the original UI commit until 0.1.0-rc02.
+        #
+        # Exempt: Read-PSMMKeyResize (only ever runs INSIDE a live display,
+        # which has already hidden it) and Read-PSMMText (deliberately shows
+        # the cursor while you type, and re-hides it in its own finally).
+        $root = Join-Path $PSScriptRoot '..' 'src' 'UI'
+        $exempt = @('Read-PSMMKeyResize', 'Read-PSMMText')
+        $offenders = [System.Collections.Generic.List[string]]::new()
+        foreach ($f in (Get-ChildItem -LiteralPath $root -Filter *.ps1)) {
+            $lines = @(Get-Content -LiteralPath $f.FullName)
+            $fn = ''
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+                if ($lines[$i] -match '^\s*function\s+(script:)?([\w-]+)') { $fn = $Matches[2] }
+                if ($lines[$i] -notmatch '\[Console\]::ReadKey') { continue }
+                if ($fn -in $exempt) { continue }
+                # the re-hide must be on one of the few lines directly above
+                $window = $lines[([Math]::Max(0, $i - 3))..$i] -join "`n"
+                if ($window -notmatch 'Hide-PSMMCursor') {
+                    $offenders.Add("$($f.Name):$($i + 1)  (in $fn)  $($lines[$i].Trim())")
+                }
+            }
+        }
+        $offenders | Should -BeNullOrEmpty -Because "each of these blocks on a key with the cursor possibly visible:`n$($offenders -join "`n")"
     }
 
     It 'the content box of a frame excludes the padded header bar from the width (live-run fix 2)' {

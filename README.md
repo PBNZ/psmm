@@ -100,24 +100,31 @@ just write the JSON yourself:
 ```
 
 **3. Restart your shell.** Managed `Load` modules import (with per-module
-timings so you always know what's slow); `InstallOnly` work runs in a
-background job; the report tells you what happened.
+timings so you always know what's slow). Every install, update and gallery
+lookup runs in a background job — nothing at shell start waits on the
+network. The report tells you what happened, including anything being
+installed behind you and therefore ready next session.
 
 **4. Manage interactively.** Run `psmm` (the very first launch floats a
 quick-tips panel over the grid — the three keys worth knowing, shown once):
 
 - one grid row per module: state (`●` loaded / `◐` installed / `○` missing /
-  `◌` unmanaged), what happens at **startup**, how psmm keeps it on disk
-  (**upkeep**),
+  `◌` unmanaged / `◈` psmm's own — psmm and its UI engine are infrastructure,
+  not part of your session), what happens at **startup**, how psmm keeps it
+  on disk (**upkeep**),
   version (`⇡` = update available), scope, file — plus a plain-words context
   sentence for the row under the cursor
-- `space` select · `^l`/`^u` load/unload (`^` = ctrl) · `i` install · `u` update
-  · `k` check for updates
+- `space` select · `enter` (or `right`) open the row's actions · `^l`/`^u`
+  load/unload (`^` = ctrl) · `i` install · `u` update · `k` check for updates
+  · `a` add · `r` reload · `m` show/hide unmanaged
 - `left`/`right` back out / open the row — the same pair on every screen
 - `g` opens the **goto layer** (anywhere): `g h` home · `g g` gallery search ·
   `g f` config files · `g p` module locations · `g t` background tasks ·
-  `g c` conflicts · `g x` version cleanup
-- `/` filter (everywhere) · `?` tabbed help (everywhere) · `^q` quit (anywhere)
+  `g c` conflicts · `g x` version cleanup · `g ?` the key reference
+- `/` filter (everywhere) · `?` tabbed help (everywhere) · `^q` or `^x` quit
+  (anywhere)
+- background tasks (`g t`): `enter` view output · `x` cancel a running task ·
+  `u` background `Update-Help` · `c` clear finished
 - per module: where it actually lives on disk and under which search root,
   every installed version, pin a version from a list of what exists, allow
   prereleases (`w`), browse its commands, or move its folder to another
@@ -160,7 +167,9 @@ Full reference: [docs/config-schema.md](docs/config-schema.md). The short
 version: up to five sources (inline JSON, the main config at
 `~/.psmm/psmm-config.json`, its `Includes`, a profile-directory config,
 legacy globs); per-module `Install` policy (`CheckOnly` / `IfMissing` /
-`Latest`) is independent of `Mode` (`Load` / `InstallOnly` / `Ignore`);
+`Latest`) sets the disk/gallery policy and `Mode` (`Load` / `InstallOnly` /
+`Ignore`) decides whether it is imported — the import is the only thing that
+happens in the foreground, and everything else is deferred;
 optional `Version` pins an exact version or NuGet range; optional
 `"Prerelease": true` lets a module track prerelease builds; `"Enabled": false`
 parks a whole file without losing it; the main config wins name conflicts.

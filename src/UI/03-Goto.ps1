@@ -59,6 +59,7 @@ function script:Build-PSMMGotoPanel {
 function script:Read-PSMMGotoKey {
     [CmdletBinding()] param($BaseRenderable)
     $region = Write-PSMMOverlay -Renderable (Build-PSMMGotoPanel) -Content $BaseRenderable
+    Hide-PSMMCursor      # reachable from the non-live screens too (module menu, tasks)
     $k2 = [Console]::ReadKey($true)
     Clear-PSMMOverlay -Region $region
     if (Test-PSMMHardQuitKey $k2) { $script:PSMM_UI.HardQuit = $true; return $null }

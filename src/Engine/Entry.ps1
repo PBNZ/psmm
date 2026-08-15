@@ -18,7 +18,13 @@ function Resolve-PSMMEntry {
     $name = [string]$Raw.Name
     if ([string]::IsNullOrWhiteSpace($name)) { $issues.Add('Missing Name') }
 
-    $install = if ($Raw.PSObject.Properties['Install'] -and $Raw.Install) { [string]$Raw.Install } else { 'IfMissing' }
+    # InstallExplicit records whether the USER wrote an Install policy, as
+    # opposed to inheriting the default. The cross-field lint needs the
+    # difference: "Install has no effect while Mode is Ignore" is worth saying
+    # to someone who typed Latest, and pure noise on every Ignore entry that
+    # never mentioned Install at all (gh#29, plan §4 cells 7-9).
+    $installExplicit = [bool]($Raw.PSObject.Properties['Install'] -and $Raw.Install)
+    $install = if ($installExplicit) { [string]$Raw.Install } else { 'IfMissing' }
     if ($install -notin $validInstall) { $issues.Add("Invalid Install '$install' (using IfMissing)"); $install = 'IfMissing' }
 
     $mode = if ($Raw.PSObject.Properties['Mode'] -and $Raw.Mode) { [string]$Raw.Mode } else { 'Load' }
@@ -60,6 +66,7 @@ function Resolve-PSMMEntry {
         FriendlyName       = if ($Raw.FriendlyName) { [string]$Raw.FriendlyName } else { $name }
         Description        = [string]$Raw.Description
         Install            = $install
+        InstallExplicit    = $installExplicit   # the user wrote it, vs inherited the default
         Mode               = $mode
         Version            = $version
         PinnedExact        = $pinnedExact
@@ -74,6 +81,7 @@ function Resolve-PSMMEntry {
         InstalledPrerelease = ''     # label of the newest installed copy ('' = stable)
         InstalledVersions  = @()     # every installed version (duplicate-cleanup feature)
         InstallScope       = $null   # CurrentUser | AllUsers | mixed | $null (unknown)
+        IsSystem           = $false  # ships with PowerShell ($PSHOME / System32) - see Test-PSMMPlatformModulePath
         Loaded             = $false
         LoadedVersion      = $null
         LoadedPrerelease   = ''

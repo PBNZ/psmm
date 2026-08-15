@@ -43,7 +43,30 @@ sandbox shows no meaningful regression vs. 233 ms.
 
 In-process split: `Import-Module` 118 ms + `Invoke-PSMMStartup` (zero
 configs) 48 ms. **Verdict: +32 ms over the block (≈12%, imperceptible at
-shell start) — accepted as within the PRD's "small margin".** The delta is
+shell start) — accepted as within the PRD's "small margin".**
+
+> **The 118/48 split does not reproduce on other machines and is not a
+> portable gate.** Re-measured 2026-07-26 on the maintainer's Windows 11 box
+> (pwsh 7.6.3, same zero-config sandbox, 15 runs, median): rc01 itself came
+> out at **184 ms + 101 ms**. Absolute numbers move with machine, pwsh
+> version and disk; compare A/B against the previous commit under identical
+> conditions instead. Two traps worth knowing: measure both sides from the
+> **same** filesystem — a worktree on local disk against a checkout inside
+> OneDrive showed a phantom 30 ms — and discard the first run, which is
+> consistently a large outlier.
+
+### rc02 re-measurement (2026-07-26, A/B, both worktrees on local disk)
+
+| Scenario | rc01 (main) | rc02 (branch) | Δ |
+|---|---|---|---|
+| `Import-Module psmm` | 183.7 ms | 190.0 ms | **+6.3 ms** |
+| `Invoke-PSMMStartup` (zero configs) | 101.2 ms | 98.0 ms | **−3.2 ms** |
+
+15 runs each, median. The import cost is one extra source file
+(`src/Engine/Plan.ps1`) plus the `OnRemove` assignment, and sits inside the
+run-to-run spread (rc01 164–227, rc02 171–243). Startup is unchanged-to-
+slightly-faster, which is the direction rc02 intends: the loader now does
+strictly less work in the foreground. The delta is
 Import-Module manifest/session machinery + 11 source files vs. one; merging
 files would need a build step (complexity) for ~tens of ms — declined. The
 UI (14 more files + Spectre.Console) is parsed/loaded only on first `psmm`

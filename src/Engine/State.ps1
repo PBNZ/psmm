@@ -119,12 +119,19 @@ function Update-PSMMAvailable {
                 Prerelease = (Get-PSMMPrereleaseLabel -ModuleInfo $_)
                 Path       = $_.ModuleBase
                 Scope      = Get-PSMMScopeForPath -Path $_.ModuleBase
+                IsSystem   = (Test-PSMMPlatformModulePath -Path "$($_.ModuleBase)")
                 ModuleType = "$($_.ModuleType)"
                 Manifest   = "$($_.Path)"
             }
         })
         $scopes = @($entry.InstalledVersions.Scope | Select-Object -Unique)
         $entry.InstallScope = if ($scopes.Count -gt 1) { 'mixed' } elseif ($scopes.Count -eq 1) { $scopes[0] } else { $null }
+        # "did this ship with PowerShell" is re-derived here as well as in the
+        # unmanaged scan, because THIS is the path that wins: a -FullScan runs
+        # Update-PSMMAvailable over the unmanaged rows too and overwrites
+        # InstallScope from disk. A marker set only by the scan would survive
+        # the 'm' toggle and vanish on reload (gh#27).
+        $entry.IsSystem = [bool]($sorted -and (Test-PSMMPlatformModulePath -Path "$($sorted[0].ModuleBase)"))
     }
 
     if ($Name) {
@@ -157,9 +164,10 @@ function Get-PSMMDuplicateVersion {
                 Latest   = $sorted[0].Version
                 Obsolete = @($sorted | Select-Object -Skip 1 | ForEach-Object {
                     [pscustomobject]@{
-                        Version = $_.Version
-                        Path    = $_.ModuleBase
-                        Scope   = Get-PSMMScopeForPath -Path $_.ModuleBase
+                        Version  = $_.Version
+                        Path     = $_.ModuleBase
+                        Scope    = Get-PSMMScopeForPath -Path $_.ModuleBase
+                        IsSystem = (Test-PSMMPlatformModulePath -Path "$($_.ModuleBase)")
                     }
                 })
             }
@@ -168,8 +176,46 @@ function Get-PSMMDuplicateVersion {
 
 # Installed modules NOT named in any config file (unmanaged-module feature).
 # Returns one object per module name, newest version, with scope.
+#
 # psmm's own modules are excluded: offering the user psmm's UI engine as
 # something to "adopt into a config" is noise, not a feature (gh#16).
+#
+# The platform's own modules are NOT excluded - they are MARKED (gh#27).
+# PBNZ's ruling: you still want to browse their commands and read their help
+# through psmm, so hiding them removes a real use. What was wrong was calling
+# them "AllUsers", which made modules that ship with PowerShell look like
+# ordinary machine-wide installs you could adopt, update or remove.
+#
+# The mark is a SEPARATE property, deliberately not a third Scope value: both
+# elevation guards are written as `-eq 'AllUsers'` / `-ne 'AllUsers'` string
+# tests (65-Cleanup.ps1, 20-Submenu.ps1) and an unrecognised third value would
+# fall OPEN through them - an unelevated session would start trying to
+# uninstall copies under $PSHOME. Scope stays the answer to "what would I have
+# to install to in order to replace this"; System answers "did this ship with
+# PowerShell".
+#
+# This is the ONLY implementation. The background scan used to carry a second
+# copy with its own inlined scope classifier, which meant the tested code was
+# not the running code; the job now dot-sources this function instead
+# (see Start-PSMMUnmanagedScan / Get-PSMMJobPrelude).
+# The source text a background scan must dot-source to run the function below.
+# Defined HERE, next to the function whose dependencies it lists, and used by
+# both the UI's scan job and its test - a hand-maintained list kept in two
+# places is how the scan came to be implemented twice in the first place, and
+# a missing transitive dependency only fails at runtime, inside a job.
+function Get-PSMMUnmanagedScanPrelude {
+    [CmdletBinding()] param()
+    Get-PSMMJobPrelude -FunctionName @(
+        'Get-PSMMUIDependencyName'
+        'Get-PSMMOwnModuleName'
+        'Get-PSMMUserDefaultModulePath'   # Get-PSMMUserModuleRoot needs it
+        'Get-PSMMUserModuleRoot'          # Get-PSMMScopeForPath needs it
+        'Get-PSMMScopeForPath'
+        'Test-PSMMPlatformModulePath'
+        'Get-PSMMUnmanagedModule'
+    )
+}
+
 function Get-PSMMUnmanagedModule {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string[]]$ManagedNames)
@@ -184,6 +230,7 @@ function Get-PSMMUnmanagedModule {
                 Name        = $_.Name
                 Version     = $newest.Version
                 Scope       = Get-PSMMScopeForPath -Path $newest.ModuleBase
+                IsSystem    = (Test-PSMMPlatformModulePath -Path "$($newest.ModuleBase)")
                 Description = $newest.Description
             }
         }

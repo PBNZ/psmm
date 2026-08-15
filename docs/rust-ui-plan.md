@@ -323,6 +323,23 @@ behaviour, but say so in the row rather than silently); **Check is suppressed
 entirely for exact-pinned modules**; **invalid values degrade with a `⚠`
 notice and are preserved on save**.
 
+> **Amended by what rc02 actually shipped (PBNZ, 2026-07-26).** The `Check`
+> column above is **not** performed at startup. `Get-PSMMEntryPlan` carries
+> `Check` and the *interactive* check consumes it — which is what stops exact
+> pins and `Mode: Ignore` entries being queried, as both were — but the
+> deferred startup job runs no gallery check. At profile time there is no UI
+> to show a result to and no cache to put one in, so it would be one gallery
+> round trip per module per shell start bought for nothing visible, which is
+> the opposite of what §3 is for. **Ruled: ship rc02 without it.** The field
+> is already on the plan object, so reinstating it is small once there is a
+> consumer — the natural shape is the self-update check's: background, at
+> most daily, cached to disk, surfaced next time the TUI opens.
+>
+> Two further amendments from the same review, both in `CHANGELOG.md`:
+> `files > apply` **never unloads** (a loaded module is not psmm's to remove;
+> unloading is `^u`), and platform modules are **marked `system`**, not
+> hidden, so their commands and help stay browsable.
+
 ---
 
 ## 5. Deliverable 4 — keyboard scheme (D-4)

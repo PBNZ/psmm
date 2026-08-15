@@ -15,14 +15,16 @@ Full plan: [`docs/rust-ui-plan.md`](docs/rust-ui-plan.md). Requirements:
 
 psmm has been in private use since 0.1.0-beta1 (2026-07-06); live-run
 feedback has driven every beta since. `RELEASE-CHECKLIST.md` section A
-remains the manual UI verification list, and is due a rewrite against the
-new keymap before rc03.
+remains the manual UI verification list; it was rewritten against the
+current (`g`-layer) keymap for rc02 and is due another pass against the D-4
+scheme before rc03.
 
 ## 2. Going public + publishing to the PowerShell Gallery (#33) — done
 
 Public at github.com/PBNZ/psmm since 2026-07-06; releases are tag-triggered
 through `.github/workflows/release.yml`. Current published version:
-0.1.0-rc01. `RELEASE-CHECKLIST.md` sections D/E/E2 still govern the process.
+0.1.0-rc01; **0.1.0-rc02 is built and gated, awaiting the live pass and a
+tag**. `RELEASE-CHECKLIST.md` sections D/E/E2 still govern the process.
 
 ## 3. Deferred features
 
@@ -61,9 +63,13 @@ been exercised on Windows.
 Crossterm carries the cross-platform key/terminal burden as a maintained
 dependency, so the rewrite *advances* this rather than competing with it:
 rc03 ships `linux-x64` and `linux-arm64` alongside Windows. It does not
-finish the job on its own - `Get-PSMMScopeForPath` still buckets everything
-outside `$HOME` as `AllUsers` (issue #27), and macOS remains out of scope
-until after rc03. Keep #34 as its own planned work, not a side effect.
+finish the job on its own: rc02 **marks** platform-shipped modules as
+`system` in the unmanaged view rather than calling them AllUsers
+(`Test-PSMMPlatformModulePath`, issue #27) — they stay listed and browsable
+— and refuses to remove them at any elevation. But `Get-PSMMScopeForPath`
+still answers only CurrentUser or AllUsers, so the FR-3 "yours vs the
+system" split proper is rc03 work, and macOS remains out of scope until
+after rc03. Keep #34 as its own planned work, not a side effect.
 
 ### #30 — Deep Microsoft Graph version handling
 The generic part shipped: the version-cleanup screen (x) prunes stacked old

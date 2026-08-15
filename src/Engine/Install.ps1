@@ -19,13 +19,74 @@ function Test-PSMMElevated {
     [System.Environment]::UserName -eq 'root'
 }
 
-# Classify a module base path into an install scope.
-# Heuristic: anything under $HOME is CurrentUser, everything else AllUsers —
-# holds for the standard PSModulePath layout on Windows, Linux and macOS.
+# The roots that count as CurrentUser.
+#
+# $HOME alone is NOT enough, and getting this wrong is expensive. On Windows
+# the CurrentUser module location is derived from the **Documents known
+# folder**, which can live on another drive entirely — a redirected or
+# relocated Documents puts every one of your own modules outside $HOME. On
+# such a machine a bare $HOME prefix test reports them all as AllUsers, so the
+# grid marks them read-only and version cleanup refuses to touch them
+# ("session is not elevated") — the feature silently stops working for exactly
+# the modules it exists to clean up. Verified on a real machine where
+# $HOME = C:\Users\<user> and Documents = E:\Users\<user>\Documents.
+#
+# Cached: this runs once per installed version during a full scan, and the
+# Documents known folder cannot move inside a live session.
+function Get-PSMMUserModuleRoot {
+    [CmdletBinding()] param()
+    if ($null -ne $script:PSMM_UserRoots) { return $script:PSMM_UserRoots }
+    $roots = [System.Collections.Generic.List[string]]::new()
+    if ($HOME) { $roots.Add("$HOME") }
+    # Documents-derived default (Windows). Unix keeps its user modules under
+    # ~/.local/share/powershell/Modules, which $HOME already covers.
+    $docs = $null
+    try { $docs = Get-PSMMUserDefaultModulePath } catch { }
+    if ($docs) { $roots.Add("$docs") }
+    $script:PSMM_UserRoots = @($roots | Where-Object { $_ } | Select-Object -Unique)
+    $script:PSMM_UserRoots
+}
+
+# Classify a module base path into an install scope: the scope you would have
+# to install to in order to replace it. Two values only — 'System' is NOT one
+# of them, because "shipped with PowerShell" is not somewhere anything can be
+# installed; see Test-PSMMPlatformModulePath for that question.
 function Get-PSMMScopeForPath {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
-    if ($Path.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) { 'CurrentUser' } else { 'AllUsers' }
+    foreach ($root in (Get-PSMMUserModuleRoot)) {
+        if ($Path.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) { return 'CurrentUser' }
+    }
+    'AllUsers'
+}
+
+# Is this module base one of the PLATFORM's own module directories?
+# $PSHOME/Modules on every platform, plus Windows PowerShell's System32 store.
+#
+# These modules ship WITH PowerShell, so they are not ordinary machine-wide
+# installs: you cannot replace pwsh's own Microsoft.PowerShell.* from the
+# gallery. The unmanaged view still LISTS them - browsing their commands and
+# help through psmm is a real use - but marks them `system` rather than
+# `all`, and version cleanup refuses to remove one at any elevation (gh#27).
+# Roots are read from $PSHOME / $env:SystemRoot at call time, never hard-coded.
+#
+# Deliberately NOT folded into Get-PSMMScopeForPath as a third scope value:
+# that function feeds install-scope and elevation decisions, and "shipped with
+# the platform" is not a scope anything can be installed to.
+function Test-PSMMPlatformModulePath {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $roots = [System.Collections.Generic.List[string]]::new()
+    if ($PSHOME) { $roots.Add((Join-Path $PSHOME 'Modules')) }
+    if ($env:SystemRoot) {
+        $roots.Add((Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules'))
+        $roots.Add((Join-Path $env:SystemRoot 'SysWOW64\WindowsPowerShell\v1.0\Modules'))
+    }
+    foreach ($r in $roots) {
+        if ($Path.StartsWith($r, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    $false
 }
 
 # The prerelease label of one module copy ('' when it is a stable release).
@@ -49,6 +110,37 @@ function Get-PSMMVersionDisplay {
     if ($null -eq $Version -or "$Version" -eq '') { return '' }
     if ([string]::IsNullOrWhiteSpace($Prerelease)) { return "$Version" }
     "$Version-$($Prerelease.TrimStart('-'))"
+}
+
+# "2.5" and "2.5.0" name the same release; [version] disagrees, because the
+# segments you leave out are -1 rather than 0. Pad to four parts so matching a
+# pin is never defeated by how many segments the user happened to type.
+function Get-PSMMNormalVersion {
+    [CmdletBinding()]
+    param($Version)
+    try {
+        $v = [version]"$Version"
+        '{0}.{1}.{2}.{3}' -f $v.Major, [Math]::Max(0, $v.Minor), [Math]::Max(0, $v.Build), [Math]::Max(0, $v.Revision)
+    } catch { "$Version" }
+}
+
+# Is this EXACT version pin (base version + prerelease label) already on disk?
+# A RANGE pin always answers $false — "newest inside the range" is a moving
+# target, so an update against it is genuinely meaningful (gh#20, gh#23).
+function Test-PSMMVersionInstalled {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Version
+    )
+    if ($Version -notmatch '^(?<base>\d+(\.\d+){1,3})(-(?<label>[A-Za-z0-9][A-Za-z0-9.-]*))?$') { return $false }
+    $want  = Get-PSMMNormalVersion -Version $Matches['base']
+    $label = "$($Matches['label'])"
+    foreach ($m in @(Get-Module -ListAvailable -Name $Name -ErrorAction SilentlyContinue)) {
+        if ((Get-PSMMNormalVersion -Version "$($m.Version)") -ne $want) { continue }
+        if ((Get-PSMMPrereleaseLabel -ModuleInfo $m) -eq $label) { return $true }
+    }
+    $false
 }
 
 # Is the newest installed copy of a module a prerelease?
@@ -77,13 +169,28 @@ function Install-PSMMModule {
         [switch]$Prerelease,
         [ValidateSet('CurrentUser', 'AllUsers')][string]$Scope = 'CurrentUser'
     )
+    # gh#20, second line of defence. The policy function already degrades
+    # Latest to IfMissing for an exact pin, so nothing psmm schedules asks for
+    # this any more — but Install-PSMMModule is callable directly (the module
+    # menu's u), and "update to the version you already have" must never mean
+    # "download it again". The pin IS the answer; if it is on disk, we are done.
+    if ($Update -and $Version -and (Test-PSMMVersionInstalled -Name $Name -Version $Version)) { return }
+
     if (Get-Command Install-PSResource -ErrorAction SilentlyContinue) {
         # a pin that names a prerelease implies -Prerelease, whatever the
         # entry's policy says: you cannot install 1.2.3-beta4 without it
         $pre = [bool]$Prerelease -or ($Version -match '^\d+(\.\d+){1,3}-')
         if ($Version) {
-            # A pin always installs the pinned version/range, update or not.
-            Install-PSResource -Name $Name -Version $Version -Scope $Scope -Prerelease:$pre -TrustRepository -Reinstall:$Update -ErrorAction Stop
+            # A pin installs the pinned version/range - and NEVER with
+            # -Reinstall, which is gh#20 for range pins. Measured against a
+            # local feed: with -Reinstall the module folder is deleted and
+            # re-extracted even when the range is already satisfied, so
+            # `Latest` + "[1.0,2.0)" re-downloaded on every single shell start.
+            # Without it PSResourceGet skips an already-satisfied range
+            # ("Resource ... is already installed") and still installs the
+            # newest in range the moment one appears - which is exactly what
+            # `Latest` within a range is supposed to mean.
+            Install-PSResource -Name $Name -Version $Version -Scope $Scope -Prerelease:$pre -TrustRepository -ErrorAction Stop
         } elseif ($Update -and (Get-Module -ListAvailable -Name $Name) -and ($pre -or (Test-PSMMInstalledPrerelease -Name $Name))) {
             # Prerelease track: Update-PSResource is blind to a
             # prerelease-label-only bump (beta2 -> beta3 shares the base
@@ -124,32 +231,6 @@ function Uninstall-PSMMModuleVersion {
     } else {
         Uninstall-Module -Name $Name -RequiredVersion $Version -Force -ErrorAction Stop
     }
-}
-
-# One entry's startup action, honouring the orthogonal Mode x Install matrix.
-# Mode decides load-vs-not; Install decides disk/gallery policy.
-function Invoke-PSMMEntryAction {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)] $Entry)
-    $name = $Entry.Name
-    if ($Entry.Mode -eq 'Ignore') { return 'ignored' }
-    $installed = [bool](Get-Module -ListAvailable -Name $name)
-    $note = ''
-    $pre = [bool]$Entry.AllowPrerelease
-    switch ($Entry.Install) {
-        'CheckOnly' { if (-not $installed) { return 'not installed (check-only)' }; $note = 'present' }
-        'IfMissing' {
-            if (-not $installed) { Install-PSMMModule -Name $name -Version $Entry.Version -Prerelease:$pre; $note = 'installed' }
-            else { $note = 'present' }
-        }
-        'Latest' { Install-PSMMModule -Name $name -Update -Version $Entry.Version -Prerelease:$pre; $note = 'latest' }
-    }
-    if ($Entry.Mode -eq 'InstallOnly') { return "$note (not loaded)" }
-    if (-not (Get-Module -Name $name)) {
-        Import-PSMMModuleTimed -Entry $Entry
-        return "$note + loaded"
-    }
-    return "$note + already loaded"
 }
 
 # Import one entry's module, honouring an exact pin and recording how long the

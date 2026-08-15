@@ -224,10 +224,41 @@ function script:Clear-PSMMScreen {
     # "clear" a silent no-op - sub-screens appended below the grid instead of
     # replacing it (2026-07-05 live-run bug).
     try { (Get-PSMMConsole).Clear($true) } catch { }
+    # Every full-screen repaint re-asserts the hidden cursor. Clear() itself
+    # emits no cursor sequence (verified: ESC[2J ESC[3J ESC[1;1H and nothing
+    # else), so anything that showed it earlier - a live display exiting, or a
+    # text prompt, which legitimately shows it while typing - would otherwise
+    # leave it blinking over the next frame.
+    Hide-PSMMCursor
+}
+
+# Hide the terminal cursor. Idempotent, cheap, and safe when redirected.
+#
+# The TUI hides the cursor once at alt-screen entry, but that is not enough on
+# its own: Spectre's LiveDisplay hides the cursor when it starts and
+# UNCONDITIONALLY SHOWS IT AGAIN when it exits. Verified by capturing the
+# bytes the real assembly emits - a live display writes, in order:
+#   ESC[?25l ... ESC[?25h        <- the show is the last thing it writes
+# So every time a live screen hands control back, the cursor is visible again,
+# and only the next live display hides it. Screens that render WITHOUT a live
+# display - the module menu and the tasks empty state, which read keys
+# directly - therefore blink a cursor over the frame.
+function script:Hide-PSMMCursor {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'Raw VT escape must bypass any host/stream formatting, like the alt-screen codes above.')]
+    param()
+    try {
+        if (-not [Console]::IsOutputRedirected) { [Console]::Write("$([char]27)[?25l") }
+    } catch { }
 }
 
 # Run a live display on the psmm console. $Body is param($ctx) { ... } and
 # runs synchronously in module scope (verified - see D-UI-ARCH).
+#
+# The re-hide in the finally is the fix for the blinking cursor: it puts the
+# cursor back the way psmm wants it the instant the live display gives it
+# back, so no later screen has to remember to. finally, not just after Start,
+# because a body that throws or returns early must not leave it showing.
 function script:Invoke-PSMMLive {
     param(
         [Parameter(Mandatory)][scriptblock]$Body,
@@ -235,7 +266,8 @@ function script:Invoke-PSMMLive {
     )
     if (-not $Initial) { $Initial = [Spectre.Console.Markup]::new(' ') }
     $live = [Spectre.Console.LiveDisplay]::new((Get-PSMMConsole), $Initial)
-    $live.Start([Action[Spectre.Console.LiveDisplayContext]]$Body)
+    try { $live.Start([Action[Spectre.Console.LiveDisplayContext]]$Body) }
+    finally { Hide-PSMMCursor }
 }
 
 # --- alternate screen buffer (#4: preserve the user's scrollback) ---------

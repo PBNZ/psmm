@@ -70,6 +70,8 @@ function script:Get-PSMMHelpSection {
             ''
             (Get-PSMMHelpTerm 'state' ("[$script:PSMM_ColOk]$([char]0x25CF) loaded[/][$script:PSMM_ColMute] (this session) $mid [/][$script:PSMM_ColWarn]$([char]0x25D0) installed[/][$script:PSMM_ColMute] (on disk)[/]"))
             (Get-PSMMHelpTerm '' ("[$script:PSMM_ColErr]$([char]0x25CB) missing[/][$script:PSMM_ColMute] $mid [/][$script:PSMM_ColInfo]$([char]0x25CC) unmanaged[/][$script:PSMM_ColMute] (in no config file - m shows them)[/]"))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColDim]$([char]0x25C8) psmm's own[/][$script:PSMM_ColMute] (psmm and its UI engine - infrastructure,[/]"))
+            (Get-PSMMHelpTerm '' ("[$script:PSMM_ColMute]not part of your session)[/]"))
             (Get-PSMMHelpTerm 'startup' (Get-PSMMHelpText1 'what happens at shell start: load / install (background) / off'))
             (Get-PSMMHelpTerm 'upkeep' (Get-PSMMHelpText1 'how psmm keeps it on disk: if-missing / check-only / latest'))
             (Get-PSMMHelpTerm '' (Get-PSMMHelpText1 '+pre means prerelease versions are allowed for that entry'))
@@ -116,7 +118,8 @@ function script:Get-PSMMHelpSection {
             (Get-PSMMHelpRow '^l' 'load into this session')
             (Get-PSMMHelpRow '^u' 'unload from this session   (^ means ctrl)')
             (Get-PSMMHelpRow 'i' 'install (when missing) - foreground, with progress')
-            (Get-PSMMHelpRow 'u' 'update (when installed) - always a separate key')
+            (Get-PSMMHelpRow 'u' 'update (when installed) - always a separate key.')
+            (Get-PSMMHelpCont 'An exact pin has nothing to update to; change the pin first.')
             (Get-PSMMHelpRow 'b' "browse the module's commands with full help")
             (Get-PSMMHelpRow 'v' 'pin the entry to a version: pick from the versions on disk')
             (Get-PSMMHelpCont 'and in the gallery, or type a NuGet range like "[1.0,2.0)".')
@@ -150,7 +153,9 @@ function script:Get-PSMMHelpSection {
             (Get-PSMMHelpText1 'Every config source psmm found, in load order.')
             ''
             (Get-PSMMHelpRow 'space' 'toggle a whole file on/off (saved immediately)')
-            (Get-PSMMHelpRow 'a' 'apply the load/unload changes to the running session')
+            (Get-PSMMHelpRow 'a' 'apply the config to this session - imports what is newly')
+            (Get-PSMMHelpCont 'declared. Nothing is ever unloaded: a module that is already')
+            (Get-PSMMHelpCont 'loaded stays loaded, and ^u on its row is the only way out.')
             (Get-PSMMHelpRow 'n' 'create a new config, blank or from a scenario template')
             (Get-PSMMHelpRow 'm' 'move a file and keep it discoverable (Includes updated)')
             (Get-PSMMHelpRow 'left' 'back out')
@@ -225,17 +230,21 @@ function script:Get-PSMMHelpSection {
         ) }
         'tasks' { @(
             (Get-PSMMHelpHead 'BACKGROUND TASKS')
-            (Get-PSMMHelpText1 'Everything psmm runs in the background lands here: install batches')
-            (Get-PSMMHelpText1 '(i), update batches (u), update checks (k), the unmanaged-module')
-            (Get-PSMMHelpText1 'scan, and Update-Help.')
+            (Get-PSMMHelpText1 'Work you start from the UI lands here: install batches (i), update')
+            (Get-PSMMHelpText1 'batches (u), update checks (k), the unmanaged-module scan, and')
+            (Get-PSMMHelpText1 'Update-Help. The background job psmm runs at SHELL START is separate')
+            (Get-PSMMHelpText1 'and reports on the home screen instead.')
             ''
             (Get-PSMMHelpRow 'enter' "show a task's full output")
+            (Get-PSMMHelpRow 'x' 'cancel the task under the cursor')
             (Get-PSMMHelpRow 'u' 'start a background Update-Help')
             (Get-PSMMHelpRow 'c' 'clear finished tasks')
             (Get-PSMMHelpRow 'left/right' 'back out / open the output')
             ''
             (Get-PSMMHelpText1 'The grid keeps working while tasks run; a one-line overlay shows')
-            (Get-PSMMHelpText1 'progress.')
+            (Get-PSMMHelpText1 'progress. Output is kept to a fixed number of recent lines, so a')
+            (Get-PSMMHelpText1 'very chatty task cannot grow without limit - the count of lines')
+            (Get-PSMMHelpText1 'trimmed is shown alongside.')
         ) }
         default { @() }
     }
@@ -343,7 +352,7 @@ function script:Get-PSMMHelpStartupLines {
     $out.Add((Get-PSMMHelpText1 '  Knobs, set before Import-Module:'))
     $knobs = @(
         '  $PSMM_StartupReport = $false      # no per-module report at startup'
-        '  $PSMM_BackgroundStartup = $false  # run InstallOnly work inline'
+        '  $PSMM_BackgroundStartup = $false  # run deferred work inline instead'
         '  $PSMM_UpdateCheck = $false        # no self-update check'
         '  $PSMM_InlineJson = ''{ ... }''      # config in the profile itself'
         '  $PSMM_JsonPath = ''~/psmodules.d/*.json'''
@@ -351,14 +360,26 @@ function script:Get-PSMMHelpStartupLines {
     )
     foreach ($l in (Format-PSMMCode -Text $knobs)) { $out.Add($l) }
     $out.Add('')
-    $out.Add((Get-PSMMHelpText1 '  Install and Mode are independent: Mode decides load / install-only /'))
-    $out.Add((Get-PSMMHelpText1 '  ignore (and foreground vs background at startup); Install decides the'))
-    $out.Add((Get-PSMMHelpText1 '  disk/gallery policy (never install / install when missing / update).'))
+    $out.Add((Get-PSMMHelpText1 '  Mode decides load-vs-not; Install decides the disk/gallery policy'))
+    $out.Add((Get-PSMMHelpText1 '  (never install / install when missing / update).'))
     $out.Add('')
-    $out.Add((Get-PSMMHelpTerm '  Load' (Get-PSMMHelpText1 'imported into this session, in the foreground.')))
-    $out.Add((Get-PSMMHelpTerm '  InstallOnly' (Get-PSMMHelpText1 'disk/gallery work only - deferred to a')))
-    $out.Add((Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'background job so your prompt appears sooner.')))
-    $out.Add((Get-PSMMHelpTerm '  Ignore' (Get-PSMMHelpText1 'parsed but not actioned.')))
+    $out.Add((Get-PSMMHelpTerm '  Load' (Get-PSMMHelpText1 'imported into this session.')))
+    $out.Add((Get-PSMMHelpTerm '  InstallOnly' (Get-PSMMHelpText1 'disk/gallery work only, never imported.')))
+    $out.Add((Get-PSMMHelpTerm '  Ignore' (Get-PSMMHelpText1 'parsed but not actioned - and no gallery')))
+    $out.Add((Get-PSMMHelpTerm '' (Get-PSMMHelpText1 'lookup of any kind.')))
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  Scheduling follows from the pair rather than being chosen: the'))
+    $out.Add((Get-PSMMHelpText1 '  import is the ONLY thing that happens before your prompt. Every'))
+    $out.Add((Get-PSMMHelpText1 '  install, update and gallery lookup runs in the background, so'))
+    $out.Add((Get-PSMMHelpText1 '  nothing at shell start ever waits on the network.'))
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  A module that has to be installed at shell start is therefore'))
+    $out.Add((Get-PSMMHelpText1 '  available NEXT session - psmm will not import it behind a prompt'))
+    $out.Add((Get-PSMMHelpText1 '  you are already typing into.'))
+    $out.Add('')
+    $out.Add((Get-PSMMHelpText1 '  An exact version pin makes Latest mean "install the pin" - there'))
+    $out.Add((Get-PSMMHelpText1 '  is nothing to update to. A range pin makes it mean "newest inside'))
+    $out.Add((Get-PSMMHelpText1 '  the range", and the update flag clears when you take it.'))
     $out.Add('')
     $out.Add((Get-PSMMHelpText1 '  Modules are imported into YOUR session (Import-Module -Global), so'))
     $out.Add((Get-PSMMHelpText1 '  their commands work at the prompt and Get-Module lists them.'))

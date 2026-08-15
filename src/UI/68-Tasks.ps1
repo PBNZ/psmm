@@ -63,14 +63,34 @@ function script:Receive-PSMMUITask {
 }
 
 # Kick off Update-Help for all installed modules in the background (#35).
+#
+# Update-Help emits NON-terminating errors, so the job always reached
+# 'Completed' and the tasks screen said "done" even when every module had
+# failed (gh#26). The errors are classified here by FullyQualifiedErrorId -
+# message text is localised, the ids are not - and the ones that mean a real
+# failure are emitted as 'FAILED ' lines, which Update-PSMMTask latches into
+# the task's Failed flag.
+#
+# The four ids below were captured from live Update-Help runs, not from
+# memory. -ErrorAction SilentlyContinue stays: it keeps a hundred
+# no-updatable-help errors out of the job's error stream, and -ErrorVariable
+# collects them just the same.
 function script:Start-PSMMUpdateHelpTask {
     $running = @(Get-PSMMTask | Where-Object { $_.Kind -eq 'updatehelp' -and -not $_.Done })
     if ($running.Count) { $script:PSMM_UI.Status = "[$script:PSMM_ColWarn]Update-Help is already running[/]"; return }
-    $null = Start-PSMMTask -Label 'Update-Help (all modules)' -Kind 'updatehelp' -ScriptBlock {
+    # the job runs the ENGINE's classifier, dot-sourced in - not a copy of it,
+    # so the tests that exercise Get-PSMMUpdateHelpReport are testing the code
+    # that actually runs (same pattern as the install job)
+    $payload = [pscustomobject]@{ Prelude = (Get-PSMMJobPrelude -FunctionName @('Get-PSMMUpdateHelpReport')) }
+    $null = Start-PSMMTask -Label 'Update-Help (all modules)' -Kind 'updatehelp' -ArgumentList (, $payload) -ScriptBlock {
+        param($payload)
+        . ([scriptblock]::Create($payload.Prelude))
         try {
+            # -ErrorAction SilentlyContinue stays: it keeps a hundred
+            # no-updatable-help errors out of the job's error stream, and
+            # -ErrorVariable collects them just the same.
             Update-Help -Scope CurrentUser -Force -ErrorAction SilentlyContinue -ErrorVariable errs 3>$null
-            foreach ($e in @($errs)) { "note: $($e.Exception.Message)" }
-            'help update finished'
+            Get-PSMMUpdateHelpReport -ErrorRecords $errs
         } catch { "FAILED: $($_.Exception.Message)" }
     }
     $script:PSMM_UI.Status = "[$script:PSMM_ColAccent]Update-Help started in the background[/]"
@@ -95,16 +115,20 @@ function script:Build-PSMMTasksView {
         $nm = ConvertTo-PSMMSafe (Get-PSMMTrunc $task.Label 44)
         if ($i -eq $State.Cursor) { $nm = "[bold $script:PSMM_ColAccent]$nm[/]" }
         $stateCell = if (-not $task.Done) { "[$script:PSMM_ColInfo]running[/]" }
+                     elseif ($task.Cancelled) { "[$script:PSMM_ColMute]cancelled[/]" }
                      elseif ($task.Failed) { "[$script:PSMM_ColErr]failed[/]" }
                      else { "[$script:PSMM_ColOk]done[/]" }
-        $rows.Add([string[]]@($nm, $stateCell, $task.StartedAt.ToString('HH:mm:ss'), "$($task.Output.Count) line(s)"))
+        # LineCount, not Output.Count: the buffer is capped, the count is not
+        $outCell = "$($task.LineCount) line(s)"
+        if ($task.Dropped) { $outCell += " [$script:PSMM_ColDim]($($task.Dropped) trimmed)[/]" }
+        $rows.Add([string[]]@($nm, $stateCell, $task.StartedAt.ToString('HH:mm:ss'), $outCell))
     }
     $T = New-PSMMTable -Headers @('task', 'state', 'started', 'output') -Rows $rows -CursorRow ($State.Cursor - $vp.First)
     $pos = Get-PSMMPositionMarkup -State $State -Count $n -Viewport $vp
     $items = [System.Collections.Generic.List[Spectre.Console.Rendering.IRenderable]]::new()
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMHeaderBar -Breadcrumb @('home', 'tasks') -CountsMarkup $pos)))
     $items.Add($T)
-    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=view output', 'u=run update-help', 'c=clear finished', 'left/right=back / open'))))
+    $items.Add([Spectre.Console.Markup]::new((Get-PSMMHint -Pairs @('enter=view output', 'x=cancel', 'u=run update-help', 'c=clear finished', 'left/right=back / open'))))
     $items.Add([Spectre.Console.Markup]::new((Get-PSMMPersistentHint -Pairs @("g=goto$([char]0x2026)", '?=help', 'esc=back', '^q=quit'))))
     if ($StatusMarkup) { $items.Add([Spectre.Console.Markup]::new($StatusMarkup)) }
     [Spectre.Console.Rows]::new($items)
@@ -126,6 +150,7 @@ function script:Show-PSMMTasks {
             Write-PSMMLine "[$script:PSMM_ColAccent]Background tasks[/]"
             Write-PSMMLine "[$script:PSMM_ColMute]No tasks yet. u starts a background Update-Help; installs/updates/scans appear here too.[/]"
             Write-PSMMLine (Get-PSMMHint -Pairs @('u=run update-help', 'esc=back'))
+            Hide-PSMMCursor      # this branch renders without a live display
             $k = [Console]::ReadKey($true)
             if (Test-PSMMHardQuitKey $k) { $ui.HardQuit = $true; return }
             if ($k.KeyChar -eq 'g') {
@@ -163,6 +188,19 @@ function script:Show-PSMMTasks {
                 switch ($k.Key) {
                     ([ConsoleKey]::Enter)  { $action.Name = 'view'; return }
                     ([ConsoleKey]::U)      { Start-PSMMUpdateHelpTask; continue }
+                    ([ConsoleKey]::X)      {
+                        # cancel the cursor row's task (gh#24 - there was no
+                        # way to stop anything psmm started)
+                        if ($tasks.Count -and $st.Cursor -lt $tasks.Count) {
+                            $target = $tasks[$st.Cursor]
+                            $st.Status = if (Stop-PSMMTask -Task $target) {
+                                "[$script:PSMM_ColOk]cancelled $(ConvertTo-PSMMSafe $target.Label)[/]"
+                            } else {
+                                "[$script:PSMM_ColMute]nothing to cancel - that task has already finished[/]"
+                            }
+                        }
+                        continue
+                    }
                     ([ConsoleKey]::C)      { Clear-PSMMTask; $st.Cursor = 0; $st.Status = "[$script:PSMM_ColOk]finished tasks cleared[/]"; continue }
                     ([ConsoleKey]::Escape) { $action.Name = 'back'; return }
                     default { if ($k.KeyChar -eq '?') { $action.Name = 'help'; return } }
@@ -177,7 +215,10 @@ function script:Show-PSMMTasks {
                 $tasks = @(Get-PSMMTask)
                 if ($tasks.Count -and $st.Cursor -lt $tasks.Count) {
                     $t = $tasks[$st.Cursor]
-                    $lines = @("task: $($t.Label)", "state: $(if (-not $t.Done) { 'running' } elseif ($t.Failed) { 'failed' } else { 'done' })", '') + @($t.Output | ForEach-Object { "$_" })
+                    $state = if (-not $t.Done) { 'running' } elseif ($t.Cancelled) { 'cancelled' } elseif ($t.Failed) { 'failed' } else { 'done' }
+                    $head = @("task: $($t.Label)", "state: $state", "output: $($t.LineCount) line(s)")
+                    if ($t.Dropped) { $head += "note: showing the last $($t.Output.Count) - $($t.Dropped) earlier line(s) trimmed to keep memory bounded" }
+                    $lines = $head + @('') + @($t.Output | ForEach-Object { "$_" })
                     Show-PSMMPager -Lines $lines -TitleMarkup "[$script:PSMM_ColAccent]Task output[/]" -Breadcrumb @('home', 'tasks', 'output')
                 }
             }

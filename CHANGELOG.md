@@ -3,6 +3,172 @@
 All notable changes to psmm. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [0.1.0-rc02] — 2026-07-26
+
+The correctness release. `Mode` × `Install` was implemented **four times** —
+in the startup loader, the actuator, the deferred thread job and the grid's
+install task — and the four had drifted apart. Six of the eight bugs below
+were consequences of that one fact, so this release fixes the cause and the
+symptoms together (gh#29).
+
+There is now exactly one decision function, `Get-PSMMEntryPlan`, returning a
+structured plan; every caller executes that plan instead of re-deriving it.
+The two thread-job bodies existed because module functions are invisible
+inside a `ThreadJob` — they are now handed psmm's real functions as source
+text, which is what let the duplicate copies be deleted rather than kept in
+sync. A test fails the build if any file outside the policy function starts
+branching on `Mode` or `Install` again.
+
+### ⚠ Behaviour change — installs at shell start are now deferred
+
+**Scheduling is derived from `Mode` × `Install` rather than declared by
+either. The import is the only thing that happens in the foreground; every
+install, update and gallery lookup now runs in the background — in all nine
+cells.**
+
+What changes for you:
+
+- **`Mode: Load` + `Install: Latest` no longer blocks your prompt.** It used
+  to perform a synchronous install/update — a gallery round trip — before
+  the prompt was typeable, on *every* shell start. It now imports what is on
+  disk immediately and updates behind the prompt.
+- **A module that has to be installed at shell start is available *next*
+  session.** psmm reports it rather than importing it behind a prompt you
+  are already typing into. Previously a missing `Load` + `IfMissing` module
+  was installed in the foreground — which, for a cold `Az` or
+  `Microsoft.Graph`, is minutes of a shell that will not respond.
+- The startup report gained a `missing` row kind so this is visible rather
+  than implied, and says which of the two it is.
+
+If you were relying on `Latest` applying before the prompt, it now applies
+after. `$PSMM_BackgroundStartup = $false` still runs the deferred work
+inline, network and all.
+
+### Fixed
+- **`Load` + `Latest` hit the gallery in the foreground on every shell
+  start** (gh#19). The partition keyed on `Mode` alone, so `Install` had no
+  influence on foreground-vs-background at all, and `Latest` was not a check
+  that might update — it was an unconditional install/update, every branch of
+  which is a repository call.
+- **An exact version pin force-reinstalled itself on every shell start**
+  (gh#20). A pin did not neuter `Latest`; it turned it into
+  `Install-PSResource -Reinstall` of the version already on disk — strictly
+  worse than not pinning. An exact pin now degrades `Latest` to `IfMissing`,
+  and `Install-PSMMModule` additionally refuses to reinstall a pin it can
+  already see. Pressing `u` on an exactly pinned module now says so instead
+  of silently re-downloading it.
+- **`Load` + `IfMissing` ignored `"Prerelease": true`** (gh#21). The fast
+  path called `Install-PSMMModule` with no `-Prerelease`, so a module opted
+  in to prereleases, with no version pin, quietly got the newest **stable**
+  release. Masked whenever the entry also carried a labelled pin.
+- **A range-pinned module was flagged "update available" forever** (gh#23).
+  The check compared against the *unconstrained* gallery latest, while `u`
+  correctly stayed inside the range — so the flag could never clear. The
+  check is now range-aware (`Find-PSResource -Version` takes a NuGet range).
+  A range pin also renders a pin marker now, instead of showing a bare
+  update arrow with nothing to explain it.
+- **`files > apply` unloaded a loaded module whose config file was
+  disabled** (gh#22). **`files > apply` now never unloads anything.** A
+  module that is already loaded is not psmm's to remove, whatever the config
+  now says — unloading is an explicit action (`^u`), never a side effect of
+  editing config. That is the same principle as the install side, applied
+  symmetrically: psmm does not reach into a running session and add things
+  behind you, and it does not take them away either. Apply still imports
+  what the config newly asks for, and now names anything still loaded that
+  the config no longer wants, rather than diverging silently.
+- **Pressing `m` reported every module as "missing"** — including, visibly,
+  psmm's own running UI engine, which the module screen would describe in
+  full (author, project, 51 commands) while insisting it was not installed.
+  Show/hide-unmanaged rebuilds the entry list, and a rebuild mints fresh
+  blank objects whose disk fields are only filled by the full disk sweep —
+  which is skipped on a toggle, for speed. What psmm knows about disk and
+  the gallery now survives a rebuild.
+- **Modules were misfiled as `AllUsers` when Documents is on another
+  drive.** The user-vs-machine test compared against `$HOME`, but on Windows
+  the CurrentUser module location follows the **Documents** known folder,
+  which can live anywhere — with Documents redirected to `E:\`, every one of
+  your own modules was reported machine-wide. The grid marked them read-only
+  and version cleanup refused to touch them ("session is not elevated"), so
+  cleanup silently stopped working for exactly the modules it exists to
+  clean up.
+- **The terminal cursor blinked over the module menu.** Spectre's live
+  display hides the cursor when it starts and shows it again when it exits,
+  and psmm hid it only once, at startup. Screens that render without a live
+  display — the module menu, the tasks empty state — therefore blinked a
+  cursor over the frame. Contrary to first appearances this was not a
+  regression: cursor hiding arrived in 0.1.0-beta7 and never covered these
+  screens. psmm now re-asserts it whenever a live display exits, on every
+  full-screen repaint, and before every key it waits for, with a test that
+  fails if a new key-wait forgets.
+- **Version cleanup could have removed a module that ships with
+  PowerShell.** Platform copies classify as `AllUsers`, so the
+  not-elevated guard skipped them by luck; an **elevated** session would
+  have gone ahead and uninstalled something the shell itself depends on.
+  Now refused at any elevation.
+- **The background job disagreed with the foreground path** (gh#25). Its
+  `Update-PSResource` call omitted `-Prerelease` and `-Scope`, and it had no
+  equivalent of the installed-prerelease track, so a module already on a
+  prerelease stayed on it in the foreground but not in the background. The
+  job runs the actuator now, so it cannot drift again.
+- **`Update-Help` failures were reported as success** (gh#26). Every module
+  could fail and the tasks screen still said "done", because
+  `-ErrorAction SilentlyContinue` kept the job at `Completed` and the failed
+  flag came from job state alone. Errors are now classified by
+  `FullyQualifiedErrorId` — elevation required, UI culture not supported,
+  and everything else — and a genuine failure fails the task. "This module
+  ships no updatable help" is the common, benign case and is summarised as
+  one note rather than a wall of errors.
+- **The unmanaged-module scan was implemented twice, and the tested copy was
+  not the running one** (gh#27). The background job re-implemented the whole
+  pipeline with its own inlined scope classifier. One implementation now,
+  used by both paths. Modules that ship with PowerShell (`$PSHOME`, Windows'
+  `System32` store) are also **marked as `system`** in the scope column
+  instead of being reported as ordinary machine-wide installs — they stay
+  listed, so you can still browse their commands and read their help through
+  psmm, which is most of what you would want them there for.
+
+### Added
+- **Background tasks can be cancelled** — `x` on the tasks screen. There was
+  previously no way to stop anything psmm started; `Stop-Job` appeared
+  nowhere in the repo. A cancelled task reads as cancelled, not failed.
+- **Background jobs are disposed when the session ends** (gh#28), through a
+  lazily registered `PowerShell.Exiting` handler plus an `OnRemove` handler
+  for `Remove-Module psmm`. Registration only happens once psmm actually
+  starts a job, so a zero-config startup pays nothing. Note that
+  `PowerShell.Exiting` does not fire on window close or a force-kill, so it
+  is a guarantee layered on top of `Start-ThreadJob` being in-process, not a
+  replacement for it.
+- **A cross-field notice on the row under the cursor.** `Install` under
+  `Mode: Ignore` now says it has no effect — but only when you actually
+  wrote one, not when the entry merely inherited the default.
+
+### Changed
+- **Task output is bounded** (gh#24). It was captured with
+  `Receive-Job -Keep`, which never drains the job buffer: every 500 ms poll
+  re-materialised the *entire* output and replaced the stored copy, and one
+  caller re-read the whole startup-job buffer purely to count its lines. A
+  chatty job grew both buffers without limit. Output is now harvested
+  incrementally into a ring buffer with a stated cap, the line count is kept
+  rather than measured, and the tasks screen shows how many lines were
+  trimmed.
+- Startup timing is unchanged: measured A/B against rc01 under identical
+  conditions, `Invoke-PSMMStartup` went 101 ms → 98 ms and `Import-Module`
+  183.7 ms → 190.0 ms (one extra source file). See `NOTES.md` — the absolute
+  118/48 figures recorded in 2026-07 do not reproduce on current machines
+  and are not a portable gate.
+- CI pins Pester to 5.x. The suite is written against Pester 5, and
+  unpinned now resolves to 6.0.1, which fails to load on the pwsh 7.4.x the
+  Linux runners ship.
+
+### Note for the next release
+rc02 is the **last release built on Spectre.Console**. rc03 replaces the
+interactive UI wholesale and deletes `src/UI` in the same release, so rc02
+is the version to fall back to if rc03 does not suit you:
+
+```powershell
+Install-PSResource psmm -Version 0.1.0-rc02 -Reinstall
+```
+
 ## [0.1.0-rc01] — 2026-07-23
 
 The label steps from `beta9` to `rc01`, not `beta10`. A prerelease label is

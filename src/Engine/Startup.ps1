@@ -7,8 +7,10 @@ function Get-PSMMStartupJobTotal { $script:PSMM_JobTotal }
 
 # v2 startup report (design-system-v2 §8): the same design tokens as the TUI,
 # rendered with raw 256-colour escapes because Spectre is NOT loaded at
-# profile time. Rows: @{ Kind = 'ok'|'skip'|'fail'|'defer'; Name; Ms; Note;
-# Count (defer only) }. Returns the finished lines; the caller prints them.
+# profile time. Rows: @{ Kind = 'ok'|'warn'|'skip'|'fail'|'defer'; Name; Ms;
+# Note; Count (defer only) }. 'warn' is "you asked for this module and it is
+# not in your session" - not an error, but not a silent skip either.
+# Returns the finished lines; the caller prints them.
 function Get-PSMMStartupReportLines {
     [CmdletBinding()]
     param(
@@ -23,11 +25,13 @@ function Get-PSMMStartupReportLines {
 
     $loaded  = @($Rows | Where-Object Kind -EQ 'ok').Count
     $skipped = @($Rows | Where-Object Kind -EQ 'skip').Count
+    $missing = @($Rows | Where-Object Kind -EQ 'warn').Count
     $failed  = @($Rows | Where-Object Kind -EQ 'fail').Count
     $bg = 0
     foreach ($r in @($Rows | Where-Object Kind -EQ 'defer')) { $bg += [Math]::Max(1, [int]$r.Count) }
     $parts = @()
     if ($loaded)  { $parts += "$loaded loaded" }
+    if ($missing) { $parts += "$missing missing" }
     if ($skipped) { $parts += "$skipped skipped" }
     if ($failed)  { $parts += "$failed failed" }
     if ($bg)      { $parts += "$bg in background" }
@@ -70,6 +74,10 @@ function Get-PSMMStartupReportLines {
                 $ms = "$([char]0x2014)".PadLeft(8)
                 $lines.Add("$($c.dim)$([char]0x25CB)$reset $($c.dim)$name$reset $($c.dim)$ms$reset   $($c.dim)$($r.Note)$reset")
             }
+            'warn' {
+                $ms = "$([char]0x2014)".PadLeft(8)
+                $lines.Add("$($c.warn)$([char]0x25CB)$reset $name $($c.dim)$ms$reset   $($c.warn)$($r.Note)$reset")
+            }
             'fail' {
                 $anyFail = $true
                 $ms = "$([char]0x2014)".PadLeft(8)
@@ -87,54 +95,78 @@ function Get-PSMMStartupReportLines {
     $lines
 }
 
-# Start the background job that handles Mode=InstallOnly entries.
-# The job re-implements the minimal install logic because module functions
-# are not visible inside a ThreadJob's session.
+# Start the background job that does every entry's disk/gallery work.
+#
+# The job EXECUTES plans; it does not decide anything. It used to re-implement
+# the Mode x Install matrix by hand — because module functions are invisible
+# inside a ThreadJob — and that copy had drifted from the actuator: no
+# -Prerelease, no -Scope, no installed-prerelease track (gh#25). The fix is to
+# ship the real functions in as source text and dot-source them, so there is
+# exactly one implementation of everything (gh#29).
 function Start-PSMMDeferredJob {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseUsingScopeModifierInNewRunspaces', '',
-        Justification = '$mods is a scriptblock param supplied via -ArgumentList; $m is its foreach variable. The rule cannot see param bindings.')]
+        Justification = '$payload is a scriptblock param supplied via -ArgumentList; $p is its foreach variable. The rule cannot see param bindings.')]
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $Entries)
-    $payload = @($Entries | ForEach-Object {
-        [pscustomobject]@{ Name = $_.Name; Install = $_.Install; Version = $_.Version; Prerelease = [bool]$_.AllowPrerelease }
-    })
-    $script:PSMM_JobTotal = $payload.Count
+    param([Parameter(Mandatory)] $Plans)
+    $list = @($Plans)
+    $script:PSMM_JobTotal = $list.Count
+    # a new job starts a new buffer: calling Invoke-PSMMStartup twice in one
+    # session otherwise left the grid reporting cumulative counts from both
+    $script:PSMM_StartupOutput = [System.Collections.Generic.List[string]]::new()
+    $script:PSMM_StartupLineCount = 0
+    # one object, so -ArgumentList cannot unroll the plan array (gh#1)
+    $payload = [pscustomobject]@{ Plans = $list; Prelude = (Get-PSMMJobPrelude) }
     $script:PSMM_StartupJob = Start-ThreadJob -Name 'PSMM-Startup' -ScriptBlock {
-        param($mods)
-        foreach ($m in $mods) {
+        param($payload)
+        . ([scriptblock]::Create($payload.Prelude))
+        foreach ($p in $payload.Plans) {
             # one output line per module so the UI can show progress + summary
-            try {
-                $have = Get-Module -ListAvailable -Name $m.Name
-                $psrg = [bool](Get-Command Install-PSResource -ErrorAction SilentlyContinue)
-                $pre = [bool]$m.Prerelease
-                $installLatest = {
-                    if ($psrg) {
-                        if ($m.Version) { Install-PSResource -Name $m.Name -Version $m.Version -Scope CurrentUser -Prerelease:$pre -TrustRepository -ErrorAction Stop }
-                        else { Install-PSResource -Name $m.Name -Scope CurrentUser -Prerelease:$pre -TrustRepository -ErrorAction Stop }
-                    } else {
-                        Install-Module -Name $m.Name -Scope CurrentUser -Force -AllowClobber -AllowPrerelease:$pre -ErrorAction Stop
-                    }
-                }
-                switch ($m.Install) {
-                    'CheckOnly' {
-                        if (-not $have) { "FAILED $($m.Name): not installed (check-only)" } else { "ok $($m.Name)" }
-                    }
-                    'IfMissing' {
-                        if (-not $have) { & $installLatest; "installed $($m.Name)" } else { "ok $($m.Name)" }
-                    }
-                    'Latest' {
-                        if ($m.Version) { & $installLatest }
-                        # $psrg, not just $have: Install-PSResource does not
-                        # exist on a PowerShellGet-only machine, and this is
-                        # the one branch that names it directly
-                        elseif ($have -and $pre -and $psrg) { Install-PSResource -Name $m.Name -Prerelease -Reinstall -Scope CurrentUser -TrustRepository -ErrorAction Stop }
-                        elseif ($have -and $psrg -and (Get-Command Update-PSResource -ErrorAction SilentlyContinue)) { Update-PSResource -Name $m.Name -ErrorAction Stop }
-                        else { & $installLatest }
-                        "updated $($m.Name)"
-                    }
-                }
-            } catch { "FAILED $($m.Name): $($_.Exception.Message)" }
+            try { Invoke-PSMMPlanAction -Plan $p }
+            catch { "FAILED $($p.Name): $($_.Exception.Message)" }
         }
     } -ArgumentList (, $payload)
+    Register-PSMMJobDisposal
     $script:PSMM_StartupJob
+}
+
+# Incrementally harvested output of the startup job (gh#24). Receive-Job -Keep
+# never drains the buffer, so the old code re-materialised the ENTIRE output
+# on every 500 ms poll — in three separate places — purely to count lines.
+# Harvest once, keep the lines and the count here.
+function Update-PSMMStartupJobOutput {
+    [CmdletBinding()] param()
+    $job = $script:PSMM_StartupJob
+    if (-not $job) { return }
+    if (-not $script:PSMM_StartupOutput) { $script:PSMM_StartupOutput = [System.Collections.Generic.List[string]]::new() }
+    try {
+        foreach ($line in @(Receive-Job -Job $job -ErrorAction SilentlyContinue)) {
+            $s = "$line"
+            if ($s.Length -gt $script:PSMM_TaskCharCap) {
+                $s = $s.Substring(0, $script:PSMM_TaskCharCap) + " $([char]0x2026)[line truncated]"
+            }
+            $script:PSMM_StartupOutput.Add($s)
+            $script:PSMM_StartupLineCount = [int]$script:PSMM_StartupLineCount + 1
+        }
+        # bounded like the task ring buffer (gh#24): the startup job emits one
+        # line per module normally, but a provider that decides to be chatty
+        # must not be able to grow this without limit either
+        if ($script:PSMM_StartupOutput.Count -gt $script:PSMM_TaskLineCap) {
+            $script:PSMM_StartupOutput.RemoveRange(0, $script:PSMM_StartupOutput.Count - $script:PSMM_TaskLineCap)
+        }
+    } catch { }
+}
+
+function Get-PSMMStartupJobOutput {
+    [CmdletBinding()] param()
+    Update-PSMMStartupJobOutput
+    if ($script:PSMM_StartupOutput) { @($script:PSMM_StartupOutput) } else { @() }
+}
+
+# Total lines the startup job has ever produced. The buffer above is capped,
+# so its .Count is not a progress number - this is (gh#24, same lesson as
+# the task registry's LineCount).
+function Get-PSMMStartupJobLineCount {
+    [CmdletBinding()] param()
+    Update-PSMMStartupJobOutput
+    [int]$script:PSMM_StartupLineCount
 }

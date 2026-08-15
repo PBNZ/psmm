@@ -12,6 +12,33 @@ Describe 'Module manifest' -Tag Module, Engine {
         { Test-ModuleManifest -Path $script:ManifestPath -ErrorAction Stop } | Should -Not -Throw
     }
 
+    It 'dot-sources every engine file - psmm.psm1 lists them explicitly' {
+        # The list in psmm.psm1 is hand-maintained for deterministic load order
+        # and to avoid a directory glob at import. A new src/Engine file left
+        # out of it still WORKS from a clone (the UI dot-sources its own
+        # directory, and tests import the manifest), but is simply absent when
+        # installed from the gallery - a failure that only shows up on a user's
+        # machine. Plan.ps1 was new in 0.1.0-rc02.
+        $psm1 = Get-Content -Raw (Join-Path $script:ModuleRoot 'psmm.psm1')
+        $missing = @(
+            foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $script:ModuleRoot 'src/Engine') -Filter *.ps1)) {
+                if ($psm1 -notmatch [regex]::Escape("src/Engine/$($f.Name)")) { $f.Name }
+            }
+        )
+        $missing | Should -BeNullOrEmpty -Because "psmm.psm1 must dot-source: $($missing -join ', ')"
+    }
+
+    It 'ships every file the module needs (FileList/packaging sanity)' {
+        # src/UI is dot-sourced lazily by Show-PSModuleManager from the
+        # directory, so it needs no list - but the directory must exist and be
+        # non-empty, and both source trees must be inside the module root.
+        foreach ($d in 'src/Engine', 'src/Public', 'src/UI') {
+            $p = Join-Path $script:ModuleRoot $d
+            Test-Path -LiteralPath $p | Should -BeTrue -Because "$d must ship"
+            @(Get-ChildItem -LiteralPath $p -Filter *.ps1).Count | Should -BeGreaterThan 0
+        }
+    }
+
     It 'has every required key present and non-empty' {
         $m = Test-ModuleManifest -Path $script:ManifestPath
         $m.Version | Should -Not -BeNullOrEmpty

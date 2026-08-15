@@ -336,11 +336,23 @@ function Get-PSMMGalleryLatest {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Name,
-        [switch]$Prerelease
+        [switch]$Prerelease,
+        # A NuGet range ("[1.0,2.0)") narrows "latest" to "newest INSIDE the
+        # range" (gh#23). Without it a range-pinned module is measured against
+        # the unconstrained gallery latest, is flagged update-available
+        # forever, and pressing u — which correctly stays in range — can never
+        # clear the flag. Find-PSResource -Version takes a NuGet range and
+        # returns every satisfying version (verified against the PSResourceGet
+        # reference); Find-Module has no equivalent, so on a PowerShellGet-only
+        # machine a range answers $null (unknown) rather than a wrong number.
+        [string]$VersionRange
     )
     try {
         if (Get-Command Find-PSResource -ErrorAction SilentlyContinue) {
-            $hits = @(Find-PSResource -Name $Name -Prerelease:$Prerelease -ErrorAction Stop)
+            $hits = if ($VersionRange) { @(Find-PSResource -Name $Name -Version $VersionRange -Prerelease:$Prerelease -ErrorAction Stop) }
+                    else { @(Find-PSResource -Name $Name -Prerelease:$Prerelease -ErrorAction Stop) }
+        } elseif ($VersionRange) {
+            return $null
         } else {
             $hits = @(Find-Module -Name $Name -AllowPrerelease:$Prerelease -ErrorAction Stop)
         }
@@ -422,20 +434,30 @@ function Get-PSMMAvailableVersion {
 }
 
 # Opt-in update check for a set of entries: marks UpdateAvailable/LatestVersion.
-# Network-bound - never runs automatically. Respects exact pins (a pinned
-# module reports pinned rather than update-available) and each entry's
-# prerelease policy (gh#6).
+# Network-bound - never runs automatically. WHICH entries are eligible is the
+# policy function's call, not this one's: Get-PSMMEntryPlan sets Check false
+# for exact pins (never flagged, per docs/config-schema.md) and for Mode=Ignore
+# (cells 7-9 do no gallery I/O of any kind). A range pin IS checked, against
+# the newest version inside its range, so its flag can clear (gh#23, gh#29).
 function Update-PSMMLatestVersion {
     [CmdletBinding()]
     param([AllowNull()][AllowEmptyCollection()] $Entries)   # empty set = normal (zero configs)
     $found = 0
     foreach ($e in @($Entries | Where-Object Installed)) {
-        $latest = Get-PSMMGalleryLatest -Name $e.Name -Prerelease:([bool]$e.AllowPrerelease)
+        # unmanaged rows have no Mode/Install to plan from - they are checked
+        # on their own terms, exactly as before
+        $unmanaged = [bool]$e.PSObject.Properties['Unmanaged']
+        $range = $null
+        if (-not $unmanaged) {
+            $plan = Get-PSMMEntryPlan -Entry $e
+            if (-not $plan.Check) { continue }
+            if ($plan.PinnedRange) { $range = $plan.Version }
+        }
+        $latest = Get-PSMMGalleryLatest -Name $e.Name -Prerelease:([bool]$e.AllowPrerelease) -VersionRange $range
         if (-not $latest) { continue }
         $e.LatestVersion = $latest.Version
         $e.LatestPrerelease = $latest.Prerelease
         $e.UpdateAvailable = $false
-        if ($e.PinnedExact) { continue }   # pinned: never nag
         if ($e.InstalledVersion) {
             $e.UpdateAvailable = (Compare-PSMMEntryVersion -VersionA $latest.Version -PrereleaseA $latest.Prerelease `
                     -VersionB "$($e.InstalledVersion)" -PrereleaseB "$($e.InstalledPrerelease)") -gt 0

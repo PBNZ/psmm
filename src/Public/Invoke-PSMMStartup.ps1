@@ -11,16 +11,23 @@
     active entry:
 
       Mode = Load         imported into this session, in the foreground.
-                          Install policy CheckOnly/IfMissing uses a fast path
-                          (try the import first, install only if genuinely
-                          missing); Latest asks the gallery for updates first.
-      Mode = InstallOnly  disk/gallery work only - deferred to a background
-                          thread job so your prompt appears sooner (set
-                          $PSMM_BackgroundStartup = $false to run inline).
-      Mode = Ignore       parsed but not actioned.
+      Mode = InstallOnly  disk/gallery work only, never imported.
+      Mode = Ignore       parsed but not actioned, and no gallery I/O at all.
 
-    Mode and Install are orthogonal: Mode decides load-vs-not and
-    foreground-vs-background; Install decides the disk/gallery policy.
+    Mode decides load-vs-not; Install (CheckOnly / IfMissing / Latest) decides
+    the disk/gallery policy. Scheduling is derived from the pair rather than
+    declared by either: the import is the only thing that happens in the
+    foreground, and every disk or gallery operation is deferred to a
+    background thread job, in all nine cells. Nothing psmm does at startup
+    waits on the network before your prompt appears.
+
+    A module installed by that background job is reported, not imported - it
+    is available next session rather than appearing behind a prompt you are
+    already typing into. Set $PSMM_BackgroundStartup = $false to run the
+    deferred work inline instead.
+
+    The whole matrix is decided in one place, Get-PSMMEntryPlan; this function
+    only executes the plans it hands back.
 
     Each imported module's import time is measured and shown in the report,
     so you always know which module is slowing your shell down.
@@ -57,78 +64,66 @@
     $rows = [System.Collections.Generic.List[object]]::new()
     $mid = [char]0x00B7
 
-    # Partition: Mode=Load must run in THIS session (imports do not cross job
-    # boundaries). InstallOnly only touches disk/gallery -> deferrable.
-    $sync     = @($entries | Where-Object { $_.Mode -eq 'Load' })
-    $deferred = @($entries | Where-Object { $_.Mode -eq 'InstallOnly' })
+    # One decision per entry, from the one function that makes it (gh#29).
+    # Nothing below re-derives policy - it only executes what the plan says.
+    $work = @(foreach ($e in $entries) {
+        [pscustomobject]@{ Entry = $e; Plan = (Get-PSMMEntryPlan -Entry $e) }
+    })
+    $deferred = [System.Collections.Generic.List[object]]::new()
 
-    foreach ($e in $sync) {
+    foreach ($w in $work) {
+        $e = $w.Entry
+        $p = $w.Plan
+        if ($p.Schedule -eq 'none') { continue }          # Mode=Ignore: nothing, no I/O
+        if (-not $p.Import) { $deferred.Add($p); continue } # InstallOnly, all three cells
+
+        # The import IS the presence check, and it is free: a module that
+        # imports is on disk, so IfMissing has nothing left to do. This is
+        # what keeps a Get-Module -ListAvailable disk sweep off the hot path.
+        $present = $true
         try {
-            # FAST PATH: try the import first; install only if the module is
-            # actually missing. Skips one Get-Module -ListAvailable disk scan
-            # per module on the happy path.
-            $result = $null
-            if ($e.Install -ne 'Latest') {
-                try {
-                    if (-not (Get-Module -Name $e.Name)) { Import-PSMMModuleTimed -Entry $e }
-                    $result = 'present + loaded'
-                } catch [System.IO.FileNotFoundException] {
-                    if ($e.Install -eq 'CheckOnly') { $result = 'not installed (check-only)' }
-                    else {
-                        Install-PSMMModule -Name $e.Name -Version $e.Version
-                        Import-PSMMModuleTimed -Entry $e
-                        $result = 'installed + loaded'
-                    }
-                }
-            } else {
-                $result = Invoke-PSMMEntryAction -Entry $e   # Latest: must hit the gallery anyway
-            }
-            $rows.Add($(
-                if ($result -match 'not installed|check-only') {
-                    [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = "not installed $mid check-only, nothing done" }
-                } elseif ($result -match 'not loaded') {
-                    [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = 'installed, not imported' }
-                } elseif ($result -match 'loaded') {
-                    $note = if ($result -match 'installed \+') { 'installed first' } else { '' }
-                    [pscustomobject]@{ Kind = 'ok'; Name = $e.FriendlyName; Ms = [int]$e.ImportMs; Note = $note }
-                } else {
-                    [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = "$result" }
-                }
-            ))
+            if (-not (Get-Module -Name $e.Name)) { Import-PSMMModuleTimed -Entry $e }
+            $rows.Add([pscustomobject]@{ Kind = 'ok'; Name = $e.FriendlyName; Ms = [int]$e.ImportMs; Note = '' })
+        } catch [System.IO.FileNotFoundException] {
+            $present = $false
+            $note = if ($p.Install -eq 'none') { "missing $mid not loaded, check-only" }
+                    else { "missing $mid installing in the background, available next session" }
+            $rows.Add([pscustomobject]@{ Kind = 'warn'; Name = $e.FriendlyName; Ms = $null; Note = $note })
         } catch {
             $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
             if (-not $report) { Write-Warning "Could not set up $($e.FriendlyName): $($_.Exception.Message)" }
+            continue
         }
+        # Latest always has background work; IfMissing only when it is missing.
+        if ($p.Install -eq 'latest' -or ($p.Install -eq 'ifmissing' -and -not $present)) { $deferred.Add($p) }
     }
 
     if ($deferred.Count) {
         $useBackground = (Get-PSMMSetting -Name 'PSMM_BackgroundStartup' -Default $true) -and
                          (Get-Command Start-ThreadJob -ErrorAction SilentlyContinue)
         if ($useBackground) {
-            $null = Start-PSMMDeferredJob -Entries $deferred
+            $null = Start-PSMMDeferredJob -Plans $deferred
             $label = "$($deferred[0].FriendlyName)$(if ($deferred.Count -gt 1) { " +$($deferred.Count - 1) more" })"
             $rows.Add([pscustomobject]@{
                 Kind = 'defer'; Name = $label; Ms = $null; Count = $deferred.Count
-                Note = "installing in the background $([char]0x2014) results in psmm"
+                Note = "working in the background $([char]0x2014) results in psmm"
             })
         } else {
-            # No ThreadJob or backgrounding disabled: run them inline.
-            foreach ($e in $deferred) {
+            # $PSMM_BackgroundStartup = $false: the user has explicitly asked
+            # for the deferred work inline, network and all.
+            foreach ($p in $deferred) {
                 try {
-                    $result = Invoke-PSMMEntryAction -Entry $e
+                    $result = Invoke-PSMMPlanAction -Plan $p
                     $rows.Add($(
-                        if ($result -match 'check-only') {
-                            # same condition as the Mode=Load path: a skip
-                            [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = "not installed $mid check-only, nothing done" }
-                        } elseif ($result -match 'not installed') {
-                            [pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$result" }
+                        if ("$result" -like 'FAILED *') {
+                            [pscustomobject]@{ Kind = 'warn'; Name = $p.FriendlyName; Ms = $null; Note = "missing $mid not installed, check-only" }
                         } else {
-                            [pscustomobject]@{ Kind = 'skip'; Name = $e.FriendlyName; Ms = $null; Note = 'installed, not imported' }
+                            [pscustomobject]@{ Kind = 'skip'; Name = $p.FriendlyName; Ms = $null; Note = "$result, not imported" }
                         }
                     ))
                 } catch {
-                    $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $e.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
-                    if (-not $report) { Write-Warning "Could not set up $($e.FriendlyName): $($_.Exception.Message)" }
+                    $rows.Add([pscustomobject]@{ Kind = 'fail'; Name = $p.FriendlyName; Ms = $null; Note = "$($_.Exception.Message)" })
+                    if (-not $report) { Write-Warning "Could not set up $($p.FriendlyName): $($_.Exception.Message)" }
                 }
             }
         }

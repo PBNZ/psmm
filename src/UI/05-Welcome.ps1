@@ -64,6 +64,7 @@ function script:Show-PSMMWelcomeOverlay {
     [CmdletBinding()] param($BaseRenderable)
     if ([Console]::IsOutputRedirected -or [Console]::IsInputRedirected) { return }
     $region = Write-PSMMOverlay -Renderable (Build-PSMMWelcomePanel) -Content $BaseRenderable
+    Hide-PSMMCursor
     $k = [Console]::ReadKey($true)
     Clear-PSMMOverlay -Region $region
     Set-PSMMWelcomeShown

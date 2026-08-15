@@ -572,6 +572,187 @@ Describe 'psmm''s own modules read as infrastructure' -Tag UI -Skip:(-not $Spect
     }
 }
 
+Describe "pressing 'm' does not wipe what psmm knows about disk" -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    # Live-run defect: drill into a module after pressing 'm' and it reported
+    # "missing / not installed" while simultaneously listing its 51 commands.
+    #
+    # Get-PSMMEntry mints NEW entry objects every call, blank-slate, and the
+    # disk sweep that fills them is gated on -FullScan. Invoke-PSMMUnmanagedToggle
+    # calls Sync-PSMMUIEntries WITHOUT it, so every managed module went blank.
+    # Update-PSMMLoaded ran unconditionally, which is why Loaded stayed right -
+    # and why the module-menu manifest block (an ungated in-memory Get-Module)
+    # kept working, producing a row that was "missing" and self-describing.
+
+    BeforeEach {
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path (Join-Path $root 'main')
+        $global:PSMM_MainConfigPath    = Join-Path $root 'main\psmm-config.json'
+        $global:PSMM_ProfileConfigPath = Join-Path $root 'profile\psmm-config.json'
+        $global:PSMM_JsonPath          = @(Join-Path $root 'legacy\*.json')
+        @{ Modules = @(@{ Name = 'DiskMod'; Install = 'IfMissing'; Mode = 'InstallOnly' }) } |
+            ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+    }
+
+    AfterEach {
+        Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'a bare Sync keeps Installed, the version, the scope and the update flag' {
+        $after = InModuleScope psmm {
+            Mock Get-Module {
+                @([pscustomobject]@{
+                        Name = 'DiskMod'; Version = [version]'3.1.0'
+                        ModuleBase = (Join-Path $HOME 'Documents\PowerShell\Modules\DiskMod\3.1.0')
+                        PrivateData = @{ PSData = @{} }
+                    })
+            } -ParameterFilter { $ListAvailable }
+            Mock Get-Module { @() } -ParameterFilter { -not $ListAvailable }
+
+            Sync-PSMMUIEntries -FullScan          # open: reads disk
+            $e = @(Get-PSMMAllEntries | Where-Object Name -eq 'DiskMod')[0]
+            $e.UpdateAvailable = $true            # as an update check would leave it
+            $e.LatestVersion = [version]'4.0.0'
+            $before = $e.Installed
+
+            Sync-PSMMUIEntries                    # <- what pressing 'm' does
+            $now = @(Get-PSMMAllEntries | Where-Object Name -eq 'DiskMod')[0]
+            [pscustomobject]@{
+                Before          = $before
+                Installed       = $now.Installed
+                Version         = "$($now.InstalledVersion)"
+                Scope           = "$($now.InstallScope)"
+                UpdateAvailable = $now.UpdateAvailable
+                Latest          = "$($now.LatestVersion)"
+            }
+        }
+        $after.Before          | Should -BeTrue
+        $after.Installed       | Should -BeTrue -Because 'the module did not leave the disk because you pressed a key'
+        $after.Version         | Should -Be '3.1.0'
+        $after.Scope           | Should -Be 'CurrentUser'
+        $after.UpdateAvailable | Should -BeTrue
+        $after.Latest          | Should -Be '4.0.0'
+    }
+
+    It 'a FullScan still re-reads the disk rather than trusting the carry-over' {
+        $v = InModuleScope psmm {
+            Mock Get-Module {
+                @([pscustomobject]@{
+                        Name = 'DiskMod'; Version = [version]'3.1.0'
+                        ModuleBase = (Join-Path $HOME 'Documents\PowerShell\Modules\DiskMod\3.1.0')
+                        PrivateData = @{ PSData = @{} }
+                    })
+            } -ParameterFilter { $ListAvailable }
+            Mock Get-Module { @() } -ParameterFilter { -not $ListAvailable }
+            Sync-PSMMUIEntries -FullScan
+            # the module goes away on disk
+            Mock Get-Module { @() } -ParameterFilter { $ListAvailable }
+            Sync-PSMMUIEntries -FullScan
+            @(Get-PSMMAllEntries | Where-Object Name -eq 'DiskMod')[0].Installed
+        }
+        $v | Should -BeFalse
+    }
+}
+
+Describe 'files > apply never unloads a loaded module (gh#22)' -Tag UI -Skip:(-not $SpectreAvailable) {
+
+    BeforeEach {
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path (Join-Path $root 'main')
+        $global:PSMM_MainConfigPath    = Join-Path $root 'main\psmm-config.json'
+        $global:PSMM_ProfileConfigPath = Join-Path $root 'profile\psmm-config.json'
+        $global:PSMM_JsonPath          = @(Join-Path $root 'legacy\*.json')
+        # a DISABLED file holding an ordinary user module - the exact shape of
+        # the failure gh#16's psmm-own allow-list never covered
+        @{
+            Enabled = $false
+            Modules = @(@{ Name = 'UserMod'; Install = 'IfMissing'; Mode = 'Load' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+    }
+
+    AfterEach {
+        Remove-Variable -Name PSMM_MainConfigPath, PSMM_ProfileConfigPath, PSMM_JsonPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    # PBNZ's ruling on the gh#22 fix: a module that is already loaded is not
+    # psmm's to remove, whatever the config now says. Unloading is an explicit
+    # user action (^u), never a side effect of editing config. These three
+    # cases are every way the old sweep could fire.
+
+    It 'leaves a loaded user module alone when its config file is disabled' {
+        InModuleScope psmm {
+            Mock Get-Module { @([pscustomobject]@{ Name = 'UserMod' }) } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            Should -Invoke Remove-Module -Times 0 -Exactly -Because 'a disabled file is parsed and shown, never actioned - in either direction'
+        }
+    }
+
+    It 'leaves it loaded when the entry is switched to Mode: Ignore' {
+        @{
+            Modules = @(@{ Name = 'UserMod'; Install = 'IfMissing'; Mode = 'Ignore' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+        InModuleScope psmm {
+            Mock Get-Module { @([pscustomobject]@{ Name = 'UserMod' }) } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            Should -Invoke Remove-Module -Times 0 -Exactly -Because 'the config declares SHELL START, not a live contract over the running session'
+        }
+    }
+
+    It 'says so rather than silently diverging' {
+        @{
+            Modules = @(@{ Name = 'UserMod'; Install = 'IfMissing'; Mode = 'Ignore' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+        $said = InModuleScope psmm {
+            $script:lines = [System.Collections.Generic.List[string]]::new()
+            Mock Get-Module { @([pscustomobject]@{ Name = 'UserMod' }) } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { $script:lines.Add("$Markup") }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            $script:lines -join "`n"
+        }
+        $said | Should -Match 'still loaded'
+        $said | Should -Match 'UserMod'
+        $said | Should -Match 'never unloads'
+    }
+
+    It 'still loads a module the config newly asks for' {
+        @{
+            Modules = @(@{ Name = 'UserMod'; Install = 'IfMissing'; Mode = 'Load' })
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $global:PSMM_MainConfigPath -Encoding utf8
+        InModuleScope psmm {
+            Mock Get-Module { @() } -ParameterFilter { -not $ListAvailable -and -not $Name }
+            Mock Get-Module { $null } -ParameterFilter { $Name }
+            Mock Remove-Module { }
+            Mock Import-PSMMModuleTimed { }
+            Mock Clear-PSMMScreen { }
+            Mock Write-PSMMLine { }
+            Mock Wait-PSMMKey { }
+            Mock Confirm-PSMMCloudHydration { $true }
+            Invoke-PSMMApply
+            Should -Invoke Import-PSMMModuleTimed -Times 1 -Exactly -Because 'apply still applies - it just only ever adds'
+        }
+    }
+}
+
 Describe 'Destructive actions are gated' -Tag UI -Skip:(-not $SpectreAvailable) {
 
     It 'the typed confirmation accepts only the phrase - not y, not enter, not esc' {

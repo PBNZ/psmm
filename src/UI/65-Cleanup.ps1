@@ -117,13 +117,20 @@ function script:Invoke-PSMMDupeCleanup {
     $ui = $script:PSMM_UI
     $work = @(foreach ($d in $Dupes) {
         foreach ($v in $d.Obsolete) {
+            # never, at any elevation: these ship WITH PowerShell, and
+            # uninstalling one breaks the shell you are standing in. The
+            # elevation test alone did not cover it - platform copies classify
+            # as 'AllUsers', so an ELEVATED session would have gone ahead (gh#27)
+            if ($v.IsSystem) { continue }
             if ($v.Scope -eq 'AllUsers' -and -not $ui.Elevated) { continue }
             [pscustomobject]@{ Name = $d.Name; Version = $v.Version; Scope = $v.Scope }
         }
     })
-    $skipped = @(foreach ($d in $Dupes) { @($d.Obsolete | Where-Object { $_.Scope -eq 'AllUsers' -and -not $ui.Elevated }) }).Count
+    $skipped = @(foreach ($d in $Dupes) { @($d.Obsolete | Where-Object { -not $_.IsSystem -and $_.Scope -eq 'AllUsers' -and -not $ui.Elevated }) }).Count
+    $system  = @(foreach ($d in $Dupes) { @($d.Obsolete | Where-Object { $_.IsSystem }) }).Count
     Clear-PSMMScreen
     Write-PSMMLine "[$script:PSMM_ColAccent]Clean up old versions[/]"
+    if ($system)  { Write-PSMMLine "[$script:PSMM_ColMute]$system version(s) ship with PowerShell - psmm never removes those[/]" }
     if ($skipped) { Write-PSMMLine "[$script:PSMM_ColWarn]$skipped AllUsers version(s) skipped - session is not elevated[/]" }
     if (-not $work.Count) { $null = Wait-PSMMKey; return "[$script:PSMM_ColWarn]nothing removable without elevation[/]" }
     foreach ($w in $work) { Write-PSMMLine "  $(ConvertTo-PSMMSafe $w.Name) v$($w.Version) [$script:PSMM_ColMute]($($w.Scope))[/]" }
