@@ -112,8 +112,8 @@ pin is correct on its own terms, not just as a workaround.
 
 **Ruled: keep the pin, and track the migration decision** —
 [#30](https://github.com/PBNZ/psmm/issues/30), so it has a review date rather
-than quietly ossifying. Not blocking: 343/343 Windows, 209/209 Linux under
-5.x.
+than quietly ossifying. Not blocking: the whole suite is green on both
+runners under 5.x (numbers in §3).
 
 ### 1.5 Two small UI additions inside a keymap that is supposed to be frozen
 
@@ -139,20 +139,22 @@ just the rc02 behaviours. It will need the D-4 pass at rc03 as planned.
 - **The live pass.** Headless tests and a ConPTY harness cannot tell you
   whether it *looks* right. `RELEASE-CHECKLIST.md` **section A1** is the
   rc02-specific list and should take ten minutes.
-- **Tag and publish.** Branch is committed, not pushed, no PR.
+- **Merge, tag and publish.** The branch is pushed and PR #31 is open with CI
+  green on both runners; merging and tagging are yours.
 - **macOS.** Untested, as before.
 
 ---
 
 ## 3. Verification actually run (not claimed)
 
-Numbers below are from the branch tip. CI has run them on GitHub's own
-runners too — that is the authority, not this table.
+Numbers below are **CI's** on the branch tip, not a local claim — GitHub's own
+runners, on the same commit the PR proposes to merge. Baselines in brackets
+are `main`'s last CI run.
 
 | Check | Result |
 |---|---|
-| Pester, Windows, full suite | **354/354** (was 283 — 71 new tests) |
-| Pester, **Linux**, `-Tag Engine` | **209/209** (2 Windows-only tests skipped) |
+| Pester, Windows, full suite | **358 passed, 0 failed, 1 skipped** (main: 283 — 75 new tests) |
+| Pester, **Linux**, `-Tag Engine` | **223 passed, 0 failed, 3 skipped** (main: 157 — 66 new tests) |
 | PSScriptAnalyzer, repo source | **0 errors / 0 warnings** |
 | ConPTY keystroke harness, real TUI | **all checks pass** |
 | Startup A/B vs rc01, same filesystem, 15 runs | `Invoke-PSMMStartup` 101 → **98 ms**; `Import-Module` 184 → **190 ms** |
@@ -190,6 +192,9 @@ python Tests/tools/drive-psmm-ui.py
    against a sandboxed copy of your real config.
 2. `RELEASE-CHECKLIST.md` section **A1** (the rc02-specific list), then the
    rest of A if you want it.
-3. Open the PR, let CI run, tag `v0.1.0-rc02`.
+3. Merge PR #31 — `Closes #19`–`#29` in the body retires all eleven issues on
+   merge; #30 stays open by design, with a review date.
+4. Tag `v0.1.0-rc02` and push the tag; the release workflow re-runs the gate
+   before it publishes.
 
 Nothing is blocked on a decision.
